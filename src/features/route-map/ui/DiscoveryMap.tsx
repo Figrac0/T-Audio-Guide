@@ -70,9 +70,11 @@ interface DiscoveryMapProps {
   onSelectPreviousPoint: () => void
   radiusMeters: number
   radiusOptions: DiscoveryRadiusOption[]
+  recenterTrigger?: number
   routeTargetId: string | null
   searchQuery: string
   selectedPointId: string
+  showPopupRouteActions?: boolean
   userPosition: GeoPoint | null
 }
 
@@ -124,9 +126,11 @@ export function DiscoveryMap({
   onSelectPreviousPoint,
   radiusMeters,
   radiusOptions,
+  recenterTrigger = 0,
   routeTargetId,
   searchQuery,
   selectedPointId,
+  showPopupRouteActions = true,
   userPosition,
 }: DiscoveryMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
@@ -419,6 +423,7 @@ export function DiscoveryMap({
         .bindPopup(
           buildPopupContent({
             googleMapsUrl,
+            showRouteActions: showPopupRouteActions,
             onBuildRoute: () => {
               preservePageScroll()
               selectionSourceRef.current = 'route'
@@ -510,6 +515,17 @@ export function DiscoveryMap({
       window.clearTimeout(popupTimeout)
     }
   }, [selectedPoint])
+
+  useEffect(() => {
+    if (!recenterTrigger) return
+    const map = mapRef.current
+    if (!userPosition || !map) return
+    applyLeafletLocation(map, {
+      center: toLngLat(userPosition),
+      zoom: locateZoom,
+      duration: 700,
+    })
+  }, [recenterTrigger, userPosition])
 
   function focusOnUser() {
     const map = mapRef.current
@@ -729,6 +745,7 @@ function buildPopupContent({
   isInDraft,
   onAddPointToDraft,
   onBuildRoute,
+  showRouteActions,
 }: {
   canAddToDraft: boolean
   isInDraft: boolean
@@ -736,6 +753,7 @@ function buildPopupContent({
   point: NearbyPoint
   googleMapsUrl: string
   onBuildRoute: () => void
+  showRouteActions: boolean
 }) {
   const container = document.createElement('div')
   container.className = 'map-popup'
@@ -763,28 +781,30 @@ function buildPopupContent({
   openLink.textContent = 'Открыть в Google Maps'
   actions.appendChild(openLink)
 
-  const routeButton = document.createElement('button')
-  routeButton.className = 'map-popup__button'
-  routeButton.type = 'button'
-  routeButton.textContent = 'Построить маршрут'
-  routeButton.addEventListener('click', (event) => {
-    event.preventDefault()
-    event.stopPropagation()
-    onBuildRoute()
-  })
-  actions.appendChild(routeButton)
+  if (showRouteActions) {
+    const routeButton = document.createElement('button')
+    routeButton.className = 'map-popup__button'
+    routeButton.type = 'button'
+    routeButton.textContent = 'Построить маршрут'
+    routeButton.addEventListener('click', (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      onBuildRoute()
+    })
+    actions.appendChild(routeButton)
 
-  const addButton = document.createElement('button')
-  addButton.className = `map-popup__button map-popup__button--accent${isInDraft ? ' map-popup__button--active' : ''}`
-  addButton.disabled = !canAddToDraft
-  addButton.type = 'button'
-  addButton.textContent = isInDraft ? 'В маршруте' : 'Добавить'
-  addButton.addEventListener('click', (event) => {
-    event.preventDefault()
-    event.stopPropagation()
-    onAddPointToDraft?.()
-  })
-  actions.appendChild(addButton)
+    const addButton = document.createElement('button')
+    addButton.className = `map-popup__button map-popup__button--accent${isInDraft ? ' map-popup__button--active' : ''}`
+    addButton.disabled = !canAddToDraft
+    addButton.type = 'button'
+    addButton.textContent = isInDraft ? 'В маршруте' : 'Добавить'
+    addButton.addEventListener('click', (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      onAddPointToDraft?.()
+    })
+    actions.appendChild(addButton)
+  }
 
   container.appendChild(actions)
   return container

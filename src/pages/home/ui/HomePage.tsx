@@ -24,23 +24,22 @@ import {
   getStoredDiscoveryContext,
   saveDiscoveryContext,
 } from '@/shared/lib/discovery-context'
-import {
-  formatDuration,
-  formatPointCategory,
-  formatTheme,
-} from '@/shared/lib/format'
+import { formatDuration, formatPointCategory, formatTheme } from '@/shared/lib/format'
 import { buildGoogleMapsUrl } from '@/shared/lib/maps'
 import { SmartPlaceImage } from '@/shared/ui/SmartPlaceImage'
 import { ExcursionCatalog } from '@/widgets/excursion-catalog/ui/ExcursionCatalog'
 import './HomePage.css'
 
-const PEEK_HEIGHT = 92
+// Height of the peek bar (drag handle + locate button row)
+const PEEK_HEIGHT = 52
+// Minimum translateY — leaves a gap below the app header
+const DRAG_MIN = 10
 const HALF_RATIO = 0.48
 
 type SheetState = 'peek' | 'half' | 'full'
 
-function getTargetTranslate(state: SheetState, sheetHeight: number): number {
-  if (state === 'full') return 0
+function getSnapTranslate(state: SheetState, sheetHeight: number): number {
+  if (state === 'full') return DRAG_MIN
   if (state === 'half') return sheetHeight - Math.round(window.innerHeight * HALF_RATIO)
   return sheetHeight - PEEK_HEIGHT
 }
@@ -54,6 +53,15 @@ const nearbyCategoryOptions: DiscoveryCategoryOption[] = [
   { id: 'park', label: 'Природа' },
 ]
 
+const categoryIcons: Record<string, string> = {
+  all: '◎',
+  museum: '🏛',
+  entertainment: '✨',
+  landmark: '📍',
+  food: '🍽',
+  park: '🌿',
+}
+
 const radiusOptions: DiscoveryRadiusOption[] = [
   { value: 1000, label: '1 км' },
   { value: 3000, label: '3 км' },
@@ -61,12 +69,7 @@ const radiusOptions: DiscoveryRadiusOption[] = [
 ]
 
 const routeThemeOptions: Array<ExcursionTheme | 'all'> = [
-  'all',
-  'walk',
-  'food',
-  'nature',
-  'fun',
-  'mixed',
+  'all', 'walk', 'food', 'nature', 'fun', 'mixed',
 ]
 
 const durationOptions = [30, 45, 60, 90, 120]
@@ -99,11 +102,11 @@ export function HomePage() {
   const [maxRouteDuration, setMaxRouteDuration] = useState<number | null>(null)
   const [selectedPointId, setSelectedPointId] = useState<string>('')
   const [routeTargetId, setRouteTargetId] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
   const [savedDraftPreviewStops, setSavedDraftPreviewStops] = useState<RouteStop[]>([])
   const [draftRouteNotice, setDraftRouteNoticeValue] = useState<string | null>(null)
   const [draftRouteNoticeKey, setDraftRouteNoticeKey] = useState(0)
   const [draftRouteNoticeTone, setDraftRouteNoticeTone] = useState<'success' | 'warning'>('success')
+  const [recenterTrigger, setRecenterTrigger] = useState(0)
 
   const nearbyListRef = useRef<HTMLDivElement | null>(null)
   const shouldScrollNearbyListRef = useRef(false)
@@ -131,7 +134,7 @@ export function HomePage() {
     enabled: canLoadNearbyPlaces,
     locale: audioLocale,
     radiusMeters,
-    search: searchQuery,
+    search: '',
   })
 
   useEffect(() => {
@@ -150,20 +153,13 @@ export function HomePage() {
 
   const effectiveSelectedPointId =
     nearbyPoints.find((p) => p.id === selectedPointId)?.id ?? nearbyPoints[0]?.id ?? ''
-
   const selectedPoint =
     nearbyPoints.find((p) => p.id === effectiveSelectedPointId) ?? nearbyPoints[0] ?? null
-
   const effectiveRouteTargetId =
     routeTargetId && nearbyPoints.some((p) => p.id === routeTargetId) ? routeTargetId : null
-
   const selectedPointMapsUrl = selectedPoint
     ? buildGoogleMapsUrl(selectedPoint.coordinates, userPosition)
     : '#'
-  const selectedPointInDraft = selectedPoint ? isPointInDraft(selectedPoint.id) : false
-  const canAddSelectedPoint = Boolean(
-    selectedPoint && !selectedPointInDraft && draftStops.length < 6,
-  )
 
   const visibleRoutes = useMemo(
     () =>
@@ -189,6 +185,53 @@ export function HomePage() {
     const id = window.setTimeout(() => setDraftRouteNoticeValue(null), 3200)
     return () => window.clearTimeout(id)
   }, [draftRouteNotice, draftRouteNoticeKey])
+
+  // Enable mouse drag-to-scroll on the nearby cards strip
+  useEffect(() => {
+    const el = nearbyListRef.current
+    if (!el) return
+    let isDown = false
+    let startX = 0
+    let scrollLeft = 0
+    let hasDragged = false
+
+    const onMouseDown = (e: MouseEvent) => {
+      isDown = true
+      hasDragged = false
+      startX = e.pageX - el.offsetLeft
+      scrollLeft = el.scrollLeft
+      el.style.cursor = 'grabbing'
+    }
+    const onMouseLeave = () => { isDown = false; el.style.cursor = '' }
+    const onMouseUp = () => { isDown = false; el.style.cursor = '' }
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDown) return
+      const x = e.pageX - el.offsetLeft
+      const walk = (x - startX) * 1.4
+      if (Math.abs(walk) > 4) {
+        hasDragged = true
+        e.preventDefault()
+      }
+      el.scrollLeft = scrollLeft - walk
+    }
+    // Prevent click on child if we actually dragged
+    const onClickCapture = (e: MouseEvent) => {
+      if (hasDragged) e.stopPropagation()
+    }
+
+    el.addEventListener('mousedown', onMouseDown)
+    el.addEventListener('mouseleave', onMouseLeave)
+    el.addEventListener('mouseup', onMouseUp)
+    el.addEventListener('mousemove', onMouseMove)
+    el.addEventListener('click', onClickCapture, true)
+    return () => {
+      el.removeEventListener('mousedown', onMouseDown)
+      el.removeEventListener('mouseleave', onMouseLeave)
+      el.removeEventListener('mouseup', onMouseUp)
+      el.removeEventListener('mousemove', onMouseMove)
+      el.removeEventListener('click', onClickCapture, true)
+    }
+  }, [])
 
   const setDraftRouteNotice = useCallback((message: string | null) => {
     if (!message) { setDraftRouteNoticeValue(null); return }
@@ -238,6 +281,11 @@ export function HomePage() {
     setRouteTargetId(null)
   }, [clearDraftRoute, saveDraftRoute, setDraftRouteNotice])
 
+  const handleCenterUser = useCallback(() => {
+    if (!userPosition) { requestLocation(); return }
+    setRecenterTrigger((n) => n + 1)
+  }, [userPosition, requestLocation])
+
   const handleNearbyCardClick = useCallback((pointId: string) => {
     shouldScrollNearbyListRef.current = true
     setSelectedPointId(pointId)
@@ -260,10 +308,13 @@ export function HomePage() {
     [effectiveSelectedPointId, nearbyPoints],
   )
 
-  // Bottom sheet
+  // ── Bottom sheet ────────────────────────────────────────────────────────────
+
   const [sheetState, setSheetState] = useState<SheetState>('peek')
   const sheetStateRef = useRef<SheetState>('peek')
   const sheetRef = useRef<HTMLDivElement>(null)
+  // Prevents the sheetState useEffect from overriding a manually set transform
+  const skipSnapRef = useRef(false)
   const dragRef = useRef({
     active: false,
     startPointerY: 0,
@@ -277,6 +328,19 @@ export function HomePage() {
     sheetStateRef.current = sheetState
   }, [sheetState])
 
+  // Apply snap transitions when state changes via keyboard (not drag)
+  useEffect(() => {
+    if (skipSnapRef.current) {
+      skipSnapRef.current = false
+      return
+    }
+    const sheet = sheetRef.current
+    if (!sheet || sheet.offsetHeight === 0) return
+    const target = getSnapTranslate(sheetState, sheet.offsetHeight)
+    sheet.style.transition = 'transform 0.36s cubic-bezier(0.4, 0, 0.2, 1)'
+    sheet.style.transform = `translateY(${target}px)`
+  }, [sheetState])
+
   useLayoutEffect(() => {
     const sheet = sheetRef.current
     if (!sheet) return
@@ -287,27 +351,17 @@ export function HomePage() {
         sheet.style.transform = `translateY(${sheet.offsetHeight - PEEK_HEIGHT}px)`
       }
     }
-
     applyInitial()
 
     const onResize = () => {
       if (dragRef.current.active) return
-      const target = getTargetTranslate(sheetStateRef.current, sheet.offsetHeight)
+      const target = getSnapTranslate(sheetStateRef.current, sheet.offsetHeight)
       sheet.style.transition = 'none'
       sheet.style.transform = `translateY(${target}px)`
     }
-
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
-
-  useEffect(() => {
-    const sheet = sheetRef.current
-    if (!sheet || sheet.offsetHeight === 0) return
-    const target = getTargetTranslate(sheetState, sheet.offsetHeight)
-    sheet.style.transition = 'transform 0.36s cubic-bezier(0.4, 0, 0.2, 1)'
-    sheet.style.transform = `translateY(${target}px)`
-  }, [sheetState])
 
   function handleDragStart(e: React.PointerEvent<HTMLDivElement>) {
     const sheet = sheetRef.current
@@ -316,7 +370,7 @@ export function HomePage() {
     const match = sheet.style.transform.match(/translateY\((-?\d+(?:\.\d+)?)px\)/)
     const current = match
       ? parseFloat(match[1])
-      : getTargetTranslate(sheetState, sheet.offsetHeight)
+      : getSnapTranslate(sheetState, sheet.offsetHeight)
     dragRef.current = {
       active: true,
       startPointerY: e.clientY,
@@ -332,8 +386,11 @@ export function HomePage() {
     if (!dragRef.current.active) return
     const sheet = sheetRef.current
     if (!sheet) return
+    const sheetHeight = sheet.offsetHeight
     const dy = e.clientY - dragRef.current.startPointerY
-    const newTranslate = Math.max(0, dragRef.current.startTranslate + dy)
+    const raw = dragRef.current.startTranslate + dy
+    // Clamp: prevent touching header (DRAG_MIN) and hide below peek
+    const newTranslate = Math.min(sheetHeight - PEEK_HEIGHT, Math.max(DRAG_MIN, raw))
     const now = Date.now()
     const dt = Math.max(1, now - dragRef.current.lastTime)
     dragRef.current.velocity = ((e.clientY - dragRef.current.lastPointerY) / dt) * 16
@@ -351,26 +408,30 @@ export function HomePage() {
     const currentTranslate = match ? parseFloat(match[1]) : 0
     const sheetHeight = sheet.offsetHeight
     const velocity = dragRef.current.velocity
-    const peekT = getTargetTranslate('peek', sheetHeight)
-    const halfT = getTargetTranslate('half', sheetHeight)
-    let nextState: SheetState
+    const peekT = getSnapTranslate('peek', sheetHeight)
+    const halfT = getSnapTranslate('half', sheetHeight)
 
-    if (velocity > 6) {
-      nextState = sheetState === 'full' ? 'half' : 'peek'
-    } else if (velocity < -6) {
-      nextState = sheetState === 'peek' ? 'half' : 'full'
+    if (velocity > 8) {
+      // Fast fling down → collapse to peek
+      skipSnapRef.current = true
+      setSheetState('peek')
+      sheet.style.transition = 'transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)'
+      sheet.style.transform = `translateY(${peekT}px)`
+    } else if (velocity < -8) {
+      // Fast fling up → expand to full
+      skipSnapRef.current = true
+      setSheetState('full')
+      sheet.style.transition = 'transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)'
+      sheet.style.transform = `translateY(${DRAG_MIN}px)`
     } else {
-      const midPeekHalf = (peekT + halfT) / 2
-      const midHalfFull = halfT / 2
-      if (currentTranslate >= midPeekHalf) nextState = 'peek'
-      else if (currentTranslate >= midHalfFull) nextState = 'half'
-      else nextState = 'full'
+      // Free position — stay exactly where released
+      sheet.style.transition = 'none'
+      // Update state for keyboard nav without triggering CSS snap
+      skipSnapRef.current = true
+      if (currentTranslate >= peekT * 0.88) setSheetState('peek')
+      else if (currentTranslate >= halfT * 0.5) setSheetState('half')
+      else setSheetState('full')
     }
-
-    setSheetState(nextState)
-    const target = getTargetTranslate(nextState, sheetHeight)
-    sheet.style.transition = 'transform 0.36s cubic-bezier(0.4, 0, 0.2, 1)'
-    sheet.style.transform = `translateY(${target}px)`
   }
 
   return (
@@ -384,7 +445,7 @@ export function HomePage() {
           draftRouteNotice={draftRouteNotice}
           draftRouteNoticeKey={draftRouteNoticeKey}
           draftRouteNoticeTone={draftRouteNoticeTone}
-          emptyMessage={searchQuery.trim() ? 'Ничего не найдено' : 'В этом радиусе нет доступных точек.'}
+          emptyMessage="В этом радиусе нет доступных точек."
           fixedRouteStops={savedDraftPreviewStops}
           fullscreen
           geolocationError={geolocationError}
@@ -397,94 +458,67 @@ export function HomePage() {
           onClearDraftRoute={handleClearDraftRoute}
           onLocateUser={requestLocation}
           onSaveDraftRoute={handleSaveDraftRoute}
-          onSearchQueryChange={setSearchQuery}
+          onSearchQueryChange={() => undefined}
           onSelectCategory={setActivePointCategory}
           onSelectNextPoint={() => cycleSelectedPoint(1)}
           onSelectPoint={handleMapPointSelect}
           onSelectPreviousPoint={() => cycleSelectedPoint(-1)}
           radiusMeters={radiusMeters}
           radiusOptions={radiusOptions}
+          recenterTrigger={recenterTrigger}
           routeTargetId={effectiveRouteTargetId}
-          searchQuery={searchQuery}
+          searchQuery=""
           selectedPointId={effectiveSelectedPointId}
+          showPopupRouteActions={false}
           userPosition={userPosition}
         />
       </div>
 
-      <button
-        aria-label="Найти моё местоположение"
-        className="home-page__locate"
-        onClick={requestLocation}
-        type="button"
-      >
-        <svg fill="none" height="20" viewBox="0 0 24 24" width="20">
-          <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2" />
-          <path
-            d="M12 2v3M12 19v3M2 12h3M19 12h3"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeWidth="2"
-          />
-        </svg>
-      </button>
-
       <div className="home-sheet" ref={sheetRef}>
+        {/* Drag handle — the only thing visible in peek state */}
         <div
+          aria-label="Потяните вверх чтобы открыть панель"
           className="home-sheet__drag"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              setSheetState((s) => (s === 'peek' ? 'half' : s === 'half' ? 'full' : 'peek'))
+            }
+          }}
           onPointerCancel={handleDragEnd}
           onPointerDown={handleDragStart}
           onPointerMove={handleDragMove}
           onPointerUp={handleDragEnd}
           role="button"
           tabIndex={0}
-          aria-label="Потяните вверх чтобы открыть панель"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              setSheetState((s) => (s === 'peek' ? 'half' : s === 'half' ? 'full' : 'peek'))
-            }
-          }}
         >
           <div className="home-sheet__handle" />
-          <div className="home-sheet__peek-row">
-            {isLoading ? (
-              <span className="home-sheet__peek-hint">Загрузка мест...</span>
-            ) : nearbyPoints.length > 0 ? (
-              <>
-                <span className="home-sheet__peek-stat">
-                  {nearbyPoints.length} мест · {radiusMeters / 1000} км
-                </span>
-                {selectedPoint && (
-                  <span className="home-sheet__peek-point">{selectedPoint.title}</span>
-                )}
-              </>
-            ) : (
-              <span className="home-sheet__peek-hint">Разрешите геолокацию чтобы найти места</span>
-            )}
-            <span className="home-sheet__peek-arrow" aria-hidden="true">↑</span>
-          </div>
+
+          {/* Locate button lives inside drag area — always visible */}
+          <button
+            aria-label="Найти моё местоположение"
+            className="home-sheet__locate"
+            onClick={handleCenterUser}
+            onPointerDown={(e) => e.stopPropagation()}
+            type="button"
+          >
+            <svg fill="none" height="16" viewBox="0 0 24 24" width="16">
+              <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="2" />
+              <path
+                d="M12 2v3M12 19v3M2 12h3M19 12h3"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeWidth="2"
+              />
+            </svg>
+          </button>
         </div>
 
+        {/* Scrollable content */}
         <div className="home-sheet__body">
-          <div className="home-sheet__search-wrap">
-            <label className="home-sheet__search-label" htmlFor="home-search">
-              <svg fill="none" height="16" viewBox="0 0 24 24" width="16" aria-hidden="true">
-                <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
-                <path d="M16.5 16.5l4 4" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-              </svg>
-              <input
-                autoComplete="off"
-                className="home-sheet__search"
-                id="home-search"
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Поиск мест..."
-                type="search"
-                value={searchQuery}
-              />
-            </label>
-          </div>
 
+          {/* ── Categories ── */}
           <div className="home-sheet__filter-group">
-            <p className="home-sheet__filter-label">Категории</p>
+            <p className="home-sheet__filter-label">Места рядом</p>
             <div className="home-sheet__cats">
               {nearbyCategoryOptions.map((opt) => (
                 <button
@@ -493,14 +527,18 @@ export function HomePage() {
                   onClick={() => setActivePointCategory(opt.id as PointCategory | 'all')}
                   type="button"
                 >
+                  <span className="home-sheet__cat-icon" aria-hidden="true">
+                    {categoryIcons[opt.id]}
+                  </span>
                   {opt.label}
                 </button>
               ))}
             </div>
           </div>
 
+          {/* ── Radius ── */}
           <div className="home-sheet__filter-group">
-            <p className="home-sheet__filter-label">Радиус поиска</p>
+            <p className="home-sheet__filter-label">Радиус</p>
             <div className="home-sheet__cats">
               {radiusOptions.map((r) => (
                 <button
@@ -515,6 +553,7 @@ export function HomePage() {
             </div>
           </div>
 
+          {/* ── Selected place card ── */}
           {selectedPoint && (
             <div className="home-sheet__place">
               <div className="home-sheet__place-media">
@@ -541,35 +580,22 @@ export function HomePage() {
                 {selectedPoint.scheduleLabel && (
                   <p className="home-sheet__place-schedule">{selectedPoint.scheduleLabel}</p>
                 )}
-                <div className="home-sheet__place-actions">
-                  <button
-                    className="button button--primary"
-                    onClick={() => handleBuildRoute(selectedPoint.id)}
-                    type="button"
-                  >
-                    Маршрут
-                  </button>
-                  <button
-                    className="button button--secondary"
-                    disabled={!canAddSelectedPoint}
-                    onClick={() => handleAddPointToRoute(selectedPoint)}
-                    type="button"
-                  >
-                    {selectedPointInDraft ? 'В маршруте ✓' : '+ Добавить'}
-                  </button>
-                  <a
-                    className="button button--ghost"
-                    href={selectedPointMapsUrl}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    Google Maps
-                  </a>
-                </div>
+                <a
+                  className="home-sheet__place-maps-btn"
+                  href={selectedPointMapsUrl}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  <svg aria-hidden="true" fill="currentColor" height="13" viewBox="0 0 24 24" width="13">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
+                  </svg>
+                  Google Maps
+                </a>
               </div>
             </div>
           )}
 
+          {/* ── Nearby cards ── */}
           {nearbyPoints.length > 0 && (
             <div className="home-sheet__section">
               <h3 className="home-sheet__section-title">Рядом с вами</h3>
@@ -579,16 +605,13 @@ export function HomePage() {
                     className={[
                       'home-card',
                       point.id === effectiveSelectedPointId ? 'home-card--active' : '',
-                      isPointInDraft(point.id) ? 'home-card--draft' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
+                    ].filter(Boolean).join(' ')}
                     data-point-id={point.id}
                     key={point.id}
                     onClick={() => handleNearbyCardClick(point.id)}
                     type="button"
                   >
-                    <div className="home-card__media">
+                    <div className="home-card__img">
                       <SmartPlaceImage
                         alt={point.title}
                         category={point.category}
@@ -598,12 +621,12 @@ export function HomePage() {
                         src={point.imageUrl}
                         title={point.title}
                       />
+                      <span className="home-card__dist-badge">
+                        {formatMeters(point.distanceMeters)}
+                      </span>
                     </div>
                     <div className="home-card__body">
-                      <div className="home-card__head">
-                        <span className="home-card__cat">{formatPointCategory(point.category)}</span>
-                        <span className="home-card__dist">{formatMeters(point.distanceMeters)}</span>
-                      </div>
+                      <span className="home-card__cat">{formatPointCategory(point.category)}</span>
                       <p className="home-card__title">{point.title}</p>
                     </div>
                   </button>
@@ -612,71 +635,11 @@ export function HomePage() {
             </div>
           )}
 
-          {draftStops.length > 0 && (
-            <div className="home-sheet__section home-sheet__builder">
-              <div className="home-sheet__builder-head">
-                <h3 className="home-sheet__section-title">Мой маршрут</h3>
-                <span className="chip chip--accent">{draftStops.length}/6</span>
-              </div>
-              <div className="home-sheet__builder-stops">
-                {draftStops.map((stop) => (
-                  <button
-                    className="home-sheet__builder-stop"
-                    key={stop.id}
-                    onClick={() => removeDraftStop(stop.id)}
-                    type="button"
-                  >
-                    <span>
-                      {stop.order}. {stop.title}
-                    </span>
-                    <span aria-hidden="true">×</span>
-                  </button>
-                ))}
-              </div>
-              <div className="home-sheet__builder-actions">
-                {isAuthenticated ? (
-                  <button
-                    className="button button--primary button--wide"
-                    disabled={draftStops.length < 2}
-                    onClick={handleSaveDraftRoute}
-                    type="button"
-                  >
-                    Сохранить маршрут
-                  </button>
-                ) : (
-                  <Link className="button button--primary button--wide" to={appRoutes.signIn}>
-                    Войти чтобы сохранить
-                  </Link>
-                )}
-                <button
-                  className="button button--secondary"
-                  onClick={handleClearDraftRoute}
-                  type="button"
-                >
-                  Очистить
-                </button>
-              </div>
-              {draftRouteNotice && (
-                <div
-                  className={`home-sheet__notice home-sheet__notice--${draftRouteNoticeTone}`}
-                  key={draftRouteNoticeKey}
-                  role="status"
-                >
-                  {draftRouteNotice}
-                </div>
-              )}
-            </div>
-          )}
-
+          {/* ── Excursions ── */}
           <div className="home-sheet__section">
-            <div className="home-sheet__section-head">
-              <h3 className="home-sheet__section-title">Готовые экскурсии</h3>
-              <Link className="home-sheet__section-link" to={appRoutes.excursions}>
-                Все →
-              </Link>
-            </div>
+            <h3 className="home-sheet__section-title">Готовые экскурсии</h3>
 
-            <div className="home-sheet__filter-group">
+            <div className="home-sheet__filter-group home-sheet__filter-group--inline">
               <div className="home-sheet__cats">
                 {routeThemeOptions.map((theme) => (
                   <button
@@ -685,13 +648,13 @@ export function HomePage() {
                     onClick={() => setActiveRouteTheme(theme)}
                     type="button"
                   >
-                    {theme === 'all' ? 'Все' : formatTheme(theme)}
+                    {theme === 'all' ? 'Все темы' : formatTheme(theme)}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="home-sheet__filter-group">
+            <div className="home-sheet__filter-group home-sheet__filter-group--inline">
               <div className="home-sheet__cats">
                 <button
                   className={`home-sheet__cat${maxRouteDuration === null ? ' home-sheet__cat--active' : ''}`}
@@ -718,6 +681,12 @@ export function HomePage() {
               emptyTitle="Нет маршрутов"
               excursions={visibleRoutes.slice(0, 4)}
             />
+
+            {visibleRoutes.length > 0 && (
+              <Link className="home-sheet__view-all" to={appRoutes.excursions}>
+                Смотреть все маршруты →
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -726,11 +695,11 @@ export function HomePage() {
 }
 
 function scrollIntoHorizontalView(container: HTMLElement, target: HTMLElement) {
-  const containerRect = container.getBoundingClientRect()
-  const targetRect = target.getBoundingClientRect()
-  if (targetRect.left >= containerRect.left && targetRect.right <= containerRect.right) return
-  const relativeLeft = targetRect.left - containerRect.left + container.scrollLeft
-  const nextScrollLeft = relativeLeft - container.clientWidth / 2 + targetRect.width / 2
-  const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth)
-  container.scrollTo({ behavior: 'smooth', left: Math.min(Math.max(0, nextScrollLeft), maxScrollLeft) })
+  const cr = container.getBoundingClientRect()
+  const tr = target.getBoundingClientRect()
+  if (tr.left >= cr.left && tr.right <= cr.right) return
+  const relLeft = tr.left - cr.left + container.scrollLeft
+  const nextLeft = relLeft - container.clientWidth / 2 + tr.width / 2
+  const maxLeft = Math.max(0, container.scrollWidth - container.clientWidth)
+  container.scrollTo({ behavior: 'smooth', left: Math.min(Math.max(0, nextLeft), maxLeft) })
 }

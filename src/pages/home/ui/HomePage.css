@@ -1,7 +1,5 @@
 /* ─────────────────────────────────────────────────────────────────────────────
    FULLSCREEN CONTAINER
-   Everything lives inside .home-page so it's one stacking context —
-   this prevents Leaflet animation from "leaking" through.
 ───────────────────────────────────────────────────────────────────────────── */
 
 body:has(.home-page) {
@@ -12,14 +10,12 @@ body:has(.home-page) {
   position: fixed;
   inset: 0;
   z-index: 100;
-  /* Solid base — shows during tile loading, never transparent */
   background: #e8edf4;
-  /* All children (map, sheet, button) are clipped here */
   overflow: hidden;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   MAP  (fills full container, sits below sheet)
+   MAP
 ───────────────────────────────────────────────────────────────────────────── */
 
 .home-page__map {
@@ -29,8 +25,8 @@ body:has(.home-page) {
   background: #e8edf4;
 }
 
-/* Force DiscoveryMap canvas to fill 100% */
-.home-page__map .discovery-map {
+.home-page__map .discovery-map,
+.home-page__map .discovery-map__root {
   height: 100%;
   display: block;
   padding: 0;
@@ -45,58 +41,18 @@ body:has(.home-page) {
   background: #e8edf4;
 }
 
-.home-page__map .discovery-map__root {
-  height: 100%;
-}
-
 .home-page__map .leaflet-container {
   background: #e8edf4;
 }
 
-/* GPU layer hint so Leaflet animation stays in its own composite layer */
 .home-page__map .leaflet-tile-pane {
   will-change: transform;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   LOCATE BUTTON  (floats above the peek bar)
-───────────────────────────────────────────────────────────────────────────── */
-
-.home-page__locate {
-  /* absolute, not fixed — stays inside home-page stacking context */
-  position: absolute;
-  right: 16px;
-  bottom: calc(92px + 14px);
-  z-index: 6;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 46px;
-  height: 46px;
-  border: 1px solid rgba(216, 220, 229, 0.8);
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.94);
-  color: var(--color-brand);
-  box-shadow: 0 6px 18px rgba(31, 37, 51, 0.14);
-  backdrop-filter: blur(10px);
-  transition: transform 0.16s ease, box-shadow 0.16s ease;
-}
-
-.home-page__locate:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 24px rgba(31, 37, 51, 0.18);
-}
-
-.home-page__locate:active {
-  transform: scale(0.9);
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
    BOTTOM SHEET
-   position: absolute inside .home-page — same stacking context as the map.
-   z-index 5 puts it above map (1) but both are inside home-page.
-   overflow: hidden on .home-page clips the sheet when it's slid down,
-   so no card content can ever "show through" the map.
+   height: calc(100% - 84px) leaves a visible gap below the app header.
+   Initial transform shows only the 52px drag handle.
 ───────────────────────────────────────────────────────────────────────────── */
 
 .home-sheet {
@@ -104,8 +60,7 @@ body:has(.home-page) {
   bottom: 0;
   left: 0;
   right: 0;
-  /* 88% of home-page height = 88% of viewport */
-  height: 88%;
+  height: calc(100% - 84px);
   z-index: 5;
   display: flex;
   flex-direction: column;
@@ -114,22 +69,21 @@ body:has(.home-page) {
   box-shadow: 0 -2px 20px rgba(31, 37, 51, 0.1);
   overflow: hidden;
   will-change: transform;
-  /* Initial CSS position: peek state — show only 92px at the bottom.
-     translateY(calc(100% - 92px)) uses own height, so it's always correct
-     regardless of screen size. JS will override this on mount. */
-  transform: translateY(calc(100% - 92px));
+  transform: translateY(calc(100% - 52px));
   transition: transform 0.38s cubic-bezier(0.32, 0, 0.16, 1);
 }
 
-/* ── Drag handle zone ──────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────────
+   DRAG HANDLE  (slim 52px bar — the only visible element in peek state)
+───────────────────────────────────────────────────────────────────────────── */
 
 .home-sheet__drag {
+  position: relative;
   flex-shrink: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 10px 16px 12px;
+  justify-content: center;
+  height: 52px;
   cursor: grab;
   touch-action: none;
   user-select: none;
@@ -141,63 +95,43 @@ body:has(.home-page) {
 }
 
 .home-sheet__handle {
-  width: 40px;
+  width: 36px;
   height: 4px;
-  flex-shrink: 0;
   border-radius: 999px;
-  background: rgba(31, 37, 51, 0.16);
+  background: rgba(31, 37, 51, 0.18);
 }
 
-.home-sheet__peek-row {
+/* Locate / GPS button — always visible, inside the drag strip */
+.home-sheet__locate {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-height: 34px;
-  overflow: hidden;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(216, 220, 229, 0.8);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--color-brand);
+  box-shadow: 0 4px 12px rgba(31, 37, 51, 0.1);
+  transition: box-shadow 0.16s ease, transform 0.16s ease;
 }
 
-.home-sheet__peek-stat {
-  flex-shrink: 0;
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--color-brand-strong);
+.home-sheet__locate:hover {
+  box-shadow: 0 6px 16px rgba(31, 37, 51, 0.14);
+  transform: translateY(calc(-50% - 1px));
 }
 
-.home-sheet__peek-point {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.86rem;
-  font-weight: 600;
-  color: var(--color-text);
+.home-sheet__locate:active {
+  transform: translateY(-50%) scale(0.91);
 }
 
-.home-sheet__peek-hint {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.82rem;
-  color: var(--color-text-secondary);
-}
-
-.home-sheet__peek-arrow {
-  flex-shrink: 0;
-  margin-left: auto;
-  font-size: 1rem;
-  color: var(--color-text-tertiary);
-  line-height: 1;
-  transition: transform 0.3s ease;
-}
-
-/* Flip arrow when sheet is open */
-.home-sheet--open .home-sheet__peek-arrow {
-  transform: rotate(180deg);
-}
-
-/* ── Scrollable body ───────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────────
+   SCROLLABLE BODY
+───────────────────────────────────────────────────────────────────────────── */
 
 .home-sheet__body {
   flex: 1;
@@ -210,43 +144,12 @@ body:has(.home-page) {
   padding-bottom: 40px;
 }
 
-/* ── Search ────────────────────────────────────────────────────────────────── */
-
-.home-sheet__search-wrap {
-  padding: 4px 16px 8px;
-}
-
-.home-sheet__search-label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 14px;
-  height: 46px;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-pill);
-  background: var(--color-bg-soft);
-  color: var(--color-text-tertiary);
-  transition: border-color 0.18s ease, background-color 0.18s ease;
-}
-
-.home-sheet__search-label:focus-within {
-  border-color: rgba(31, 138, 112, 0.34);
-  background: #ffffff;
-}
-
-.home-sheet__search {
-  flex: 1;
-  border: none;
-  background: transparent;
-  color: var(--color-text);
-  font-size: 0.9rem;
-  outline: none;
-}
-
-/* ── Filter groups ─────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────────
+   FILTER GROUPS  (categories, radius, theme, duration)
+───────────────────────────────────────────────────────────────────────────── */
 
 .home-sheet__filter-group {
-  padding: 4px 16px 6px;
+  padding: 6px 16px 6px;
 }
 
 .home-sheet__filter-label {
@@ -275,7 +178,8 @@ body:has(.home-page) {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  height: 34px;
+  gap: 5px;
+  height: 36px;
   padding: 0 14px;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-pill);
@@ -284,10 +188,7 @@ body:has(.home-page) {
   font-size: 0.8rem;
   font-weight: 700;
   white-space: nowrap;
-  transition:
-    background-color 0.16s ease,
-    border-color 0.16s ease,
-    color 0.16s ease;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
 }
 
 .home-sheet__cat--active {
@@ -296,24 +197,31 @@ body:has(.home-page) {
   color: var(--color-brand-strong);
 }
 
-/* ── Selected point card ───────────────────────────────────────────────────── */
+.home-sheet__cat-icon {
+  font-size: 0.88rem;
+  line-height: 1;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   SELECTED PLACE CARD
+───────────────────────────────────────────────────────────────────────────── */
 
 .home-sheet__place {
   margin: 6px 16px 4px;
   display: grid;
-  grid-template-columns: 88px 1fr;
+  grid-template-columns: 80px 1fr;
   gap: 12px;
   align-items: start;
   padding: 12px;
   border: 1px solid var(--color-line);
   border-radius: 20px;
-  background: linear-gradient(135deg, #fff 0%, var(--color-bg-soft) 100%);
+  background: linear-gradient(135deg, #fff, var(--color-bg-soft));
   box-shadow: 0 4px 12px rgba(31, 37, 51, 0.05);
 }
 
 .home-sheet__place-media {
-  width: 88px;
-  height: 88px;
+  width: 80px;
+  height: 80px;
   border-radius: 14px;
   overflow: hidden;
   background: var(--color-bg-muted);
@@ -329,7 +237,7 @@ body:has(.home-page) {
 .home-sheet__place-info {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -356,40 +264,38 @@ body:has(.home-page) {
 
 .home-sheet__place-title {
   margin: 0;
-  font-size: 0.96rem;
+  font-size: 0.93rem;
   font-weight: 800;
   line-height: 1.2;
   letter-spacing: -0.02em;
   color: var(--color-text);
+  overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  overflow: hidden;
 }
 
 .home-sheet__place-schedule {
   margin: 0;
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   color: var(--color-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.home-sheet__place-actions {
-  display: flex;
-  flex-wrap: wrap;
+.home-sheet__place-maps-btn {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
-  margin-top: 2px;
-}
-
-.home-sheet__place-actions .button {
-  min-height: 34px;
-  padding: 0 11px;
+  min-height: 32px;
+  padding: 0 14px;
   font-size: 0.78rem;
 }
 
-/* ── Sections ──────────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────────
+   CONTENT SECTIONS
+───────────────────────────────────────────────────────────────────────────── */
 
 .home-sheet__section {
   padding: 10px 16px 4px;
@@ -401,28 +307,17 @@ body:has(.home-page) {
   border-top: 1px solid var(--color-line);
 }
 
-.home-sheet__section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
 .home-sheet__section-title {
-  margin: 0;
+  margin: 0 0 10px;
   font-size: 0.96rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   color: var(--color-text);
 }
 
-.home-sheet__section-link {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--color-brand-strong);
-}
-
-/* ── Nearby cards — horizontal scroll ─────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────────
+   NEARBY PLACE CARDS  (horizontal scroll strip)
+───────────────────────────────────────────────────────────────────────────── */
 
 .home-sheet__cards {
   display: flex;
@@ -431,6 +326,11 @@ body:has(.home-page) {
   padding: 2px 0 8px;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+  cursor: grab;
+}
+
+.home-sheet__cards:active {
+  cursor: grabbing;
 }
 
 .home-sheet__cards::-webkit-scrollbar {
@@ -439,99 +339,121 @@ body:has(.home-page) {
 
 .home-card {
   flex-shrink: 0;
-  width: 144px;
+  width: 140px;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--color-line);
+  border: 1.5px solid var(--color-line);
   border-radius: 18px;
   background: #ffffff;
   overflow: hidden;
   text-align: left;
-  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.18s ease;
+}
+
+.home-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(31, 37, 51, 0.09);
 }
 
 .home-card--active {
-  border-color: rgba(31, 138, 112, 0.4);
-  box-shadow: 0 4px 14px rgba(31, 138, 112, 0.1);
+  border-color: rgba(31, 138, 112, 0.45);
+  box-shadow: 0 4px 14px rgba(31, 138, 112, 0.12);
 }
 
-.home-card--draft .home-card__media::after {
-  content: '✓';
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: var(--color-brand);
-  color: #fff;
-  font-size: 0.66rem;
-  font-weight: 900;
-}
-
-.home-card__media {
+/* Image area with distance badge overlay */
+.home-card__img {
   position: relative;
-  height: 82px;
+  height: 88px;
   background: var(--color-bg-muted);
   overflow: hidden;
+  flex-shrink: 0;
 }
 
-.home-card__media img {
+.home-card__img img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.32s ease;
+}
+
+.home-card:hover .home-card__img img {
+  transform: scale(1.06);
+}
+
+.home-card__dist-badge {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.52);
+  color: #ffffff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(4px);
+  pointer-events: none;
 }
 
 .home-card__body {
-  padding: 8px 10px 10px;
+  padding: 7px 10px 10px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-
-.home-card__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
+  gap: 3px;
 }
 
 .home-card__cat {
-  font-size: 0.63rem;
+  font-size: 0.61rem;
   font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-accent-ink);
 }
 
-.home-card__dist {
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: var(--color-brand-strong);
-  white-space: nowrap;
-}
-
 .home-card__title {
   margin: 0;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 700;
   line-height: 1.22;
   color: var(--color-text);
+  overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  overflow: hidden;
 }
 
-/* ── Route builder ─────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────────
+   VIEW-ALL BUTTON
+───────────────────────────────────────────────────────────────────────────── */
+
+.home-sheet__view-all {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  margin-top: 12px;
+  border: 1px solid rgba(31, 138, 112, 0.22);
+  border-radius: var(--radius-pill);
+  background: var(--color-brand-soft);
+  color: var(--color-brand-strong);
+  font-size: 0.86rem;
+  font-weight: 700;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.home-sheet__view-all:hover {
+  background: rgba(232, 250, 244, 0.9);
+  border-color: rgba(31, 138, 112, 0.38);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ROUTE BUILDER  (hidden on this page, kept for potential reuse)
+───────────────────────────────────────────────────────────────────────────── */
 
 .home-sheet__builder {
   margin: 6px 16px 0;
-  padding: 14px !important;
-  border: 1px solid rgba(31, 138, 112, 0.14) !important;
+  padding: 14px;
+  border: 1px solid rgba(31, 138, 112, 0.14);
   border-radius: 20px;
   background: linear-gradient(135deg, rgba(232, 250, 244, 0.6), transparent);
 }
@@ -593,7 +515,7 @@ body:has(.home-page) {
   font-size: 0.82rem;
   font-weight: 700;
   line-height: 1.4;
-  animation: sheet-notice-enter 0.22s ease both;
+  animation: notice-enter 0.22s ease both;
 }
 
 .home-sheet__notice--success {
@@ -608,38 +530,109 @@ body:has(.home-page) {
   color: var(--color-accent-ink);
 }
 
-/* ── Catalog inside sheet ──────────────────────────────────────────────────── */
-
-.home-sheet .catalog {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-/* ── Animation keyframes ───────────────────────────────────────────────────── */
-
-@keyframes sheet-notice-enter {
+@keyframes notice-enter {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   DESKTOP  — wider sheet, still bottom-anchored
+   EXCURSION CARDS INSIDE SHEET  (compact 2-col grid, centered actions)
+───────────────────────────────────────────────────────────────────────────── */
+
+.home-sheet .catalog {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.home-sheet .card__description,
+.home-sheet .card__stop-preview,
+.home-sheet .card__route-points {
+  display: none;
+}
+
+.home-sheet .card__content {
+  gap: 7px;
+  padding: 11px 13px 13px;
+}
+
+.home-sheet .card__title {
+  font-size: 0.9rem;
+  -webkit-line-clamp: 2;
+}
+
+.home-sheet .card__tagline {
+  font-size: 0.78rem;
+  -webkit-line-clamp: 1;
+}
+
+.home-sheet .card__stats {
+  gap: 4px;
+}
+
+.home-sheet .card__stats-row {
+  gap: 4px;
+}
+
+.home-sheet .card__stat-badge {
+  height: 26px;
+  font-size: 0.74rem;
+}
+
+.home-sheet .card__stat-duration {
+  height: 28px;
+  font-size: 0.78rem;
+}
+
+.home-sheet .card__actions {
+  justify-content: center;
+  padding-top: 2px;
+}
+
+.home-sheet .card__actions .button {
+  min-height: 34px;
+  font-size: 0.78rem;
+}
+
+.home-sheet .card__icon-button {
+  min-height: 34px;
+  font-size: 0.76rem;
+  padding: 0 8px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   DESKTOP LAYOUT
+   ≥768px  — sheet matches app-header side padding (20px each side)
+   ≥1480px — constrained to header's max inner width (1440px + 20px×2)
 ───────────────────────────────────────────────────────────────────────────── */
 
 @media (min-width: 768px) {
   .home-sheet {
-    height: 80%;
+    left: 20px;
+    right: 20px;
+    border-radius: 28px 28px 0 0;
   }
 
   .home-sheet .catalog {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
   }
 }
 
-/* ── Reduced motion ────────────────────────────────────────────────────────── */
+@media (min-width: 1480px) {
+  .home-sheet {
+    left: max(20px, calc(50% - 720px));
+    right: max(20px, calc(50% - 720px));
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   REDUCED MOTION
+───────────────────────────────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
-  .home-sheet {
-    transition: none !important;
+  .home-sheet,
+  .home-sheet__locate,
+  .home-card {
+    transition: none;
   }
 }

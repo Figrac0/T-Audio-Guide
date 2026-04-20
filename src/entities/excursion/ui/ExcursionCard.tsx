@@ -85,19 +85,12 @@ export function ExcursionCard({ excursion }: ExcursionCardProps) {
           <span className="chip">{excursion.district}</span>
         </div>
 
-        <div className="card__meta">
-          <div className="meta-pill">
-            <span className="meta-pill__value">{formatDuration(excursion.durationMinutes)}</span>
-            <span className="meta-pill__label">Длительность</span>
+        <div className="card__stats">
+          <div className="card__stats-row">
+            <span className="card__stat-badge">{formatDistance(excursion.distanceKm)}</span>
+            <span className="card__stat-badge">{formatStopCount(excursion.stops.length)}</span>
           </div>
-          <div className="meta-pill">
-            <span className="meta-pill__value">{formatDistance(excursion.distanceKm)}</span>
-            <span className="meta-pill__label">Дистанция</span>
-          </div>
-          <div className="meta-pill">
-            <span className="meta-pill__value">{formatStopCount(excursion.stops.length)}</span>
-            <span className="meta-pill__label">Точки</span>
-          </div>
+          <div className="card__stat-duration">{formatDuration(excursion.durationMinutes)}</div>
         </div>
 
         <div className="card__route-points">
