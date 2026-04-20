@@ -23,8 +23,10 @@ export function createOpenStreetMapLayer() {
 export function createLeafletMap(container: HTMLElement, center: GeoPoint, zoom: number) {
   const map = L.map(container, {
     attributionControl: true,
-    fadeAnimation: false,
-    markerZoomAnimation: false,
+    fadeAnimation: true,
+    markerZoomAnimation: true,
+    zoomAnimation: true,
+    zoomAnimationThreshold: 4,
     preferCanvas: true,
     zoomControl: false,
   }).setView(toLeafletLatLng(center), zoom)

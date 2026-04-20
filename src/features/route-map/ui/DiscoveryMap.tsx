@@ -50,6 +50,7 @@ interface DiscoveryMapProps {
   draftRouteNotice?: string | null
   draftRouteNoticeTone?: 'success' | 'warning'
   embedded?: boolean
+  fullscreen?: boolean
   emptyMessage: string
   fixedRouteStops?: RouteStop[]
   geolocationError: string | null
@@ -103,6 +104,7 @@ export function DiscoveryMap({
   draftRouteNotice = null,
   draftRouteNoticeTone = 'success',
   embedded = false,
+  fullscreen = false,
   emptyMessage,
   fixedRouteStops = [],
   geolocationError,
@@ -550,8 +552,8 @@ export function DiscoveryMap({
   }
 
   return (
-    <section className={`discovery-map discovery-map--wide${embedded ? ' discovery-map--embedded' : ''}`}>
-      <div className="discovery-map__toolbar" ref={controlsRef}>
+    <section className={`discovery-map discovery-map--wide${embedded ? ' discovery-map--embedded' : ''}${fullscreen ? ' discovery-map--fullscreen' : ''}`}>
+      <div className="discovery-map__toolbar" ref={controlsRef} style={fullscreen ? { display: 'none' } : undefined}>
         <div className="discovery-map__toolbar-side discovery-map__toolbar-side--start">
           <div className={`discovery-map__dropdown${openMenu === 'category' ? ' discovery-map__dropdown--open' : ''}`}>
             <button
@@ -685,7 +687,7 @@ export function DiscoveryMap({
         ) : null}
       </div>
 
-      <div className="discovery-map__navigation">
+      <div className="discovery-map__navigation" style={fullscreen ? { display: 'none' } : undefined}>
         <div className="discovery-map__navigation-side discovery-map__navigation-side--start">
           <button
             className="discovery-map__arrow-button"
