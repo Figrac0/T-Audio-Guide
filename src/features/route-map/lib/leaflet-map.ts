@@ -93,9 +93,9 @@ export function createPoiIcon(point: NearbyPoint, isActive: boolean, isInDraft =
   return L.divIcon({
     className: emptyDivIconClassName,
     html: `<div class="poi-marker${isActive ? ' poi-marker--active' : ''}${isInDraft ? ' poi-marker--draft' : ''}"><span class="poi-marker__glyph poi-marker__glyph--${point.category}" aria-hidden="true">${getCategoryIcon(point.category)}</span></div>`,
-    iconSize: [20, 20],
-    iconAnchor: [10, 18],
-    popupAnchor: [0, -16],
+    iconSize: [34, 34],
+    iconAnchor: [17, 30],
+    popupAnchor: [0, -28],
   })
 }
 

@@ -75,11 +75,16 @@ export const mockApi: FrontendApi = {
         })
       : radiusFiltered
 
+    // Excursions are built from all nearby points regardless of the active
+    // category filter — only the map markers and "Рядом с вами" strip are filtered.
+    const allRadiusFiltered = baseFeed.nearbyPoints.filter(
+      (point) => point.distanceMeters <= request.radiusMeters,
+    )
     const excursions = createDiscoveryRoutes({
-      activePointCategory: request.category,
+      activePointCategory: 'all',
       center: request.center,
       locale: request.locale,
-      nearbyPoints: searchFiltered,
+      nearbyPoints: allRadiusFiltered,
       radiusMeters: request.radiusMeters,
     })
 

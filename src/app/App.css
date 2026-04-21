@@ -21,7 +21,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  max-width: var(--container-width);
+  max-width: 860px;
   margin: 0 auto;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.72);
@@ -207,9 +207,9 @@
   72%, 100% { transform: translateX(420%) skewX(-18deg); }
 }
 
-/* ─── Desktop nav (inline, no burger) ────────────────────────────────────── */
+/* ─── Desktop nav (inline, no burger — ≥576px) ───────────────────────────── */
 
-@media (min-width: 768px) {
+@media (min-width: 576px) {
   .app-header__inner {
     flex-direction: row;
     align-items: center;
@@ -228,14 +228,17 @@
     flex-direction: row;
     align-items: center;
     gap: 6px;
-    padding: 0 8px 0 4px;
-    flex: 1;
-    justify-content: flex-end;
+    padding: 0 4px;
+    flex: none;
     max-height: none !important;
     overflow: visible !important;
     opacity: 1 !important;
     transform: none !important;
     transition: none !important;
+  }
+
+  .app-header__bar {
+    flex: 1;
   }
 
   .app-nav {

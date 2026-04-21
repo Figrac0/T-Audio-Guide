@@ -64,16 +64,16 @@ interface DiscoveryMapProps {
   onClearDraftRoute?: () => void
   onLocateUser: () => void
   onSaveDraftRoute?: () => void
-  onSearchQueryChange: (value: string) => void
+  onSearchQueryChange?: (value: string) => void
   onSelectCategory: (category: PointCategory | 'all') => void
   onSelectNextPoint: () => void
   onSelectPoint: (pointId: string) => void
   onSelectPreviousPoint: () => void
   radiusMeters: number
-  radiusOptions: DiscoveryRadiusOption[]
+  radiusOptions?: DiscoveryRadiusOption[]
   recenterTrigger?: number
   routeTargetId: string | null
-  searchQuery: string
+  searchQuery?: string
   selectedPointId: string
   showDirectRouteInPopup?: boolean
   showPopupRouteActions?: boolean
@@ -127,10 +127,10 @@ export function DiscoveryMap({
   onSelectPoint,
   onSelectPreviousPoint,
   radiusMeters,
-  radiusOptions,
+  radiusOptions = [],
   recenterTrigger = 0,
   routeTargetId,
-  searchQuery,
+  searchQuery = '',
   selectedPointId,
   showDirectRouteInPopup = false,
   showPopupRouteActions = true,
@@ -139,11 +139,17 @@ export function DiscoveryMap({
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const overlayRef = useRef<L.LayerGroup | null>(null)
+  const radiusCircleRef = useRef<L.Circle | null>(null)
   const markerRefs = useRef(new Map<string, L.Marker>())
   const controlsRef = useRef<HTMLDivElement | null>(null)
   const initialCenterRef = useRef(userPosition ?? appMapConfig.defaultCenter)
   const skipSelectedFocusRef = useRef(true)
+  const hasAutoFittedRef = useRef(false)
   const selectionSourceRef = useRef<SelectionSource | null>(null)
+  const lastNonEmptySelectedIdRef = useRef<string>('')
+  // Tracks the route signature last fitted to — prevents re-fitting on every
+  // nearbyPoints refresh while the same route is active.
+  const lastFittedRouteRef = useRef<string>('')
   const onChangeRadiusRef = useRef(onChangeRadius)
   const [mapLoadError, setMapLoadError] = useState<string | null>(null)
   const [openMenu, setOpenMenu] = useState<'category' | 'radius' | null>(null)
@@ -366,27 +372,44 @@ export function DiscoveryMap({
       return
     }
 
+    // Only fly to route bounds when the route itself changes — not on every
+    // nearbyPoints refresh (which happens on zoom/radius changes).
+    const routeSignature = `${routeTargetId ?? ''}:${visibleDraftStops.map((s) => s.id).join(',')}`
+
     if (draftBounds && visibleDraftStops.length) {
-      applyLeafletLocation(map, {
-        bounds: draftBounds,
-        padding: mapPadding,
-        duration: 700,
-        easing: 'ease-in-out',
-      })
+      if (routeSignature !== lastFittedRouteRef.current) {
+        lastFittedRouteRef.current = routeSignature
+        applyLeafletLocation(map, {
+          bounds: draftBounds,
+          padding: mapPadding,
+          duration: 700,
+          easing: 'ease-in-out',
+        })
+      }
       return
     }
 
     if (guideBounds && routeTargetId) {
-      applyLeafletLocation(map, {
-        bounds: guideBounds,
-        padding: mapPadding,
-        duration: 700,
-        easing: 'ease-in-out',
-      })
+      if (routeSignature !== lastFittedRouteRef.current) {
+        lastFittedRouteRef.current = routeSignature
+        applyLeafletLocation(map, {
+          bounds: guideBounds,
+          padding: mapPadding,
+          duration: 700,
+          easing: 'ease-in-out',
+        })
+      }
       return
     }
 
+    // Route was cleared — reset so next route activation flies correctly
+    if (lastFittedRouteRef.current) lastFittedRouteRef.current = ''
+
+    // Only auto-fit once on initial load — never re-center when user is freely panning/zooming
+    if (hasAutoFittedRef.current) return
+
     if (!nearbyPoints.length && userPosition) {
+      hasAutoFittedRef.current = true
       applyLeafletLocation(map, {
         center: toLngLat(userPosition),
         zoom: locateZoom,
@@ -396,10 +419,9 @@ export function DiscoveryMap({
       return
     }
 
-    if (!nearbyPoints.length) {
-      return
-    }
+    if (!nearbyPoints.length) return
 
+    hasAutoFittedRef.current = true
     skipSelectedFocusRef.current = true
     applyLeafletLocation(map, {
       bounds: pointsBounds,
@@ -420,7 +442,11 @@ export function DiscoveryMap({
     markerRefs.current.clear()
 
     if (userPosition) {
-      createDiscoveryRadiusCircle(userPosition, radiusMeters).addTo(overlay)
+      const circle = createDiscoveryRadiusCircle(userPosition, radiusMeters)
+      circle.addTo(overlay)
+      radiusCircleRef.current = circle
+    } else {
+      radiusCircleRef.current = null
     }
 
     if (guideGeometry && !draftGeometry) {
@@ -491,7 +517,27 @@ export function DiscoveryMap({
         title: 'Ваше местоположение',
       }).addTo(overlay)
     }
-  }, [draftGeometry, draftStops.length, guideGeometry, nearbyPoints, onAddPointToDraft, onBuildRoute, onClearDraftRoute, onSelectPoint, radiusMeters, routeTargetId, selectedPointId, userPosition, visibleDraftPointIds])
+  }, [draftGeometry, draftStops.length, guideGeometry, nearbyPoints, onAddPointToDraft, onBuildRoute, onClearDraftRoute, onSelectPoint, routeTargetId, selectedPointId, userPosition, visibleDraftPointIds])
+
+  // Animate radius circle smoothly when radiusMeters changes (no full redraw)
+  useEffect(() => {
+    const circle = radiusCircleRef.current
+    if (!circle) return
+    const start = circle.getRadius()
+    const end = radiusMeters
+    if (Math.abs(end - start) < 5) { circle.setRadius(end); return }
+    const duration = 380
+    const t0 = performance.now()
+    let raf: number
+    function step(now: number) {
+      const p = Math.min(1, (now - t0) / duration)
+      const eased = 1 - Math.pow(1 - p, 3)
+      circle.setRadius(start + (end - start) * eased)
+      if (p < 1) raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [radiusMeters])
 
   useEffect(() => {
     nearbyPoints.forEach((point) => {
@@ -506,12 +552,20 @@ export function DiscoveryMap({
   }, [nearbyPoints, selectedPointId, visibleDraftPointIds])
 
   useEffect(() => {
-    const map = mapRef.current
-    const marker = selectedPoint ? markerRefs.current.get(selectedPoint.id) : null
+    if (!selectedPointId) return
 
-    if (!map || !selectedPoint || !marker) {
-      return
-    }
+    // If the same point is re-emerging after temporarily leaving nearbyPoints
+    // (radius shrunk then grew), don't snap the camera back
+    const comingBack = selectedPointId === lastNonEmptySelectedIdRef.current
+    lastNonEmptySelectedIdRef.current = selectedPointId
+    if (comingBack) return
+
+    const map = mapRef.current
+    const marker = markerRefs.current.get(selectedPointId)
+    // Look up point coordinates from the live nearbyPoints array via the ref
+    const point = nearbyPoints.find((p) => p.id === selectedPointId)
+
+    if (!map || !marker || !point) return
 
     if (skipSelectedFocusRef.current) {
       skipSelectedFocusRef.current = false
@@ -527,20 +581,16 @@ export function DiscoveryMap({
     }
 
     applyLeafletLocation(map, {
-      center: toLngLat(selectedPoint.coordinates),
+      center: toLngLat(point.coordinates),
       zoom: selectedPointZoom,
       duration: 600,
       easing: 'ease-in-out',
     })
 
-    const popupTimeout = window.setTimeout(() => {
-      marker.openPopup()
-    }, 240)
-
-    return () => {
-      window.clearTimeout(popupTimeout)
-    }
-  }, [selectedPoint])
+    const popupTimeout = window.setTimeout(() => marker.openPopup(), 240)
+    return () => window.clearTimeout(popupTimeout)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPointId])
 
   useEffect(() => {
     if (!recenterTrigger) return

@@ -204,12 +204,37 @@ body:has(.home-page) {
   line-height: 1;
 }
 
+/* Route filter pills: left-aligned horizontal scroll (no wrap) */
+.home-sheet__filter-group--inline .home-sheet__cats {
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+
+.home-sheet__filter-group--inline .home-sheet__cats::-webkit-scrollbar {
+  display: none;
+}
+
+/* Divider between route filter rows */
+.home-sheet__filter-divider {
+  height: 1px;
+  margin: 0 16px 2px;
+  background: linear-gradient(90deg, transparent, rgba(31, 37, 51, 0.1) 20%, rgba(31, 37, 51, 0.1) 80%, transparent);
+}
+
 /* ─────────────────────────────────────────────────────────────────────────────
    SELECTED PLACE CARD
 ───────────────────────────────────────────────────────────────────────────── */
 
-.home-sheet__place {
+.home-sheet__place-wrap {
+  position: relative;
   margin: 6px 16px 4px;
+}
+
+.home-sheet__place {
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -219,6 +244,46 @@ body:has(.home-page) {
   background: linear-gradient(135deg, #fff, var(--color-bg-soft));
   box-shadow: 0 4px 12px rgba(31, 37, 51, 0.05);
   animation: place-card-enter 0.28s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+}
+
+@media (min-width: 768px) {
+  .home-sheet__place-wrap {
+    margin: 8px auto 4px;
+    max-width: 580px;
+  }
+
+  /* Decorative root/vine art on both sides */
+  .home-sheet__place-wrap::before,
+  .home-sheet__place-wrap::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 200px;
+    height: 220px;
+    pointer-events: none;
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+    animation: vine-breathe 5s ease-in-out infinite;
+  }
+
+  /* Left vine — mirrored copy of the right vine */
+  .home-sheet__place-wrap::before {
+    right: calc(100% + 6px);
+    transform: translateY(-50%) scaleX(-1);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 220'%3E%3Cdefs%3E%3ClinearGradient id='rg' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%231f8a70' stop-opacity='0.88'/%3E%3Cstop offset='45%25' stop-color='%232d9e5f' stop-opacity='0.72'/%3E%3Cstop offset='100%25' stop-color='%23c8920a' stop-opacity='0.52'/%3E%3C/linearGradient%3E%3ClinearGradient id='rg2' x1='1' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%231f8a70' stop-opacity='0.6'/%3E%3Cstop offset='100%25' stop-color='%23c8920a' stop-opacity='0.35'/%3E%3C/linearGradient%3E%3C/defs%3E%3C!-- Main trunk: emerges from left edge (x%3D2) and snakes right --%3E%3Cpath d='M2 110 C 22 95 38 78 58 88 C 78 98 85 118 105 112 C 125 106 138 86 158 92 C 174 97 184 112 198 108' stroke='url(%23rg)' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C!-- Upper branch from mid-trunk --%3E%3Cpath d='M105 112 C 102 92 110 72 100 52 C 93 36 80 30 84 14' stroke='url(%23rg)' stroke-width='2.2' fill='none' stroke-linecap='round'/%3E%3C!-- Spiral coil at top of upper branch --%3E%3Cpath d='M84 14 C 96 6 112 14 108 30 C 104 46 86 48 80 34 C 74 20 84 6 98 12 C 108 16 110 28 100 34' stroke='url(%23rg)' stroke-width='1.7' fill='none' stroke-linecap='round'/%3E%3C!-- Lower branch from mid-trunk --%3E%3Cpath d='M105 112 C 108 132 100 152 110 170 C 118 184 132 188 128 204' stroke='url(%23rg)' stroke-width='2.2' fill='none' stroke-linecap='round'/%3E%3C!-- Spiral coil at base of lower branch --%3E%3Cpath d='M128 204 C 140 196 148 204 144 216 C 140 228 124 228 120 216 C 116 204 126 196 136 200 C 144 203 145 213 138 216' stroke='url(%23rg)' stroke-width='1.7' fill='none' stroke-linecap='round'/%3E%3C!-- Side tendril from near start --%3E%3Cpath d='M58 88 C 54 68 60 50 50 34 C 44 22 32 18 34 6' stroke='url(%23rg2)' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C!-- Small spiral at top tendril --%3E%3Cpath d='M34 6 C 44 0 54 8 50 20 C 46 32 32 32 30 20 C 28 10 38 4 46 10' stroke='url(%23rg2)' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C!-- Side tendril going down from near end --%3E%3Cpath d='M158 92 C 162 112 155 130 162 148 C 167 162 178 166 176 180' stroke='url(%23rg2)' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C!-- Tiny coil at bottom tendril --%3E%3Cpath d='M176 180 C 184 174 190 180 188 190 C 186 200 174 200 172 190 C 170 182 178 176 184 182' stroke='url(%23rg2)' stroke-width='1.3' fill='none' stroke-linecap='round'/%3E%3C!-- Dot nodes --%3E%3Ccircle cx='2' cy='110' r='4' fill='%231f8a70' opacity='0.6'/%3E%3Ccircle cx='198' cy='108' r='3' fill='%23c8920a' opacity='0.45'/%3E%3Ccircle cx='84' cy='14' r='2.5' fill='%231f8a70' opacity='0.4'/%3E%3Ccircle cx='128' cy='204' r='2.5' fill='%23c8920a' opacity='0.4'/%3E%3Ccircle cx='34' cy='6' r='2' fill='%231f8a70' opacity='0.35'/%3E%3C/svg%3E");
+  }
+
+  /* Right vine */
+  .home-sheet__place-wrap::after {
+    left: calc(100% + 6px);
+    transform: translateY(-50%);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 220'%3E%3Cdefs%3E%3ClinearGradient id='rg' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%231f8a70' stop-opacity='0.88'/%3E%3Cstop offset='45%25' stop-color='%232d9e5f' stop-opacity='0.72'/%3E%3Cstop offset='100%25' stop-color='%23c8920a' stop-opacity='0.52'/%3E%3C/linearGradient%3E%3ClinearGradient id='rg2' x1='1' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%231f8a70' stop-opacity='0.6'/%3E%3Cstop offset='100%25' stop-color='%23c8920a' stop-opacity='0.35'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M2 110 C 22 95 38 78 58 88 C 78 98 85 118 105 112 C 125 106 138 86 158 92 C 174 97 184 112 198 108' stroke='url(%23rg)' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M105 112 C 102 92 110 72 100 52 C 93 36 80 30 84 14' stroke='url(%23rg)' stroke-width='2.2' fill='none' stroke-linecap='round'/%3E%3Cpath d='M84 14 C 96 6 112 14 108 30 C 104 46 86 48 80 34 C 74 20 84 6 98 12 C 108 16 110 28 100 34' stroke='url(%23rg)' stroke-width='1.7' fill='none' stroke-linecap='round'/%3E%3Cpath d='M105 112 C 108 132 100 152 110 170 C 118 184 132 188 128 204' stroke='url(%23rg)' stroke-width='2.2' fill='none' stroke-linecap='round'/%3E%3Cpath d='M128 204 C 140 196 148 204 144 216 C 140 228 124 228 120 216 C 116 204 126 196 136 200 C 144 203 145 213 138 216' stroke='url(%23rg)' stroke-width='1.7' fill='none' stroke-linecap='round'/%3E%3Cpath d='M58 88 C 54 68 60 50 50 34 C 44 22 32 18 34 6' stroke='url(%23rg2)' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3Cpath d='M34 6 C 44 0 54 8 50 20 C 46 32 32 32 30 20 C 28 10 38 4 46 10' stroke='url(%23rg2)' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3Cpath d='M158 92 C 162 112 155 130 162 148 C 167 162 178 166 176 180' stroke='url(%23rg2)' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3Cpath d='M176 180 C 184 174 190 180 188 190 C 186 200 174 200 172 190 C 170 182 178 176 184 182' stroke='url(%23rg2)' stroke-width='1.3' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='2' cy='110' r='4' fill='%231f8a70' opacity='0.6'/%3E%3Ccircle cx='198' cy='108' r='3' fill='%23c8920a' opacity='0.45'/%3E%3Ccircle cx='84' cy='14' r='2.5' fill='%231f8a70' opacity='0.4'/%3E%3Ccircle cx='128' cy='204' r='2.5' fill='%23c8920a' opacity='0.4'/%3E%3Ccircle cx='34' cy='6' r='2' fill='%231f8a70' opacity='0.35'/%3E%3C/svg%3E");
+  }
+}
+
+@keyframes vine-breathe {
+  0%, 100% { opacity: 0.68; }
+  50% { opacity: 0.92; }
 }
 
 @keyframes place-card-enter {
@@ -610,6 +675,7 @@ body:has(.home-page) {
 .home-sheet .catalog {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+  /* Always show all 4 cards */
 }
 
 .home-sheet .card__description,
@@ -677,8 +743,6 @@ body:has(.home-page) {
 
 /* ─────────────────────────────────────────────────────────────────────────────
    DESKTOP LAYOUT
-   ≥768px  — sheet matches app-header side padding (20px each side)
-   ≥1480px — constrained to header's max inner width (1440px + 20px×2)
 ───────────────────────────────────────────────────────────────────────────── */
 
 @media (min-width: 768px) {
@@ -688,16 +752,45 @@ body:has(.home-page) {
     border-radius: 28px 28px 0 0;
   }
 
+  /* Center the excursions block heading and filters */
+  .home-sheet__section--excursions .home-sheet__section-title {
+    text-align: center;
+  }
+
+  .home-sheet__section--excursions .home-sheet__filter-group--inline .home-sheet__cats {
+    justify-content: center;
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
   .home-sheet .catalog {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 10px;
   }
 
-  /* Hide 4th+ card — 3 per row on desktop */
-  .home-sheet .catalog .card:nth-child(n+4) {
-    display: none;
+  /* All stat elements in one row, centered */
+  .home-sheet .card__stats {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
   }
 
+  .home-sheet .card__stats-row {
+    flex: none;
+    flex-wrap: nowrap;
+    width: auto;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  .home-sheet .card__stat-duration {
+    flex: none;
+    margin: 0;
+    width: auto;
+    padding: 0 10px;
+  }
 }
 
 @media (min-width: 1480px) {
@@ -766,10 +859,17 @@ body:has(.home-page) {
 }
 
 .home-sheet__footer-features {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr;
+  justify-items: center;
   gap: 8px;
   margin-bottom: 16px;
+}
+
+@media (min-width: 380px) {
+  .home-sheet__footer-features {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .home-sheet__footer-feature {
@@ -784,6 +884,7 @@ body:has(.home-page) {
   color: var(--color-text-secondary);
   font-size: 0.74rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .home-sheet__footer-copy {
@@ -809,7 +910,9 @@ body:has(.home-page) {
   }
 
   .home-sheet__footer-features {
+    grid-template-columns: repeat(4, auto);
     justify-content: center;
+    justify-items: center;
   }
 }
 

@@ -18,10 +18,7 @@ import type {
 import { useDiscoveryRoutes } from "@/entities/excursion/model/useDiscoveryRoutes";
 import { formatMeters } from "@/features/route-map/lib/route-geometry";
 import { useUserGeolocation } from "@/features/route-map/model/useUserGeolocation";
-import type {
-    DiscoveryCategoryOption,
-    DiscoveryRadiusOption,
-} from "@/features/route-map/ui/DiscoveryMap";
+import type { DiscoveryCategoryOption } from "@/features/route-map/ui/DiscoveryMap";
 import { DiscoveryMap } from "@/features/route-map/ui/DiscoveryMap";
 import { useAuth } from "@/app/providers/useAuth";
 import { useUserRoutes } from "@/features/user-routes/model/useUserRoutes";
@@ -72,12 +69,6 @@ const categoryIcons: Record<string, string> = {
     food: "🍽",
     park: "🌿",
 };
-
-const radiusOptions: DiscoveryRadiusOption[] = [
-    { value: 1000, label: "1 км" },
-    { value: 3000, label: "3 км" },
-    { value: 5000, label: "5 км" },
-];
 
 const routeThemeOptions: Array<ExcursionTheme | "all"> = [
     "all",
@@ -570,16 +561,13 @@ export function HomePage() {
                     onClearDraftRoute={handleClearDraftRoute}
                     onLocateUser={requestLocation}
                     onSaveDraftRoute={handleSaveDraftRoute}
-                    onSearchQueryChange={() => undefined}
                     onSelectCategory={setActivePointCategory}
                     onSelectNextPoint={() => cycleSelectedPoint(1)}
                     onSelectPoint={handleMapPointSelect}
                     onSelectPreviousPoint={() => cycleSelectedPoint(-1)}
                     radiusMeters={radiusMeters}
-                    radiusOptions={radiusOptions}
                     recenterTrigger={recenterTrigger}
                     routeTargetId={effectiveRouteTargetId}
-                    searchQuery=""
                     selectedPointId={effectiveSelectedPointId}
                     showDirectRouteInPopup={true}
                     showPopupRouteActions={false}
@@ -669,9 +657,8 @@ export function HomePage() {
 
                     {/* ── Selected place card ── */}
                     {selectedPoint && (
-                        <div
-                            className="home-sheet__place"
-                            key={selectedPoint.id}>
+                        <div className="home-sheet__place-wrap" key={selectedPoint.id}>
+                        <div className="home-sheet__place">
                             <div className="home-sheet__place-top">
                                 <div className="home-sheet__place-meta">
                                     <span className="home-sheet__place-cat">
@@ -742,6 +729,7 @@ export function HomePage() {
                                 </div>
                             )}
                         </div>
+                        </div>
                     )}
 
                     {/* ── Nearby cards ── */}
@@ -803,7 +791,7 @@ export function HomePage() {
                     )}
 
                     {/* ── Excursions ── */}
-                    <div className="home-sheet__section">
+                    <div className="home-sheet__section home-sheet__section--excursions">
                         <h3 className="home-sheet__section-title">
                             Готовые экскурсии
                         </h3>
@@ -825,6 +813,8 @@ export function HomePage() {
                                 ))}
                             </div>
                         </div>
+
+                        <div className="home-sheet__filter-divider" />
 
                         <div className="home-sheet__filter-group home-sheet__filter-group--inline">
                             <div className="home-sheet__cats">
