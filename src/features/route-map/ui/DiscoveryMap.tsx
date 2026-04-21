@@ -13,6 +13,7 @@ import {
   getBoundsFromGeometry,
   getBoundsFromPoints,
   toLngLat,
+  type LngLatBounds,
   type RouteGeometry,
 } from '@/features/route-map/lib/route-geometry'
 import {
@@ -74,6 +75,7 @@ interface DiscoveryMapProps {
   routeTargetId: string | null
   searchQuery: string
   selectedPointId: string
+  showDirectRouteInPopup?: boolean
   showPopupRouteActions?: boolean
   userPosition: GeoPoint | null
 }
@@ -130,6 +132,7 @@ export function DiscoveryMap({
   routeTargetId,
   searchQuery,
   selectedPointId,
+  showDirectRouteInPopup = false,
   showPopupRouteActions = true,
   userPosition,
 }: DiscoveryMapProps) {
@@ -141,6 +144,7 @@ export function DiscoveryMap({
   const initialCenterRef = useRef(userPosition ?? appMapConfig.defaultCenter)
   const skipSelectedFocusRef = useRef(true)
   const selectionSourceRef = useRef<SelectionSource | null>(null)
+  const onChangeRadiusRef = useRef(onChangeRadius)
   const [mapLoadError, setMapLoadError] = useState<string | null>(null)
   const [openMenu, setOpenMenu] = useState<'category' | 'radius' | null>(null)
   const [guideRoute, setGuideRoute] = useState<{
@@ -194,6 +198,9 @@ export function DiscoveryMap({
     userPosition && guidedPoint
       ? `${guidedPoint.id}:${userPosition.lat.toFixed(5)}:${userPosition.lng.toFixed(5)}`
       : ''
+
+  // Keep radius callback ref current so zoomend listener always calls latest version
+  onChangeRadiusRef.current = onChangeRadius
   const guideGeometry =
     guideRoute.signature === guideSignature && guideRoute.geometry
       ? guideRoute.geometry
@@ -229,6 +236,17 @@ export function DiscoveryMap({
 
       mapRef.current = map
       overlayRef.current = overlay
+
+      // Dynamic radius: update based on map zoom (1 km – 5 km)
+      map.on('zoomend', () => {
+        const bounds = map.getBounds()
+        const center = bounds.getCenter()
+        const east = L.latLng(center.lat, bounds.getEast())
+        const halfWidthMeters = center.distanceTo(east)
+        const clamped = Math.round(Math.min(5000, Math.max(1000, halfWidthMeters)))
+        onChangeRadiusRef.current(clamped)
+      })
+
       queueMicrotask(() => setMapLoadError(null))
     } catch (error) {
       console.error(error)
@@ -423,13 +441,21 @@ export function DiscoveryMap({
         .bindPopup(
           buildPopupContent({
             googleMapsUrl,
+            showDirectRoute: showDirectRouteInPopup || showPopupRouteActions,
             showRouteActions: showPopupRouteActions,
+            isRouteTarget: point.id === routeTargetId,
             onBuildRoute: () => {
               preservePageScroll()
               selectionSourceRef.current = 'route'
               onSelectPoint(point.id)
               onBuildRoute(point.id)
             },
+            onCancelRoute: onClearDraftRoute
+              ? () => {
+                  preservePageScroll()
+                  onClearDraftRoute()
+                }
+              : undefined,
             onAddPointToDraft: onAddPointToDraft
               ? () => {
                   preservePageScroll()
@@ -465,7 +491,7 @@ export function DiscoveryMap({
         title: 'Ваше местоположение',
       }).addTo(overlay)
     }
-  }, [draftGeometry, draftStops.length, guideGeometry, nearbyPoints, onAddPointToDraft, onBuildRoute, onSelectPoint, radiusMeters, selectedPointId, userPosition, visibleDraftPointIds])
+  }, [draftGeometry, draftStops.length, guideGeometry, nearbyPoints, onAddPointToDraft, onBuildRoute, onClearDraftRoute, onSelectPoint, radiusMeters, routeTargetId, selectedPointId, userPosition, visibleDraftPointIds])
 
   useEffect(() => {
     nearbyPoints.forEach((point) => {
@@ -520,10 +546,20 @@ export function DiscoveryMap({
     if (!recenterTrigger) return
     const map = mapRef.current
     if (!userPosition || !map) return
+    const { lat, lng } = userPosition
+    // Fixed 1 km view regardless of selected radius
+    const viewKm = 1.0
+    const latDelta = (viewKm * 1000) / 111320
+    const lngDelta = (viewKm * 1000) / (111320 * Math.cos((lat * Math.PI) / 180))
+    const bounds: LngLatBounds = [
+      [lng - lngDelta, lat - latDelta],
+      [lng + lngDelta, lat + latDelta],
+    ]
     applyLeafletLocation(map, {
-      center: toLngLat(userPosition),
-      zoom: locateZoom,
+      bounds,
+      padding: [56, 20, 64, 20],
       duration: 700,
+      easing: 'ease-in-out',
     })
   }, [recenterTrigger, userPosition])
 
@@ -743,16 +779,22 @@ function buildPopupContent({
   googleMapsUrl,
   canAddToDraft,
   isInDraft,
+  isRouteTarget,
   onAddPointToDraft,
   onBuildRoute,
+  onCancelRoute,
+  showDirectRoute,
   showRouteActions,
 }: {
   canAddToDraft: boolean
   isInDraft: boolean
+  isRouteTarget: boolean
   onAddPointToDraft?: () => void
   point: NearbyPoint
   googleMapsUrl: string
   onBuildRoute: () => void
+  onCancelRoute?: () => void
+  showDirectRoute: boolean
   showRouteActions: boolean
 }) {
   const container = document.createElement('div')
@@ -781,18 +823,32 @@ function buildPopupContent({
   openLink.textContent = 'Открыть в Google Maps'
   actions.appendChild(openLink)
 
-  if (showRouteActions) {
+  if (showDirectRoute) {
     const routeButton = document.createElement('button')
-    routeButton.className = 'map-popup__button'
     routeButton.type = 'button'
-    routeButton.textContent = 'Построить маршрут'
-    routeButton.addEventListener('click', (event) => {
-      event.preventDefault()
-      event.stopPropagation()
-      onBuildRoute()
-    })
-    actions.appendChild(routeButton)
 
+    if (isRouteTarget && onCancelRoute) {
+      routeButton.className = 'map-popup__button map-popup__button--cancel'
+      routeButton.textContent = 'Убрать маршрут'
+      routeButton.addEventListener('click', (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        onCancelRoute()
+      })
+    } else {
+      routeButton.className = 'map-popup__button'
+      routeButton.textContent = 'Построить маршрут'
+      routeButton.addEventListener('click', (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        onBuildRoute()
+      })
+    }
+
+    actions.appendChild(routeButton)
+  }
+
+  if (showRouteActions) {
     const addButton = document.createElement('button')
     addButton.className = `map-popup__button map-popup__button--accent${isInDraft ? ' map-popup__button--active' : ''}`
     addButton.disabled = !canAddToDraft

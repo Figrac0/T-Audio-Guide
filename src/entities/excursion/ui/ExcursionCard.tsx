@@ -8,7 +8,6 @@ import { useUserRoutes } from '@/features/user-routes/model/useUserRoutes'
 import { appRoutes } from '@/shared/config/routes'
 import { buildRoutePlaceholderImage } from '@/shared/lib/placeholder-images'
 import {
-  formatDifficulty,
   formatDistance,
   formatDuration,
   formatStopCount,
@@ -69,13 +68,10 @@ export function ExcursionCard({ excursion }: ExcursionCardProps) {
 
       <div className="card__content">
         <div className="card__title-row">
-          <div>
-            <Link className="card__title-link" to={routeUrl}>
-              <h3 className="card__title">{excursion.title}</h3>
-            </Link>
-            <p className="card__tagline">{excursion.tagline}</p>
-          </div>
-          <span className="card__tag">{formatDifficulty(excursion.difficulty)}</span>
+          <Link className="card__title-link" to={routeUrl}>
+            <h3 className="card__title">{excursion.title}</h3>
+          </Link>
+          <p className="card__tagline">{excursion.tagline}</p>
         </div>
 
         <p className="card__description">{excursion.description}</p>

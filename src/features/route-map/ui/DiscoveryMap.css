@@ -445,6 +445,12 @@
   opacity: 0.64;
 }
 
+.map-popup__button--cancel {
+  border-color: rgba(220, 60, 60, 0.22);
+  background: rgba(255, 240, 240, 0.9);
+  color: #c0392b;
+}
+
 @keyframes discovery-map-actions-enter {
   from {
     opacity: 0;

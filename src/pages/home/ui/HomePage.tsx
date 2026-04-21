@@ -1,705 +1,916 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
+import { Link } from "react-router-dom";
 
 import type {
-  ExcursionTheme,
-  NearbyPoint,
-  PointCategory,
-  RouteStop,
-  SupportedLocale,
-} from '@/entities/excursion/model/types'
-import { useDiscoveryRoutes } from '@/entities/excursion/model/useDiscoveryRoutes'
-import { formatMeters } from '@/features/route-map/lib/route-geometry'
-import { useUserGeolocation } from '@/features/route-map/model/useUserGeolocation'
+    ExcursionTheme,
+    NearbyPoint,
+    PointCategory,
+    RouteStop,
+    SupportedLocale,
+} from "@/entities/excursion/model/types";
+import { useDiscoveryRoutes } from "@/entities/excursion/model/useDiscoveryRoutes";
+import { formatMeters } from "@/features/route-map/lib/route-geometry";
+import { useUserGeolocation } from "@/features/route-map/model/useUserGeolocation";
 import type {
-  DiscoveryCategoryOption,
-  DiscoveryRadiusOption,
-} from '@/features/route-map/ui/DiscoveryMap'
-import { DiscoveryMap } from '@/features/route-map/ui/DiscoveryMap'
-import { useAuth } from '@/app/providers/useAuth'
-import { useUserRoutes } from '@/features/user-routes/model/useUserRoutes'
-import { appRoutes } from '@/shared/config/routes'
+    DiscoveryCategoryOption,
+    DiscoveryRadiusOption,
+} from "@/features/route-map/ui/DiscoveryMap";
+import { DiscoveryMap } from "@/features/route-map/ui/DiscoveryMap";
+import { useAuth } from "@/app/providers/useAuth";
+import { useUserRoutes } from "@/features/user-routes/model/useUserRoutes";
+import { appRoutes } from "@/shared/config/routes";
 import {
-  detectSupportedLocale,
-  getStoredDiscoveryContext,
-  saveDiscoveryContext,
-} from '@/shared/lib/discovery-context'
-import { formatDuration, formatPointCategory, formatTheme } from '@/shared/lib/format'
-import { buildGoogleMapsUrl } from '@/shared/lib/maps'
-import { SmartPlaceImage } from '@/shared/ui/SmartPlaceImage'
-import { ExcursionCatalog } from '@/widgets/excursion-catalog/ui/ExcursionCatalog'
-import './HomePage.css'
+    detectSupportedLocale,
+    getStoredDiscoveryContext,
+    saveDiscoveryContext,
+} from "@/shared/lib/discovery-context";
+import {
+    formatDuration,
+    formatPointCategory,
+    formatTheme,
+} from "@/shared/lib/format";
+import { SmartPlaceImage } from "@/shared/ui/SmartPlaceImage";
+import { ExcursionCatalog } from "@/widgets/excursion-catalog/ui/ExcursionCatalog";
+import "./HomePage.css";
 
 // Height of the peek bar (drag handle + locate button row)
-const PEEK_HEIGHT = 52
+const PEEK_HEIGHT = 52;
 // Minimum translateY — leaves a gap below the app header
-const DRAG_MIN = 10
-const HALF_RATIO = 0.48
+const DRAG_MIN = 10;
+const HALF_RATIO = 0.48;
 
-type SheetState = 'peek' | 'half' | 'full'
+type SheetState = "peek" | "half" | "full";
 
 function getSnapTranslate(state: SheetState, sheetHeight: number): number {
-  if (state === 'full') return DRAG_MIN
-  if (state === 'half') return sheetHeight - Math.round(window.innerHeight * HALF_RATIO)
-  return sheetHeight - PEEK_HEIGHT
+    if (state === "full") return DRAG_MIN;
+    if (state === "half")
+        return sheetHeight - Math.round(window.innerHeight * HALF_RATIO);
+    return sheetHeight - PEEK_HEIGHT;
 }
 
 const nearbyCategoryOptions: DiscoveryCategoryOption[] = [
-  { id: 'all', label: 'Все' },
-  { id: 'museum', label: 'Музеи' },
-  { id: 'entertainment', label: 'Развлечения' },
-  { id: 'landmark', label: 'История' },
-  { id: 'food', label: 'Еда' },
-  { id: 'park', label: 'Природа' },
-]
+    { id: "all", label: "Все" },
+    { id: "museum", label: "Музеи" },
+    { id: "entertainment", label: "Развлечения" },
+    { id: "landmark", label: "История" },
+    { id: "food", label: "Еда" },
+    { id: "park", label: "Природа" },
+];
 
 const categoryIcons: Record<string, string> = {
-  all: '◎',
-  museum: '🏛',
-  entertainment: '✨',
-  landmark: '📍',
-  food: '🍽',
-  park: '🌿',
-}
+    all: "◎",
+    museum: "🏛",
+    entertainment: "✨",
+    landmark: "📍",
+    food: "🍽",
+    park: "🌿",
+};
 
 const radiusOptions: DiscoveryRadiusOption[] = [
-  { value: 1000, label: '1 км' },
-  { value: 3000, label: '3 км' },
-  { value: 5000, label: '5 км' },
-]
+    { value: 1000, label: "1 км" },
+    { value: 3000, label: "3 км" },
+    { value: 5000, label: "5 км" },
+];
 
-const routeThemeOptions: Array<ExcursionTheme | 'all'> = [
-  'all', 'walk', 'food', 'nature', 'fun', 'mixed',
-]
+const routeThemeOptions: Array<ExcursionTheme | "all"> = [
+    "all",
+    "walk",
+    "food",
+    "nature",
+    "fun",
+    "mixed",
+];
 
-const durationOptions = [30, 45, 60, 90, 120]
+const durationOptions = [30, 45, 60, 90, 120];
 
 export function HomePage() {
-  const { session } = useAuth()
-  const {
-    addPointToDraft,
-    clearDraftRoute,
-    draftStops,
-    isPointInDraft,
-    removeDraftStop,
-    saveDraftRoute,
-  } = useUserRoutes()
+    const { session } = useAuth();
+    const {
+        addPointToDraft,
+        clearDraftRoute,
+        draftStops,
 
-  const storedContext = useMemo(() => getStoredDiscoveryContext(), [])
-  const detectedLocale = useMemo(() => {
-    if (typeof window === 'undefined') return storedContext.locale
-    return detectSupportedLocale(
-      navigator.languages?.[0] ?? navigator.language ?? storedContext.browserLocale,
-    )
-  }, [storedContext.browserLocale, storedContext.locale])
+        saveDraftRoute,
+    } = useUserRoutes();
 
-  const [audioLocale] = useState<SupportedLocale>(storedContext.locale ?? detectedLocale)
-  const [activePointCategory, setActivePointCategory] = useState<PointCategory | 'all'>(
-    storedContext.activePointCategory ?? 'all',
-  )
-  const [radiusMeters, setRadiusMeters] = useState<number>(storedContext.radiusMeters ?? 1000)
-  const [activeRouteTheme, setActiveRouteTheme] = useState<ExcursionTheme | 'all'>('all')
-  const [maxRouteDuration, setMaxRouteDuration] = useState<number | null>(null)
-  const [selectedPointId, setSelectedPointId] = useState<string>('')
-  const [routeTargetId, setRouteTargetId] = useState<string | null>(null)
-  const [savedDraftPreviewStops, setSavedDraftPreviewStops] = useState<RouteStop[]>([])
-  const [draftRouteNotice, setDraftRouteNoticeValue] = useState<string | null>(null)
-  const [draftRouteNoticeKey, setDraftRouteNoticeKey] = useState(0)
-  const [draftRouteNoticeTone, setDraftRouteNoticeTone] = useState<'success' | 'warning'>('success')
-  const [recenterTrigger, setRecenterTrigger] = useState(0)
+    const storedContext = useMemo(() => getStoredDiscoveryContext(), []);
+    const detectedLocale = useMemo(() => {
+        if (typeof window === "undefined") return storedContext.locale;
+        return detectSupportedLocale(
+            navigator.languages?.[0] ??
+                navigator.language ??
+                storedContext.browserLocale,
+        );
+    }, [storedContext.browserLocale, storedContext.locale]);
 
-  const nearbyListRef = useRef<HTMLDivElement | null>(null)
-  const shouldScrollNearbyListRef = useRef(false)
-  const isAuthenticated = Boolean(session?.isAuthenticated && session.profile)
+    const [audioLocale] = useState<SupportedLocale>(
+        storedContext.locale ?? detectedLocale,
+    );
+    const [activePointCategory, setActivePointCategory] = useState<
+        PointCategory | "all"
+    >(storedContext.activePointCategory ?? "all");
+    const [radiusMeters, setRadiusMeters] = useState<number>(
+        storedContext.radiusMeters ?? 1000,
+    );
+    const [activeRouteTheme, setActiveRouteTheme] = useState<
+        ExcursionTheme | "all"
+    >("all");
+    const [maxRouteDuration, setMaxRouteDuration] = useState<number | null>(
+        null,
+    );
+    const [selectedPointId, setSelectedPointId] = useState<string>("");
+    const [routeTargetId, setRouteTargetId] = useState<string | null>(null);
+    const [savedDraftPreviewStops, setSavedDraftPreviewStops] = useState<
+        RouteStop[]
+    >([]);
+    const [draftRouteNotice, setDraftRouteNoticeValue] = useState<
+        string | null
+    >(null);
+    const [draftRouteNoticeKey, setDraftRouteNoticeKey] = useState(0);
+    const [draftRouteNoticeTone, setDraftRouteNoticeTone] = useState<
+        "success" | "warning"
+    >("success");
+    const [recenterTrigger, setRecenterTrigger] = useState(0);
 
-  const {
-    error: geolocationError,
-    requestLocation,
-    status: geolocationStatus,
-    userPosition,
-  } = useUserGeolocation()
+    const nearbyListRef = useRef<HTMLDivElement | null>(null);
+    const shouldScrollNearbyListRef = useRef(false);
+    const isAuthenticated = Boolean(
+        session?.isAuthenticated && session.profile,
+    );
 
-  const currentCenter = userPosition ?? storedContext.center
-  const canLoadNearbyPlaces =
-    Boolean(userPosition) || geolocationStatus === 'blocked' || geolocationStatus === 'unsupported'
+    const {
+        error: geolocationError,
+        requestLocation,
+        status: geolocationStatus,
+        userPosition,
+    } = useUserGeolocation();
 
-  const {
-    error: discoveryError,
-    excursions,
-    isLoading,
-    nearbyPoints,
-  } = useDiscoveryRoutes({
-    activePointCategory,
-    center: currentCenter,
-    enabled: canLoadNearbyPlaces,
-    locale: audioLocale,
-    radiusMeters,
-    search: '',
-  })
+    const currentCenter = userPosition ?? storedContext.center;
+    const canLoadNearbyPlaces =
+        Boolean(userPosition) ||
+        geolocationStatus === "blocked" ||
+        geolocationStatus === "unsupported";
 
-  useEffect(() => {
-    saveDiscoveryContext({
-      activePointCategory,
-      center: currentCenter,
-      locale: audioLocale,
-      browserLocale:
-        typeof window === 'undefined'
-          ? storedContext.browserLocale
-          : navigator.languages?.[0] ?? navigator.language ?? storedContext.browserLocale,
-      radiusMeters,
-      updatedAt: new Date().toISOString(),
-    })
-  }, [activePointCategory, audioLocale, currentCenter, radiusMeters, storedContext.browserLocale])
+    const {
+        error: discoveryError,
+        excursions,
+        isLoading,
+        nearbyPoints,
+    } = useDiscoveryRoutes({
+        activePointCategory,
+        center: currentCenter,
+        enabled: canLoadNearbyPlaces,
+        locale: audioLocale,
+        radiusMeters,
+        search: "",
+    });
 
-  const effectiveSelectedPointId =
-    nearbyPoints.find((p) => p.id === selectedPointId)?.id ?? nearbyPoints[0]?.id ?? ''
-  const selectedPoint =
-    nearbyPoints.find((p) => p.id === effectiveSelectedPointId) ?? nearbyPoints[0] ?? null
-  const effectiveRouteTargetId =
-    routeTargetId && nearbyPoints.some((p) => p.id === routeTargetId) ? routeTargetId : null
-  const selectedPointMapsUrl = selectedPoint
-    ? buildGoogleMapsUrl(selectedPoint.coordinates, userPosition)
-    : '#'
+    useEffect(() => {
+        saveDiscoveryContext({
+            activePointCategory,
+            center: currentCenter,
+            locale: audioLocale,
+            browserLocale:
+                typeof window === "undefined"
+                    ? storedContext.browserLocale
+                    : (navigator.languages?.[0] ??
+                      navigator.language ??
+                      storedContext.browserLocale),
+            radiusMeters,
+            updatedAt: new Date().toISOString(),
+        });
+    }, [
+        activePointCategory,
+        audioLocale,
+        currentCenter,
+        radiusMeters,
+        storedContext.browserLocale,
+    ]);
 
-  const visibleRoutes = useMemo(
-    () =>
-      excursions.filter((e) => {
-        const matchesTheme = activeRouteTheme === 'all' || e.theme === activeRouteTheme
-        const matchesDuration = maxRouteDuration === null || e.durationMinutes <= maxRouteDuration
-        return matchesTheme && matchesDuration
-      }),
-    [activeRouteTheme, excursions, maxRouteDuration],
-  )
+    const effectiveSelectedPointId =
+        nearbyPoints.find((p) => p.id === selectedPointId)?.id ?? "";
+    const selectedPoint = effectiveSelectedPointId
+        ? (nearbyPoints.find((p) => p.id === effectiveSelectedPointId) ?? null)
+        : null;
+    const effectiveRouteTargetId =
+        routeTargetId && nearbyPoints.some((p) => p.id === routeTargetId)
+            ? routeTargetId
+            : null;
+    const visibleRoutes = useMemo(
+        () =>
+            excursions.filter((e) => {
+                const matchesTheme =
+                    activeRouteTheme === "all" || e.theme === activeRouteTheme;
+                const matchesDuration =
+                    maxRouteDuration === null ||
+                    e.durationMinutes <= maxRouteDuration;
+                return matchesTheme && matchesDuration;
+            }),
+        [activeRouteTheme, excursions, maxRouteDuration],
+    );
 
-  useEffect(() => {
-    if (!shouldScrollNearbyListRef.current) return
-    const list = nearbyListRef.current
-    if (!list || !effectiveSelectedPointId) return
-    const card = list.querySelector<HTMLElement>(`[data-point-id="${effectiveSelectedPointId}"]`)
-    if (card) scrollIntoHorizontalView(list, card)
-    shouldScrollNearbyListRef.current = false
-  }, [effectiveSelectedPointId])
+    useEffect(() => {
+        if (!shouldScrollNearbyListRef.current) return;
+        const list = nearbyListRef.current;
+        if (!list || !effectiveSelectedPointId) return;
+        const card = list.querySelector<HTMLElement>(
+            `[data-point-id="${effectiveSelectedPointId}"]`,
+        );
+        if (card) scrollIntoHorizontalView(list, card);
+        shouldScrollNearbyListRef.current = false;
+    }, [effectiveSelectedPointId]);
 
-  useEffect(() => {
-    if (!draftRouteNotice) return
-    const id = window.setTimeout(() => setDraftRouteNoticeValue(null), 3200)
-    return () => window.clearTimeout(id)
-  }, [draftRouteNotice, draftRouteNoticeKey])
+    useEffect(() => {
+        if (!draftRouteNotice) return;
+        const id = window.setTimeout(
+            () => setDraftRouteNoticeValue(null),
+            3200,
+        );
+        return () => window.clearTimeout(id);
+    }, [draftRouteNotice, draftRouteNoticeKey]);
 
-  // Enable mouse drag-to-scroll on the nearby cards strip
-  useEffect(() => {
-    const el = nearbyListRef.current
-    if (!el) return
-    let isDown = false
-    let startX = 0
-    let scrollLeft = 0
-    let hasDragged = false
+    // Enable mouse drag-to-scroll on the nearby cards strip
+    useEffect(() => {
+        const el = nearbyListRef.current;
+        if (!el) return;
+        let isDown = false;
+        let startX = 0;
+        let scrollLeft = 0;
+        let hasDragged = false;
 
-    const onMouseDown = (e: MouseEvent) => {
-      isDown = true
-      hasDragged = false
-      startX = e.pageX - el.offsetLeft
-      scrollLeft = el.scrollLeft
-      el.style.cursor = 'grabbing'
-    }
-    const onMouseLeave = () => { isDown = false; el.style.cursor = '' }
-    const onMouseUp = () => { isDown = false; el.style.cursor = '' }
-    const onMouseMove = (e: MouseEvent) => {
-      if (!isDown) return
-      const x = e.pageX - el.offsetLeft
-      const walk = (x - startX) * 1.4
-      if (Math.abs(walk) > 4) {
-        hasDragged = true
-        e.preventDefault()
-      }
-      el.scrollLeft = scrollLeft - walk
-    }
-    // Prevent click on child if we actually dragged
-    const onClickCapture = (e: MouseEvent) => {
-      if (hasDragged) e.stopPropagation()
-    }
-
-    el.addEventListener('mousedown', onMouseDown)
-    el.addEventListener('mouseleave', onMouseLeave)
-    el.addEventListener('mouseup', onMouseUp)
-    el.addEventListener('mousemove', onMouseMove)
-    el.addEventListener('click', onClickCapture, true)
-    return () => {
-      el.removeEventListener('mousedown', onMouseDown)
-      el.removeEventListener('mouseleave', onMouseLeave)
-      el.removeEventListener('mouseup', onMouseUp)
-      el.removeEventListener('mousemove', onMouseMove)
-      el.removeEventListener('click', onClickCapture, true)
-    }
-  }, [])
-
-  const setDraftRouteNotice = useCallback((message: string | null) => {
-    if (!message) { setDraftRouteNoticeValue(null); return }
-    setDraftRouteNoticeTone(message.toLowerCase().includes('уже') ? 'warning' : 'success')
-    setDraftRouteNoticeKey((n) => n + 1)
-    setDraftRouteNoticeValue(message)
-  }, [])
-
-  const handleBuildRoute = useCallback(
-    (pointId: string) => {
-      setSelectedPointId(pointId)
-      setRouteTargetId(pointId)
-      if (!userPosition) requestLocation()
-    },
-    [requestLocation, userPosition],
-  )
-
-  const handleAddPointToRoute = useCallback(
-    (point: NearbyPoint) => {
-      addPointToDraft(point)
-      setDraftRouteNotice(null)
-      setSavedDraftPreviewStops([])
-      setSelectedPointId(point.id)
-      setRouteTargetId(point.id)
-      if (!userPosition) requestLocation()
-    },
-    [addPointToDraft, requestLocation, setDraftRouteNotice, userPosition],
-  )
-
-  const handleClearDraftRoute = useCallback(() => {
-    clearDraftRoute()
-    setDraftRouteNotice(null)
-    setSavedDraftPreviewStops([])
-    setRouteTargetId(null)
-  }, [clearDraftRoute, setDraftRouteNotice])
-
-  const handleSaveDraftRoute = useCallback(() => {
-    const result = saveDraftRoute()
-    if (result.status === 'duplicate') {
-      setDraftRouteNotice('Такой маршрут уже сохранен.')
-      return
-    }
-    if (result.status !== 'saved' || !result.route) return
-    setDraftRouteNotice('Маршрут сохранен в профиле.')
-    setSavedDraftPreviewStops(result.route.stops)
-    clearDraftRoute()
-    setRouteTargetId(null)
-  }, [clearDraftRoute, saveDraftRoute, setDraftRouteNotice])
-
-  const handleCenterUser = useCallback(() => {
-    if (!userPosition) { requestLocation(); return }
-    setRecenterTrigger((n) => n + 1)
-  }, [userPosition, requestLocation])
-
-  const handleNearbyCardClick = useCallback((pointId: string) => {
-    shouldScrollNearbyListRef.current = true
-    setSelectedPointId(pointId)
-  }, [])
-
-  const handleMapPointSelect = useCallback((pointId: string) => {
-    shouldScrollNearbyListRef.current = true
-    setSelectedPointId(pointId)
-  }, [])
-
-  const cycleSelectedPoint = useCallback(
-    (direction: 1 | -1) => {
-      if (!nearbyPoints.length) return
-      const currentIndex = nearbyPoints.findIndex((p) => p.id === effectiveSelectedPointId)
-      const safeIndex = currentIndex >= 0 ? currentIndex : 0
-      const nextIndex = (safeIndex + direction + nearbyPoints.length) % nearbyPoints.length
-      shouldScrollNearbyListRef.current = true
-      setSelectedPointId(nearbyPoints[nextIndex].id)
-    },
-    [effectiveSelectedPointId, nearbyPoints],
-  )
-
-  // ── Bottom sheet ────────────────────────────────────────────────────────────
-
-  const [sheetState, setSheetState] = useState<SheetState>('peek')
-  const sheetStateRef = useRef<SheetState>('peek')
-  const sheetRef = useRef<HTMLDivElement>(null)
-  // Prevents the sheetState useEffect from overriding a manually set transform
-  const skipSnapRef = useRef(false)
-  const dragRef = useRef({
-    active: false,
-    startPointerY: 0,
-    startTranslate: 0,
-    lastPointerY: 0,
-    lastTime: 0,
-    velocity: 0,
-  })
-
-  useEffect(() => {
-    sheetStateRef.current = sheetState
-  }, [sheetState])
-
-  // Apply snap transitions when state changes via keyboard (not drag)
-  useEffect(() => {
-    if (skipSnapRef.current) {
-      skipSnapRef.current = false
-      return
-    }
-    const sheet = sheetRef.current
-    if (!sheet || sheet.offsetHeight === 0) return
-    const target = getSnapTranslate(sheetState, sheet.offsetHeight)
-    sheet.style.transition = 'transform 0.36s cubic-bezier(0.4, 0, 0.2, 1)'
-    sheet.style.transform = `translateY(${target}px)`
-  }, [sheetState])
-
-  useLayoutEffect(() => {
-    const sheet = sheetRef.current
-    if (!sheet) return
-
-    const applyInitial = () => {
-      if (sheet.offsetHeight > 0) {
-        sheet.style.transition = 'none'
-        sheet.style.transform = `translateY(${sheet.offsetHeight - PEEK_HEIGHT}px)`
-      }
-    }
-    applyInitial()
-
-    const onResize = () => {
-      if (dragRef.current.active) return
-      const target = getSnapTranslate(sheetStateRef.current, sheet.offsetHeight)
-      sheet.style.transition = 'none'
-      sheet.style.transform = `translateY(${target}px)`
-    }
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
-
-  function handleDragStart(e: React.PointerEvent<HTMLDivElement>) {
-    const sheet = sheetRef.current
-    if (!sheet) return
-    e.currentTarget.setPointerCapture(e.pointerId)
-    const match = sheet.style.transform.match(/translateY\((-?\d+(?:\.\d+)?)px\)/)
-    const current = match
-      ? parseFloat(match[1])
-      : getSnapTranslate(sheetState, sheet.offsetHeight)
-    dragRef.current = {
-      active: true,
-      startPointerY: e.clientY,
-      startTranslate: current,
-      lastPointerY: e.clientY,
-      lastTime: Date.now(),
-      velocity: 0,
-    }
-    sheet.style.transition = 'none'
-  }
-
-  function handleDragMove(e: React.PointerEvent<HTMLDivElement>) {
-    if (!dragRef.current.active) return
-    const sheet = sheetRef.current
-    if (!sheet) return
-    const sheetHeight = sheet.offsetHeight
-    const dy = e.clientY - dragRef.current.startPointerY
-    const raw = dragRef.current.startTranslate + dy
-    // Clamp: prevent touching header (DRAG_MIN) and hide below peek
-    const newTranslate = Math.min(sheetHeight - PEEK_HEIGHT, Math.max(DRAG_MIN, raw))
-    const now = Date.now()
-    const dt = Math.max(1, now - dragRef.current.lastTime)
-    dragRef.current.velocity = ((e.clientY - dragRef.current.lastPointerY) / dt) * 16
-    dragRef.current.lastPointerY = e.clientY
-    dragRef.current.lastTime = now
-    sheet.style.transform = `translateY(${newTranslate}px)`
-  }
-
-  function handleDragEnd() {
-    if (!dragRef.current.active) return
-    dragRef.current.active = false
-    const sheet = sheetRef.current
-    if (!sheet) return
-    const match = sheet.style.transform.match(/translateY\((-?\d+(?:\.\d+)?)px\)/)
-    const currentTranslate = match ? parseFloat(match[1]) : 0
-    const sheetHeight = sheet.offsetHeight
-    const velocity = dragRef.current.velocity
-    const peekT = getSnapTranslate('peek', sheetHeight)
-    const halfT = getSnapTranslate('half', sheetHeight)
-
-    if (velocity > 8) {
-      // Fast fling down → collapse to peek
-      skipSnapRef.current = true
-      setSheetState('peek')
-      sheet.style.transition = 'transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)'
-      sheet.style.transform = `translateY(${peekT}px)`
-    } else if (velocity < -8) {
-      // Fast fling up → expand to full
-      skipSnapRef.current = true
-      setSheetState('full')
-      sheet.style.transition = 'transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)'
-      sheet.style.transform = `translateY(${DRAG_MIN}px)`
-    } else {
-      // Free position — stay exactly where released
-      sheet.style.transition = 'none'
-      // Update state for keyboard nav without triggering CSS snap
-      skipSnapRef.current = true
-      if (currentTranslate >= peekT * 0.88) setSheetState('peek')
-      else if (currentTranslate >= halfT * 0.5) setSheetState('half')
-      else setSheetState('full')
-    }
-  }
-
-  return (
-    <div className="home-page">
-      <div className="home-page__map">
-        <DiscoveryMap
-          activeCategory={activePointCategory}
-          canSaveDraftRoute={isAuthenticated}
-          categoryOptions={nearbyCategoryOptions}
-          draftStops={draftStops}
-          draftRouteNotice={draftRouteNotice}
-          draftRouteNoticeKey={draftRouteNoticeKey}
-          draftRouteNoticeTone={draftRouteNoticeTone}
-          emptyMessage="В этом радиусе нет доступных точек."
-          fixedRouteStops={savedDraftPreviewStops}
-          fullscreen
-          geolocationError={geolocationError}
-          isLoading={isLoading || !canLoadNearbyPlaces}
-          loadError={discoveryError}
-          nearbyPoints={nearbyPoints}
-          onAddPointToDraft={handleAddPointToRoute}
-          onBuildRoute={handleBuildRoute}
-          onChangeRadius={setRadiusMeters}
-          onClearDraftRoute={handleClearDraftRoute}
-          onLocateUser={requestLocation}
-          onSaveDraftRoute={handleSaveDraftRoute}
-          onSearchQueryChange={() => undefined}
-          onSelectCategory={setActivePointCategory}
-          onSelectNextPoint={() => cycleSelectedPoint(1)}
-          onSelectPoint={handleMapPointSelect}
-          onSelectPreviousPoint={() => cycleSelectedPoint(-1)}
-          radiusMeters={radiusMeters}
-          radiusOptions={radiusOptions}
-          recenterTrigger={recenterTrigger}
-          routeTargetId={effectiveRouteTargetId}
-          searchQuery=""
-          selectedPointId={effectiveSelectedPointId}
-          showPopupRouteActions={false}
-          userPosition={userPosition}
-        />
-      </div>
-
-      <div className="home-sheet" ref={sheetRef}>
-        {/* Drag handle — the only thing visible in peek state */}
-        <div
-          aria-label="Потяните вверх чтобы открыть панель"
-          className="home-sheet__drag"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              setSheetState((s) => (s === 'peek' ? 'half' : s === 'half' ? 'full' : 'peek'))
+        const onMouseDown = (e: MouseEvent) => {
+            isDown = true;
+            hasDragged = false;
+            startX = e.pageX - el.offsetLeft;
+            scrollLeft = el.scrollLeft;
+            el.style.cursor = "grabbing";
+        };
+        const onMouseLeave = () => {
+            isDown = false;
+            el.style.cursor = "";
+        };
+        const onMouseUp = () => {
+            isDown = false;
+            el.style.cursor = "";
+        };
+        const onMouseMove = (e: MouseEvent) => {
+            if (!isDown) return;
+            const x = e.pageX - el.offsetLeft;
+            const walk = (x - startX) * 1.4;
+            if (Math.abs(walk) > 4) {
+                hasDragged = true;
+                e.preventDefault();
             }
-          }}
-          onPointerCancel={handleDragEnd}
-          onPointerDown={handleDragStart}
-          onPointerMove={handleDragMove}
-          onPointerUp={handleDragEnd}
-          role="button"
-          tabIndex={0}
-        >
-          <div className="home-sheet__handle" />
+            el.scrollLeft = scrollLeft - walk;
+        };
+        // Prevent click on child if we actually dragged
+        const onClickCapture = (e: MouseEvent) => {
+            if (hasDragged) e.stopPropagation();
+        };
 
-          {/* Locate button lives inside drag area — always visible */}
-          <button
-            aria-label="Найти моё местоположение"
-            className="home-sheet__locate"
-            onClick={handleCenterUser}
-            onPointerDown={(e) => e.stopPropagation()}
-            type="button"
-          >
-            <svg fill="none" height="16" viewBox="0 0 24 24" width="16">
-              <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="2" />
-              <path
-                d="M12 2v3M12 19v3M2 12h3M19 12h3"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeWidth="2"
-              />
-            </svg>
-          </button>
-        </div>
+        el.addEventListener("mousedown", onMouseDown);
+        el.addEventListener("mouseleave", onMouseLeave);
+        el.addEventListener("mouseup", onMouseUp);
+        el.addEventListener("mousemove", onMouseMove);
+        el.addEventListener("click", onClickCapture, true);
+        return () => {
+            el.removeEventListener("mousedown", onMouseDown);
+            el.removeEventListener("mouseleave", onMouseLeave);
+            el.removeEventListener("mouseup", onMouseUp);
+            el.removeEventListener("mousemove", onMouseMove);
+            el.removeEventListener("click", onClickCapture, true);
+        };
+    }, []);
 
-        {/* Scrollable content */}
-        <div className="home-sheet__body">
+    const setDraftRouteNotice = useCallback((message: string | null) => {
+        if (!message) {
+            setDraftRouteNoticeValue(null);
+            return;
+        }
+        setDraftRouteNoticeTone(
+            message.toLowerCase().includes("уже") ? "warning" : "success",
+        );
+        setDraftRouteNoticeKey((n) => n + 1);
+        setDraftRouteNoticeValue(message);
+    }, []);
 
-          {/* ── Categories ── */}
-          <div className="home-sheet__filter-group">
-            <p className="home-sheet__filter-label">Места рядом</p>
-            <div className="home-sheet__cats">
-              {nearbyCategoryOptions.map((opt) => (
-                <button
-                  className={`home-sheet__cat${activePointCategory === opt.id ? ' home-sheet__cat--active' : ''}`}
-                  key={opt.id}
-                  onClick={() => setActivePointCategory(opt.id as PointCategory | 'all')}
-                  type="button"
-                >
-                  <span className="home-sheet__cat-icon" aria-hidden="true">
-                    {categoryIcons[opt.id]}
-                  </span>
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
+    const handleBuildRoute = useCallback(
+        (pointId: string) => {
+            setSelectedPointId(pointId);
+            setRouteTargetId(pointId);
+            if (!userPosition) requestLocation();
+        },
+        [requestLocation, userPosition],
+    );
 
-          {/* ── Radius ── */}
-          <div className="home-sheet__filter-group">
-            <p className="home-sheet__filter-label">Радиус</p>
-            <div className="home-sheet__cats">
-              {radiusOptions.map((r) => (
-                <button
-                  className={`home-sheet__cat${radiusMeters === r.value ? ' home-sheet__cat--active' : ''}`}
-                  key={r.value}
-                  onClick={() => setRadiusMeters(r.value)}
-                  type="button"
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
-          </div>
+    const handleAddPointToRoute = useCallback(
+        (point: NearbyPoint) => {
+            addPointToDraft(point);
+            setDraftRouteNotice(null);
+            setSavedDraftPreviewStops([]);
+            setSelectedPointId(point.id);
+            setRouteTargetId(point.id);
+            if (!userPosition) requestLocation();
+        },
+        [addPointToDraft, requestLocation, setDraftRouteNotice, userPosition],
+    );
 
-          {/* ── Selected place card ── */}
-          {selectedPoint && (
-            <div className="home-sheet__place">
-              <div className="home-sheet__place-media">
-                <SmartPlaceImage
-                  alt={selectedPoint.title}
-                  category={selectedPoint.category}
-                  coordinates={selectedPoint.coordinates}
-                  loading="lazy"
-                  referrerPolicy="no-referrer"
-                  src={selectedPoint.imageUrl}
-                  title={selectedPoint.title}
+    const handleClearDraftRoute = useCallback(() => {
+        clearDraftRoute();
+        setDraftRouteNotice(null);
+        setSavedDraftPreviewStops([]);
+        setRouteTargetId(null);
+    }, [clearDraftRoute, setDraftRouteNotice]);
+
+    const handleSaveDraftRoute = useCallback(() => {
+        const result = saveDraftRoute();
+        if (result.status === "duplicate") {
+            setDraftRouteNotice("Такой маршрут уже сохранен.");
+            return;
+        }
+        if (result.status !== "saved" || !result.route) return;
+        setDraftRouteNotice("Маршрут сохранен в профиле.");
+        setSavedDraftPreviewStops(result.route.stops);
+        clearDraftRoute();
+        setRouteTargetId(null);
+    }, [clearDraftRoute, saveDraftRoute, setDraftRouteNotice]);
+
+    const handleCenterUser = useCallback(() => {
+        if (!userPosition) {
+            requestLocation();
+            return;
+        }
+        setRecenterTrigger((n) => n + 1);
+    }, [userPosition, requestLocation]);
+
+    const handleNearbyCardClick = useCallback((pointId: string) => {
+        shouldScrollNearbyListRef.current = true;
+        setSelectedPointId(pointId);
+    }, []);
+
+    const handleMapPointSelect = useCallback((pointId: string) => {
+        shouldScrollNearbyListRef.current = true;
+        setSelectedPointId(pointId);
+    }, []);
+
+    const cycleSelectedPoint = useCallback(
+        (direction: 1 | -1) => {
+            if (!nearbyPoints.length) return;
+            const currentIndex = nearbyPoints.findIndex(
+                (p) => p.id === effectiveSelectedPointId,
+            );
+            const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+            const nextIndex =
+                (safeIndex + direction + nearbyPoints.length) %
+                nearbyPoints.length;
+            shouldScrollNearbyListRef.current = true;
+            setSelectedPointId(nearbyPoints[nextIndex].id);
+        },
+        [effectiveSelectedPointId, nearbyPoints],
+    );
+
+    // ── Bottom sheet ────────────────────────────────────────────────────────────
+
+    const [sheetState, setSheetState] = useState<SheetState>("peek");
+    const sheetStateRef = useRef<SheetState>("peek");
+    const sheetRef = useRef<HTMLDivElement>(null);
+    // Prevents the sheetState useEffect from overriding a manually set transform
+    const skipSnapRef = useRef(false);
+
+    const snapToPeek = useCallback(() => {
+        const sheet = sheetRef.current;
+        if (!sheet) return;
+        const peekT = getSnapTranslate("peek", sheet.offsetHeight);
+        skipSnapRef.current = true;
+        setSheetState("peek");
+        sheet.style.transition = "transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)";
+        sheet.style.transform = `translateY(${peekT}px)`;
+    }, []);
+
+    const handleGoToPlace = useCallback(
+        (point: NearbyPoint) => {
+            setSelectedPointId(point.id);
+            setRouteTargetId(point.id);
+            if (!userPosition) requestLocation();
+            snapToPeek();
+        },
+        [requestLocation, snapToPeek, userPosition],
+    );
+
+    // Collapse sheet when the app nav menu opens
+    useEffect(() => {
+        window.addEventListener("app-menu-open", snapToPeek);
+        return () => window.removeEventListener("app-menu-open", snapToPeek);
+    }, [snapToPeek]);
+    const dragRef = useRef({
+        active: false,
+        startPointerY: 0,
+        startTranslate: 0,
+        lastPointerY: 0,
+        lastTime: 0,
+        velocity: 0,
+    });
+
+    useEffect(() => {
+        sheetStateRef.current = sheetState;
+    }, [sheetState]);
+
+    // Apply snap transitions when state changes via keyboard (not drag)
+    useEffect(() => {
+        if (skipSnapRef.current) {
+            skipSnapRef.current = false;
+            return;
+        }
+        const sheet = sheetRef.current;
+        if (!sheet || sheet.offsetHeight === 0) return;
+        const target = getSnapTranslate(sheetState, sheet.offsetHeight);
+        sheet.style.transition = "transform 0.36s cubic-bezier(0.4, 0, 0.2, 1)";
+        sheet.style.transform = `translateY(${target}px)`;
+    }, [sheetState]);
+
+    useLayoutEffect(() => {
+        const sheet = sheetRef.current;
+        if (!sheet) return;
+
+        const applyInitial = () => {
+            if (sheet.offsetHeight > 0) {
+                sheet.style.transition = "none";
+                sheet.style.transform = `translateY(${sheet.offsetHeight - PEEK_HEIGHT}px)`;
+            }
+        };
+        applyInitial();
+
+        const onResize = () => {
+            if (dragRef.current.active) return;
+            const target = getSnapTranslate(
+                sheetStateRef.current,
+                sheet.offsetHeight,
+            );
+            sheet.style.transition = "none";
+            sheet.style.transform = `translateY(${target}px)`;
+        };
+        window.addEventListener("resize", onResize);
+        return () => window.removeEventListener("resize", onResize);
+    }, []);
+
+    function handleDragStart(e: React.PointerEvent<HTMLDivElement>) {
+        const sheet = sheetRef.current;
+        if (!sheet) return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        const match = sheet.style.transform.match(
+            /translateY\((-?\d+(?:\.\d+)?)px\)/,
+        );
+        const current = match
+            ? parseFloat(match[1])
+            : getSnapTranslate(sheetState, sheet.offsetHeight);
+        dragRef.current = {
+            active: true,
+            startPointerY: e.clientY,
+            startTranslate: current,
+            lastPointerY: e.clientY,
+            lastTime: Date.now(),
+            velocity: 0,
+        };
+        sheet.style.transition = "none";
+    }
+
+    function handleDragMove(e: React.PointerEvent<HTMLDivElement>) {
+        if (!dragRef.current.active) return;
+        const sheet = sheetRef.current;
+        if (!sheet) return;
+        const sheetHeight = sheet.offsetHeight;
+        const dy = e.clientY - dragRef.current.startPointerY;
+        const raw = dragRef.current.startTranslate + dy;
+        // Clamp: prevent touching header (DRAG_MIN) and hide below peek
+        const newTranslate = Math.min(
+            sheetHeight - PEEK_HEIGHT,
+            Math.max(DRAG_MIN, raw),
+        );
+        const now = Date.now();
+        const dt = Math.max(1, now - dragRef.current.lastTime);
+        dragRef.current.velocity =
+            ((e.clientY - dragRef.current.lastPointerY) / dt) * 16;
+        dragRef.current.lastPointerY = e.clientY;
+        dragRef.current.lastTime = now;
+        sheet.style.transform = `translateY(${newTranslate}px)`;
+    }
+
+    function handleDragEnd() {
+        if (!dragRef.current.active) return;
+        dragRef.current.active = false;
+        const sheet = sheetRef.current;
+        if (!sheet) return;
+        const match = sheet.style.transform.match(
+            /translateY\((-?\d+(?:\.\d+)?)px\)/,
+        );
+        const currentTranslate = match ? parseFloat(match[1]) : 0;
+        const sheetHeight = sheet.offsetHeight;
+        const velocity = dragRef.current.velocity;
+        const peekT = getSnapTranslate("peek", sheetHeight);
+        const halfT = getSnapTranslate("half", sheetHeight);
+
+        if (velocity > 8) {
+            // Fast fling down → collapse to peek
+            skipSnapRef.current = true;
+            setSheetState("peek");
+            sheet.style.transition =
+                "transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)";
+            sheet.style.transform = `translateY(${peekT}px)`;
+        } else if (velocity < -8) {
+            // Fast fling up → expand to full
+            skipSnapRef.current = true;
+            setSheetState("full");
+            sheet.style.transition =
+                "transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)";
+            sheet.style.transform = `translateY(${DRAG_MIN}px)`;
+        } else if (currentTranslate >= peekT - 10) {
+            // Within 10px of peek — snap fully closed
+            skipSnapRef.current = true;
+            setSheetState("peek");
+            sheet.style.transition =
+                "transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)";
+            sheet.style.transform = `translateY(${peekT}px)`;
+        } else {
+            // Free position — stay exactly where released
+            sheet.style.transition = "none";
+            skipSnapRef.current = true;
+            if (currentTranslate >= halfT * 0.5) setSheetState("half");
+            else setSheetState("full");
+        }
+    }
+
+    return (
+        <div className="home-page">
+            <div className="home-page__map">
+                <DiscoveryMap
+                    activeCategory={activePointCategory}
+                    canSaveDraftRoute={isAuthenticated}
+                    categoryOptions={nearbyCategoryOptions}
+                    draftStops={draftStops}
+                    draftRouteNotice={draftRouteNotice}
+                    draftRouteNoticeKey={draftRouteNoticeKey}
+                    draftRouteNoticeTone={draftRouteNoticeTone}
+                    emptyMessage="В этом радиусе нет доступных точек."
+                    fixedRouteStops={savedDraftPreviewStops}
+                    fullscreen
+                    geolocationError={geolocationError}
+                    isLoading={isLoading || !canLoadNearbyPlaces}
+                    loadError={discoveryError}
+                    nearbyPoints={nearbyPoints}
+                    onAddPointToDraft={handleAddPointToRoute}
+                    onBuildRoute={handleBuildRoute}
+                    onChangeRadius={setRadiusMeters}
+                    onClearDraftRoute={handleClearDraftRoute}
+                    onLocateUser={requestLocation}
+                    onSaveDraftRoute={handleSaveDraftRoute}
+                    onSearchQueryChange={() => undefined}
+                    onSelectCategory={setActivePointCategory}
+                    onSelectNextPoint={() => cycleSelectedPoint(1)}
+                    onSelectPoint={handleMapPointSelect}
+                    onSelectPreviousPoint={() => cycleSelectedPoint(-1)}
+                    radiusMeters={radiusMeters}
+                    radiusOptions={radiusOptions}
+                    recenterTrigger={recenterTrigger}
+                    routeTargetId={effectiveRouteTargetId}
+                    searchQuery=""
+                    selectedPointId={effectiveSelectedPointId}
+                    showDirectRouteInPopup={true}
+                    showPopupRouteActions={false}
+                    userPosition={userPosition}
                 />
-              </div>
-              <div className="home-sheet__place-info">
-                <div className="home-sheet__place-meta">
-                  <span className="home-sheet__place-cat">
-                    {formatPointCategory(selectedPoint.category)}
-                  </span>
-                  <span className="home-sheet__place-dist">
-                    {formatMeters(selectedPoint.distanceMeters)}
-                  </span>
+            </div>
+
+            <div className="home-sheet" ref={sheetRef}>
+                {/* Drag handle — the only thing visible in peek state */}
+                <div
+                    aria-label="Потяните вверх чтобы открыть панель"
+                    className="home-sheet__drag"
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                            setSheetState((s) =>
+                                s === "peek"
+                                    ? "half"
+                                    : s === "half"
+                                      ? "full"
+                                      : "peek",
+                            );
+                        }
+                    }}
+                    onPointerCancel={handleDragEnd}
+                    onPointerDown={handleDragStart}
+                    onPointerMove={handleDragMove}
+                    onPointerUp={handleDragEnd}
+                    role="button"
+                    tabIndex={0}>
+                    <div className="home-sheet__handle" />
+
+                    {/* Locate button lives inside drag area — always visible */}
+                    <button
+                        aria-label="Найти моё местоположение"
+                        className="home-sheet__locate"
+                        onClick={handleCenterUser}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        type="button">
+                        <svg
+                            fill="none"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            width="16">
+                            <circle
+                                cx="12"
+                                cy="12"
+                                r="3.5"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                            />
+                            <path
+                                d="M12 2v3M12 19v3M2 12h3M19 12h3"
+                                stroke="currentColor"
+                                strokeLinecap="round"
+                                strokeWidth="2"
+                            />
+                        </svg>
+                    </button>
                 </div>
-                <h3 className="home-sheet__place-title">{selectedPoint.title}</h3>
-                {selectedPoint.scheduleLabel && (
-                  <p className="home-sheet__place-schedule">{selectedPoint.scheduleLabel}</p>
-                )}
-                <a
-                  className="home-sheet__place-maps-btn"
-                  href={selectedPointMapsUrl}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  <svg aria-hidden="true" fill="currentColor" height="13" viewBox="0 0 24 24" width="13">
-                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
-                  </svg>
-                  Google Maps
-                </a>
-              </div>
-            </div>
-          )}
 
-          {/* ── Nearby cards ── */}
-          {nearbyPoints.length > 0 && (
-            <div className="home-sheet__section">
-              <h3 className="home-sheet__section-title">Рядом с вами</h3>
-              <div className="home-sheet__cards" ref={nearbyListRef}>
-                {nearbyPoints.map((point) => (
-                  <button
-                    className={[
-                      'home-card',
-                      point.id === effectiveSelectedPointId ? 'home-card--active' : '',
-                    ].filter(Boolean).join(' ')}
-                    data-point-id={point.id}
-                    key={point.id}
-                    onClick={() => handleNearbyCardClick(point.id)}
-                    type="button"
-                  >
-                    <div className="home-card__img">
-                      <SmartPlaceImage
-                        alt={point.title}
-                        category={point.category}
-                        coordinates={point.coordinates}
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                        src={point.imageUrl}
-                        title={point.title}
-                      />
-                      <span className="home-card__dist-badge">
-                        {formatMeters(point.distanceMeters)}
-                      </span>
+                {/* Scrollable content */}
+                <div className="home-sheet__body">
+                    {/* ── Categories ── */}
+                    <div className="home-sheet__filter-group">
+                        <p className="home-sheet__filter-label">Места рядом</p>
+                        <div className="home-sheet__cats">
+                            {nearbyCategoryOptions.map((opt) => (
+                                <button
+                                    className={`home-sheet__cat${activePointCategory === opt.id ? " home-sheet__cat--active" : ""}`}
+                                    key={opt.id}
+                                    onClick={() =>
+                                        setActivePointCategory(
+                                            opt.id as PointCategory | "all",
+                                        )
+                                    }
+                                    type="button">
+                                    <span
+                                        className="home-sheet__cat-icon"
+                                        aria-hidden="true">
+                                        {categoryIcons[opt.id]}
+                                    </span>
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                    <div className="home-card__body">
-                      <span className="home-card__cat">{formatPointCategory(point.category)}</span>
-                      <p className="home-card__title">{point.title}</p>
+
+                    {/* ── Selected place card ── */}
+                    {selectedPoint && (
+                        <div
+                            className="home-sheet__place"
+                            key={selectedPoint.id}>
+                            <div className="home-sheet__place-top">
+                                <div className="home-sheet__place-meta">
+                                    <span className="home-sheet__place-cat">
+                                        {formatPointCategory(
+                                            selectedPoint.category,
+                                        )}
+                                    </span>
+                                    <span className="home-sheet__place-dist">
+                                        {formatMeters(
+                                            selectedPoint.distanceMeters,
+                                        )}
+                                    </span>
+                                </div>
+                                <button
+                                    aria-label="Построить маршрут к месту"
+                                    className="home-sheet__place-go"
+                                    onClick={() =>
+                                        handleGoToPlace(selectedPoint)
+                                    }
+                                    type="button">
+                                    {/* Walking person icon */}
+                                    <svg
+                                        fill="currentColor"
+                                        height="18"
+                                        viewBox="0 0 24 24"
+                                        width="18"
+                                        aria-hidden="true">
+                                        <circle cx="12" cy="4.5" r="1.75" />
+                                        <path d="M14.5 8.5c-.6-.8-1.4-1-2-.9l-3 1.2-1.5 3.5 1.8.7.9-2.2 1-.4-1.5 4.1-2.8 2.4 1.2 1.4 3-2.6 1.4 3.3H16l-1.6-4 .6-1.6 1 2h1.9L15.5 12l-.3-1.4 1.4.6.6-1.7-2.7-1z" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <h3 className="home-sheet__place-title">
+                                {selectedPoint.title}
+                            </h3>
+                            {selectedPoint.addressLabel && (
+                                <p className="home-sheet__place-address">
+                                    {selectedPoint.addressLabel}
+                                </p>
+                            )}
+                            {selectedPoint.scheduleLabel && (
+                                <p className="home-sheet__place-schedule">
+                                    {selectedPoint.scheduleLabel}
+                                </p>
+                            )}
+                            {(selectedPoint.description ||
+                                selectedPoint.shortDescription) && (
+                                <p className="home-sheet__place-desc">
+                                    {selectedPoint.description ||
+                                        selectedPoint.shortDescription}
+                                </p>
+                            )}
+                            {(selectedPoint.rating > 0 ||
+                                selectedPoint.expectedVisitMinutes > 0) && (
+                                <div className="home-sheet__place-stats">
+                                    {selectedPoint.rating > 0 && (
+                                        <span className="home-sheet__place-stat home-sheet__place-stat--rating">
+                                            ★ {selectedPoint.rating.toFixed(1)}
+                                        </span>
+                                    )}
+                                    {selectedPoint.expectedVisitMinutes > 0 && (
+                                        <span className="home-sheet__place-stat">
+                                            ~
+                                            {selectedPoint.expectedVisitMinutes}{" "}
+                                            мин
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ── Nearby cards ── */}
+                    {nearbyPoints.length > 0 && (
+                        <div className="home-sheet__section">
+                            <h3 className="home-sheet__section-title">
+                                Рядом с вами
+                            </h3>
+                            <div
+                                className="home-sheet__cards"
+                                ref={nearbyListRef}>
+                                {nearbyPoints.map((point) => (
+                                    <button
+                                        className={[
+                                            "home-card",
+                                            point.id ===
+                                            effectiveSelectedPointId
+                                                ? "home-card--active"
+                                                : "",
+                                        ]
+                                            .filter(Boolean)
+                                            .join(" ")}
+                                        data-point-id={point.id}
+                                        key={point.id}
+                                        onClick={() =>
+                                            handleNearbyCardClick(point.id)
+                                        }
+                                        type="button">
+                                        <div className="home-card__img">
+                                            <SmartPlaceImage
+                                                alt={point.title}
+                                                category={point.category}
+                                                coordinates={point.coordinates}
+                                                loading="lazy"
+                                                referrerPolicy="no-referrer"
+                                                src={point.imageUrl}
+                                                title={point.title}
+                                            />
+                                            <span className="home-card__dist-badge">
+                                                {formatMeters(
+                                                    point.distanceMeters,
+                                                )}
+                                            </span>
+                                        </div>
+                                        <div className="home-card__body">
+                                            <span className="home-card__cat">
+                                                {formatPointCategory(
+                                                    point.category,
+                                                )}
+                                            </span>
+                                            <p className="home-card__title">
+                                                {point.title}
+                                            </p>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Excursions ── */}
+                    <div className="home-sheet__section">
+                        <h3 className="home-sheet__section-title">
+                            Готовые экскурсии
+                        </h3>
+
+                        <div className="home-sheet__filter-group home-sheet__filter-group--inline">
+                            <div className="home-sheet__cats">
+                                {routeThemeOptions.map((theme) => (
+                                    <button
+                                        className={`home-sheet__cat${activeRouteTheme === theme ? " home-sheet__cat--active" : ""}`}
+                                        key={theme}
+                                        onClick={() =>
+                                            setActiveRouteTheme(theme)
+                                        }
+                                        type="button">
+                                        {theme === "all"
+                                            ? "Все темы"
+                                            : formatTheme(theme)}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="home-sheet__filter-group home-sheet__filter-group--inline">
+                            <div className="home-sheet__cats">
+                                <button
+                                    className={`home-sheet__cat${maxRouteDuration === null ? " home-sheet__cat--active" : ""}`}
+                                    onClick={() => setMaxRouteDuration(null)}
+                                    type="button">
+                                    Любое время
+                                </button>
+                                {durationOptions.map((d) => (
+                                    <button
+                                        className={`home-sheet__cat${maxRouteDuration === d ? " home-sheet__cat--active" : ""}`}
+                                        key={d}
+                                        onClick={() => setMaxRouteDuration(d)}
+                                        type="button">
+                                        До {formatDuration(d)}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <ExcursionCatalog
+                            emptyDescription="Попробуйте другой фильтр"
+                            emptyTitle="Нет маршрутов"
+                            excursions={visibleRoutes.slice(0, 4)}
+                        />
+
+                        {visibleRoutes.length > 0 && (
+                            <div className="home-sheet__view-all-wrap">
+                                <Link
+                                    className="home-sheet__view-all"
+                                    to={appRoutes.excursions}>
+                                    Смотреть все маршруты
+                                </Link>
+                            </div>
+                        )}
                     </div>
-                  </button>
-                ))}
-              </div>
+
+                    {/* ── Footer ── */}
+                    <footer className="home-sheet__footer">
+                        <div className="home-sheet__footer-brand">
+                            <span className="home-sheet__footer-logo">
+                                T-GUIDE
+                            </span>
+                            <p className="home-sheet__footer-tagline">
+                                Аудиогид по городу
+                            </p>
+                        </div>
+                        <p className="home-sheet__footer-desc">
+                            Готовые маршруты с описаниями
+                            достопримечательностей, точки интереса рядом с вами
+                            и удобная навигация по улицам — всё в одном месте.
+                        </p>
+                        <div className="home-sheet__footer-features">
+                            <span className="home-sheet__footer-feature">
+                                🎧 Аудиоэкскурсии
+                            </span>
+                            <span className="home-sheet__footer-feature">
+                                🗺 Готовые маршруты
+                            </span>
+                            <span className="home-sheet__footer-feature">
+                                📍 Места рядом
+                            </span>
+                            <span className="home-sheet__footer-feature">
+                                🚶 Пешие прогулки
+                            </span>
+                        </div>
+                        <p className="home-sheet__footer-copy">
+                            © T-Guide · Открывайте город пешком
+                        </p>
+                    </footer>
+                </div>
             </div>
-          )}
-
-          {/* ── Excursions ── */}
-          <div className="home-sheet__section">
-            <h3 className="home-sheet__section-title">Готовые экскурсии</h3>
-
-            <div className="home-sheet__filter-group home-sheet__filter-group--inline">
-              <div className="home-sheet__cats">
-                {routeThemeOptions.map((theme) => (
-                  <button
-                    className={`home-sheet__cat${activeRouteTheme === theme ? ' home-sheet__cat--active' : ''}`}
-                    key={theme}
-                    onClick={() => setActiveRouteTheme(theme)}
-                    type="button"
-                  >
-                    {theme === 'all' ? 'Все темы' : formatTheme(theme)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="home-sheet__filter-group home-sheet__filter-group--inline">
-              <div className="home-sheet__cats">
-                <button
-                  className={`home-sheet__cat${maxRouteDuration === null ? ' home-sheet__cat--active' : ''}`}
-                  onClick={() => setMaxRouteDuration(null)}
-                  type="button"
-                >
-                  Любое время
-                </button>
-                {durationOptions.map((d) => (
-                  <button
-                    className={`home-sheet__cat${maxRouteDuration === d ? ' home-sheet__cat--active' : ''}`}
-                    key={d}
-                    onClick={() => setMaxRouteDuration(d)}
-                    type="button"
-                  >
-                    До {formatDuration(d)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <ExcursionCatalog
-              emptyDescription="Попробуйте другой фильтр"
-              emptyTitle="Нет маршрутов"
-              excursions={visibleRoutes.slice(0, 4)}
-            />
-
-            {visibleRoutes.length > 0 && (
-              <Link className="home-sheet__view-all" to={appRoutes.excursions}>
-                Смотреть все маршруты →
-              </Link>
-            )}
-          </div>
         </div>
-      </div>
-    </div>
-  )
+    );
 }
 
 function scrollIntoHorizontalView(container: HTMLElement, target: HTMLElement) {
-  const cr = container.getBoundingClientRect()
-  const tr = target.getBoundingClientRect()
-  if (tr.left >= cr.left && tr.right <= cr.right) return
-  const relLeft = tr.left - cr.left + container.scrollLeft
-  const nextLeft = relLeft - container.clientWidth / 2 + tr.width / 2
-  const maxLeft = Math.max(0, container.scrollWidth - container.clientWidth)
-  container.scrollTo({ behavior: 'smooth', left: Math.min(Math.max(0, nextLeft), maxLeft) })
+    const cr = container.getBoundingClientRect();
+    const tr = target.getBoundingClientRect();
+    if (tr.left >= cr.left && tr.right <= cr.right) return;
+    const relLeft = tr.left - cr.left + container.scrollLeft;
+    const nextLeft = relLeft - container.clientWidth / 2 + tr.width / 2;
+    const maxLeft = Math.max(0, container.scrollWidth - container.clientWidth);
+    container.scrollTo({
+        behavior: "smooth",
+        left: Math.min(Math.max(0, nextLeft), maxLeft),
+    });
 }

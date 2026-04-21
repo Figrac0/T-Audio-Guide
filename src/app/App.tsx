@@ -53,24 +53,29 @@ function AppFrame() {
   return (
     <div className="app-shell">
       <header className="app-header" ref={headerRef}>
-        <div className={`app-header__inner${isMenuOpen ? ' app-header__inner--menu-open' : ''}`}>
-          <Link className="app-brand" onClick={() => setIsMenuOpen(false)} to={appRoutes.home}>
-            <span className="app-brand__badge">T Guide</span>
-            <span className="app-brand__title">Аудиогид, маршруты и точки рядом</span>
-          </Link>
+        <div className="app-header__inner">
+          <div className="app-header__bar">
+            <Link className="app-brand" onClick={() => setIsMenuOpen(false)} to={appRoutes.home}>
+              <span className="app-brand__name">T-GUIDE</span>
+            </Link>
 
-          <button
-            aria-controls="app-navigation"
-            aria-expanded={isMenuOpen}
-            aria-label={isMenuOpen ? 'Закрыть меню' : 'Открыть меню'}
-            className={`app-header__toggle${isMenuOpen ? ' app-header__toggle--active' : ''}`}
-            onClick={() => setIsMenuOpen((current) => !current)}
-            type="button"
-          >
-            <span />
-            <span />
-            <span />
-          </button>
+            <button
+              aria-controls="app-navigation"
+              aria-expanded={isMenuOpen}
+              aria-label={isMenuOpen ? 'Закрыть меню' : 'Открыть меню'}
+              className={`app-header__toggle${isMenuOpen ? ' app-header__toggle--active' : ''}`}
+              onClick={() => {
+                const next = !isMenuOpen
+                setIsMenuOpen(next)
+                if (next) window.dispatchEvent(new CustomEvent('app-menu-open'))
+              }}
+              type="button"
+            >
+              <span />
+              <span />
+              <span />
+            </button>
+          </div>
 
           <div className={`app-header__panel${isMenuOpen ? ' app-header__panel--open' : ''}`}>
             <nav className="app-nav" id="app-navigation">
