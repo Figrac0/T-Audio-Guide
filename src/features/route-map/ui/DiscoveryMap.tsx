@@ -170,8 +170,6 @@ export function DiscoveryMap({
     signature: '',
   })
 
-  const selectedPoint =
-    nearbyPoints.find((point) => point.id === selectedPointId) ?? nearbyPoints[0] ?? null
   const guidedPoint =
     nearbyPoints.find((point) => point.id === routeTargetId) ?? null
   const pointsBounds = useMemo(() => {
@@ -190,6 +188,10 @@ export function DiscoveryMap({
   const visibleDraftStops = draftStops.length > 0 ? draftStops : fixedRouteStops
   const visibleDraftPointIds = useMemo(
     () => new Set(visibleDraftStops.map(getSourcePointId)),
+    [visibleDraftStops],
+  )
+  const visibleDraftStopsSignature = useMemo(
+    () => visibleDraftStops.map((stop) => stop.id).join(','),
     [visibleDraftStops],
   )
   const draftSignature = useMemo(() => {
@@ -385,7 +387,7 @@ export function DiscoveryMap({
 
     // Only fly to route bounds when the route itself changes — not on every
     // nearbyPoints refresh (which happens on zoom/radius changes).
-    const routeSignature = `${routeTargetId ?? ''}:${visibleDraftStops.map((s) => s.id).join(',')}`
+    const routeSignature = `${routeTargetId ?? ''}:${visibleDraftStopsSignature}`
 
     if (draftBounds && visibleDraftStops.length) {
       if (routeSignature !== lastFittedRouteRef.current) {
@@ -440,7 +442,7 @@ export function DiscoveryMap({
       duration: 850,
       easing: 'ease-in-out',
     })
-  }, [draftBounds, guideBounds, nearbyPoints.length, pointsBounds, routeTargetId, userPosition, visibleDraftStops.length])
+  }, [draftBounds, guideBounds, nearbyPoints.length, pointsBounds, routeTargetId, userPosition, visibleDraftStops.length, visibleDraftStopsSignature])
 
   // Route layer: circle + polylines + user marker — rebuilt only when geometry/position changes.
   // Intentionally excludes radiusMeters: the animation effect handles smooth radius updates.
@@ -545,14 +547,18 @@ export function DiscoveryMap({
     if (!circle) return
     const start = circle.getRadius()
     const end = radiusMeters
-    if (Math.abs(end - start) < 5) { circle.setRadius(end); return }
+    if (Math.abs(end - start) < 5) {
+      circle.setRadius(end)
+      return
+    }
     const duration = 380
     const t0 = performance.now()
     let raf: number
+    const circleLayer = circle
     function step(now: number) {
       const p = Math.min(1, (now - t0) / duration)
       const eased = 1 - Math.pow(1 - p, 3)
-      circle.setRadius(start + (end - start) * eased)
+      circleLayer.setRadius(start + (end - start) * eased)
       if (p < 1) raf = requestAnimationFrame(step)
     }
     raf = requestAnimationFrame(step)

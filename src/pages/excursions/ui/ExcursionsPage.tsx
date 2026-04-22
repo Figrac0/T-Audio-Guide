@@ -2,35 +2,20 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
 } from 'react'
 import { Link } from 'react-router-dom'
 
-import type {
-  Excursion,
-  NearbyPoint,
-  RouteStop,
-  SupportedLocale,
-} from '@/entities/excursion/model/types'
-import { useDiscoveryRoutes } from '@/entities/excursion/model/useDiscoveryRoutes'
+import type { Excursion, RouteStop } from '@/entities/excursion/model/types'
 import {
-  buildOsmWalkingRouteGeometryFromPoints,
-  formatMeters,
-  type LngLat,
-  type RouteGeometry,
-} from '@/features/route-map/lib/route-geometry'
-import { useUserGeolocation } from '@/features/route-map/model/useUserGeolocation'
-import { useAuth } from '@/app/providers/useAuth'
-import { useUserRoutes } from '@/features/user-routes/model/useUserRoutes'
+  durationOptions,
+  themeOptions,
+  useExcursionsPageState,
+} from '@/pages/excursions/model/useExcursionsPageState'
 import { appRoutes } from '@/shared/config/routes'
 import {
-  detectSupportedLocale,
-  getStoredDiscoveryContext,
-  saveDiscoveryContext,
-} from '@/shared/lib/discovery-context'
-import {
+  formatDifficulty,
   formatDistance,
   formatDuration,
   formatPointCategory,
@@ -39,7 +24,6 @@ import {
 } from '@/shared/lib/format'
 import { buildRoutePlaceholderImage } from '@/shared/lib/placeholder-images'
 import { ResilientImage } from '@/shared/ui/ResilientImage'
-import { PointModal } from './PointModal'
 import { RouteBuilderMap } from './RouteBuilderMap'
 import './ExcursionsPage.css'
 
@@ -57,175 +41,15 @@ function getSnapTranslate(state: SheetState, sheetHeight: number): number {
   return sheetHeight - PEEK_HEIGHT
 }
 
-// ── useSegmentedRoute ─────────────────────────────────────────────────────────
-// Fetches pairwise OSRM walking routes between consecutive stops and combines
-// them into a MultiLineString so each segment renders in a distinct color.
-
-function useSegmentedRoute(stops: RouteStop[]): RouteGeometry | null {
-  const [geometry, setGeometry] = useState<RouteGeometry | null>(null)
-
-  const signature = stops
-    .map((s) => `${s.coordinates.lat.toFixed(5)},${s.coordinates.lng.toFixed(5)}`)
-    .join('|')
-
-  useEffect(() => {
-    if (stops.length < 2) {
-      setGeometry(null)
-      return
-    }
-
-    const controller = new AbortController()
-
-    async function buildSegments() {
-      const results = await Promise.all(
-        stops.slice(0, -1).map((s, i) =>
-          buildOsmWalkingRouteGeometryFromPoints(
-            [s.coordinates, stops[i + 1].coordinates],
-            controller.signal,
-          ).catch(() => null),
-        ),
-      )
-
-      if (controller.signal.aborted) return
-
-      // Use OSRM geometry per segment; fall back to straight line when unavailable.
-      const segments: LngLat[][] = results.map((r, i) => {
-        if (r?.geometry?.type === 'LineString') return r.geometry.coordinates
-        if (r?.geometry?.type === 'MultiLineString') return r.geometry.coordinates[0]
-        return [
-          [stops[i].coordinates.lng, stops[i].coordinates.lat],
-          [stops[i + 1].coordinates.lng, stops[i + 1].coordinates.lat],
-        ] as LngLat[]
-      })
-
-      setGeometry({ type: 'MultiLineString', coordinates: segments })
-    }
-
-    void buildSegments()
-    return () => controller.abort()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signature])
-
-  return geometry
-}
-
 // ── ExcursionsPage ────────────────────────────────────────────────────────────
 
 export function ExcursionsPage() {
-  const { session } = useAuth()
-  const {
-    addPointToDraft,
-    clearDraftRoute,
-    draftStops,
-    isPointInDraft,
-    saveDraftRoute,
-  } = useUserRoutes()
-  const isAuthenticated = Boolean(session?.isAuthenticated && session.profile)
+  const state = useExcursionsPageState()
 
-  const storedContext = useMemo(() => getStoredDiscoveryContext(), [])
-  const detectedLocale = useMemo<SupportedLocale>(() => {
-    if (typeof window === 'undefined') return storedContext.locale
-    return detectSupportedLocale(
-      navigator.languages?.[0] ?? navigator.language ?? storedContext.browserLocale,
-    )
-  }, [storedContext.browserLocale, storedContext.locale])
-
-  const [locale] = useState<SupportedLocale>(storedContext.locale ?? detectedLocale)
-  const [radiusMeters, setRadiusMeters] = useState(storedContext.radiusMeters ?? 1000)
-  const [selectedPointId, setSelectedPointId] = useState('')
-  const [modalPoint, setModalPoint] = useState<NearbyPoint | null>(null)
-  const [expandedStopId, setExpandedStopId] = useState<string | null>(null)
-  const [recenterTrigger, setRecenterTrigger] = useState(0)
-  const [saveNotice, setSaveNotice] = useState<string | null>(null)
-
-  const { error: geoError, requestLocation, status: geoStatus, userPosition } = useUserGeolocation()
-
-  const canLoad = Boolean(userPosition) || geoStatus === 'blocked' || geoStatus === 'unsupported'
-  const center = userPosition ?? storedContext.center
-
-  const { excursions: allExcursions, isLoading, nearbyPoints } = useDiscoveryRoutes({
-    activePointCategory: 'all',
-    center,
-    enabled: canLoad,
-    locale,
-    radiusMeters,
-    search: '',
-  })
-
-  const draftRouteGeometry = useSegmentedRoute(draftStops)
-
-  // Set of original point IDs currently in the draft — shows draft markers on map
-  const draftStopIds = useMemo(
-    () => new Set(draftStops.map((s) => s.id.replace(/-draft-stop.*$/, ''))),
-    [draftStops],
-  )
-
-  // Persist discovery context on relevant changes
-  useEffect(() => {
-    saveDiscoveryContext({
-      activePointCategory: 'all',
-      browserLocale:
-        typeof window === 'undefined'
-          ? storedContext.browserLocale
-          : (navigator.languages?.[0] ?? navigator.language ?? storedContext.browserLocale),
-      center,
-      locale,
-      radiusMeters,
-      updatedAt: new Date().toISOString(),
-    })
-  }, [center, locale, radiusMeters, storedContext.browserLocale])
-
-  // Auto-dismiss save notice
-  useEffect(() => {
-    if (!saveNotice) return
-    const id = window.setTimeout(() => setSaveNotice(null), 3200)
-    return () => window.clearTimeout(id)
-  }, [saveNotice])
-
-  const handlePointClick = useCallback((point: NearbyPoint) => {
-    setSelectedPointId(point.id)
-    setModalPoint(point)
-  }, [])
-
-  const handleAddToDraft = useCallback(
-    (point: NearbyPoint) => {
-      addPointToDraft(point)
-      if (!userPosition) requestLocation()
-    },
-    [addPointToDraft, requestLocation, userPosition],
-  )
-
-  const handleClearDraft = useCallback(() => {
-    clearDraftRoute()
-    setSaveNotice(null)
-    setExpandedStopId(null)
-  }, [clearDraftRoute])
-
-  const handleSaveDraft = useCallback(() => {
-    const result = saveDraftRoute()
-    if (result.status === 'duplicate') {
-      setSaveNotice('Такой маршрут уже сохранён.')
-      return
-    }
-    if (result.status === 'unauthorized') {
-      setSaveNotice('Войдите в профиль, чтобы сохранить маршрут.')
-      return
-    }
-    if (result.status === 'saved') {
-      clearDraftRoute()
-      setExpandedStopId(null)
-      setSaveNotice('Маршрут сохранён в профиле!')
-    }
-  }, [clearDraftRoute, saveDraftRoute])
-
-  const handleLocate = useCallback(() => {
-    if (userPosition) setRecenterTrigger((n) => n + 1)
-    else requestLocation()
-  }, [userPosition, requestLocation])
-
-  // ── Bottom sheet ────────────────────────────────────────────────────────────
+  // ── Sheet drag state ────────────────────────────────────────────────────────
 
   const [sheetState, setSheetState] = useState<SheetState>('peek')
+  const [isDragging, setIsDragging] = useState(false)
   const sheetStateRef = useRef<SheetState>('peek')
   const sheetRef = useRef<HTMLDivElement>(null)
   const skipSnapRef = useRef(false)
@@ -301,6 +125,7 @@ export function ExcursionsPage() {
       velocity: 0,
     }
     sheet.style.transition = 'none'
+    setIsDragging(true)
   }
 
   function handleDragMove(e: React.PointerEvent<HTMLDivElement>) {
@@ -352,84 +177,67 @@ export function ExcursionsPage() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="routes-page">
+    <div className="ep">
       {/* Fullscreen map */}
-      <div className="routes-page__map">
+      <div className="ep__map">
         <RouteBuilderMap
-          draftRouteGeometry={draftRouteGeometry}
-          draftStopIds={draftStopIds}
-          isLoading={isLoading || !canLoad}
-          nearbyPoints={nearbyPoints}
-          onChangeRadius={setRadiusMeters}
-          onPointClick={handlePointClick}
-          radiusMeters={radiusMeters}
-          recenterTrigger={recenterTrigger}
-          selectedPointId={selectedPointId}
-          userPosition={userPosition}
+          draftPointIds={state.draftPointIds}
+          isDraftFull={state.draftStops.length >= 6}
+          isLoading={state.isLoading || !state.canLoadNearbyPlaces}
+          isPointInDraft={state.isPointInDraft}
+          nearbyPoints={state.nearbyPoints}
+          onAddPoint={state.handleAddPoint}
+          onChangeRadius={state.setRadiusMeters}
+          onSelectPoint={state.handleSelectPoint}
+          radiusMeters={state.radiusMeters}
+          recenterKey={state.recenterKey}
+          routeState={state.routeState}
+          selectedPointId={state.selectedPointId}
+          userPosition={state.userPosition}
         />
       </div>
 
-      {/* Draft action buttons — float above the sheet peek strip */}
-      {draftStops.length > 0 && (
-        <div className="routes-page__draft-bar">
+      {/* Map corner buttons — only in peek state */}
+      {state.draftStops.length > 0 && sheetState === 'peek' && (
+        <>
           <button
-            className="routes-page__draft-btn"
-            onClick={handleClearDraft}
+            className="ep__corner-btn ep__corner-btn--left"
+            onClick={state.handleClearRoute}
             type="button"
           >
             Сбросить
           </button>
-          {draftStops.length > 2 && (
-            isAuthenticated ? (
-              <button
-                className="routes-page__draft-btn routes-page__draft-btn--primary"
-                onClick={handleSaveDraft}
-                type="button"
-              >
-                Сохранить
-              </button>
-            ) : (
-              <Link
-                className="routes-page__draft-btn routes-page__draft-btn--primary"
-                to={appRoutes.signIn}
-              >
-                Сохранить
-              </Link>
-            )
+          {state.draftStops.length >= 2 && (
+            <button
+              className="ep__corner-btn ep__corner-btn--right"
+              onClick={state.handleSaveRoute}
+              type="button"
+            >
+              Сохранить
+            </button>
           )}
-        </div>
+        </>
       )}
 
-      {/* Save notice toast */}
-      {saveNotice && (
-        <div className="routes-page__toast" role="status">{saveNotice}</div>
+      {/* Toast notice */}
+      {state.notice && (
+        <div className="ep__notice" role="status">{state.notice}</div>
       )}
 
-      {/* Geolocation error note */}
-      {geoError && (
-        <p className="routes-page__geo-error">{geoError}</p>
-      )}
-
-      {/* POI detail modal — rendered above the map */}
-      {modalPoint && (
-        <PointModal
-          isInDraft={isPointInDraft(modalPoint.id)}
-          isDraftFull={draftStops.length >= 6}
-          onAddToDraft={handleAddToDraft}
-          onClose={() => setModalPoint(null)}
-          point={modalPoint}
-        />
+      {/* Geolocation error */}
+      {state.geolocationError && (
+        <p className="ep__geo-error">{state.geolocationError}</p>
       )}
 
       {/* Bottom sheet */}
-      <div className="routes-sheet" ref={sheetRef}>
+      <div className="ep-sheet" ref={sheetRef}>
+        {/* Drag handle row */}
         <div
           aria-label="Потяните вверх чтобы открыть панель"
-          className="routes-sheet__drag"
+          className="ep-sheet__drag"
           onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
+            if (e.key === 'Enter' || e.key === ' ')
               setSheetState((s) => s === 'peek' ? 'half' : s === 'half' ? 'full' : 'peek')
-            }
           }}
           onPointerCancel={handleDragEnd}
           onPointerDown={handleDragStart}
@@ -438,11 +246,11 @@ export function ExcursionsPage() {
           role="button"
           tabIndex={0}
         >
-          <div className="routes-sheet__handle" />
+          <div className="ep-sheet__handle" />
           <button
             aria-label="Найти моё местоположение"
-            className="routes-sheet__locate"
-            onClick={handleLocate}
+            className="ep-sheet__locate"
+            onClick={state.handleLocateUser}
             onPointerDown={(e) => e.stopPropagation()}
             type="button"
           >
@@ -458,60 +266,137 @@ export function ExcursionsPage() {
           </button>
         </div>
 
-        <div className="routes-sheet__body">
-          {/* User's draft route — appears when at least one point is selected */}
-          {draftStops.length > 0 && (
-            <section className="routes-sheet__draft">
-              <div className="routes-sheet__section-head">
+        {/* Scrollable body */}
+        <div className="ep-sheet__body">
+
+          {/* ── My Route ──────────────────────────────────────────────────── */}
+          {state.draftStops.length > 0 && (
+            <section className="ep-draft">
+              <div className="ep-draft__head">
                 <div>
-                  <h2 className="routes-sheet__section-title">
+                  <h2 className="ep-draft__title">
                     Мой маршрут
-                    <span className="routes-sheet__stop-badge">{draftStops.length}/6</span>
+                    <span className="ep-draft__badge">{state.draftStops.length}/6</span>
                   </h2>
-                  <p className="routes-sheet__section-sub">
-                    Нажмите на точку для подробностей
-                  </p>
+                  <p className="ep-draft__sub">Нажмите на точку на карте, чтобы добавить</p>
                 </div>
               </div>
 
-              <div className="routes-sheet__stops">
-                {draftStops.map((stop) => (
+              <div className="ep-draft__stops">
+                {state.draftStops.map((stop) => (
                   <DraftStopCard
-                    isExpanded={expandedStopId === stop.id}
+                    isExpanded={state.expandedStopId === stop.id}
                     key={stop.id}
+                    onRemove={() => state.handleRemoveStop(stop.id)}
                     onToggle={() =>
-                      setExpandedStopId((id) => (id === stop.id ? null : stop.id))
+                      state.setExpandedStopId((id) => (id === stop.id ? null : stop.id))
                     }
                     stop={stop}
                   />
                 ))}
               </div>
+
+              <div className="ep-draft__actions">
+                <button
+                  className="ep-draft__action-btn"
+                  onClick={state.handleClearRoute}
+                  type="button"
+                >
+                  Сбросить
+                </button>
+                {state.draftStops.length >= 2 && (
+                  <button
+                    className="ep-draft__action-btn ep-draft__action-btn--primary"
+                    onClick={state.handleSaveRoute}
+                    type="button"
+                  >
+                    Сохранить маршрут
+                  </button>
+                )}
+              </div>
             </section>
           )}
 
-          {/* Ready excursions from the catalog */}
-          <section className="routes-sheet__excursions">
-            <div className="routes-sheet__section-head">
-              <h2 className="routes-sheet__section-title">Готовые маршруты</h2>
-              {allExcursions.length > 0 && (
-                <span className="routes-sheet__count">{allExcursions.length}</span>
+          {/* ── Filters ───────────────────────────────────────────────────── */}
+          <section className="ep-filters">
+            <div className="ep-filters__group">
+              {themeOptions.map((theme) => (
+                <button
+                  className={`ep-filters__pill${state.activeTheme === theme ? ' ep-filters__pill--active' : ''}`}
+                  key={theme}
+                  onClick={() => state.setActiveTheme(theme)}
+                  type="button"
+                >
+                  {theme === 'all' ? 'Все темы' : formatTheme(theme)}
+                </button>
+              ))}
+            </div>
+
+            <div className="ep-filters__divider" />
+
+            <div className="ep-filters__group">
+              <button
+                className={`ep-filters__pill${state.maxDuration === null ? ' ep-filters__pill--active' : ''}`}
+                onClick={() => state.setMaxDuration(null)}
+                type="button"
+              >
+                Любое время
+              </button>
+              {durationOptions.map((d) => (
+                <button
+                  className={`ep-filters__pill${state.maxDuration === d ? ' ep-filters__pill--active' : ''}`}
+                  key={d}
+                  onClick={() => state.setMaxDuration(d)}
+                  type="button"
+                >
+                  До {formatDuration(d)}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {/* ── Excursion catalog ─────────────────────────────────────────── */}
+          <section className="ep-catalog">
+            <div className="ep-catalog__head">
+              <h2 className="ep-catalog__title">Готовые маршруты</h2>
+              {state.excursions.length > 0 && (
+                <span className="ep-catalog__count">{state.excursions.length}</span>
               )}
             </div>
 
-            {isLoading && allExcursions.length === 0 ? (
+            {state.isLoading && state.excursions.length === 0 ? (
               <ExcursionsSkeleton />
-            ) : allExcursions.length === 0 ? (
-              <p className="routes-sheet__empty">
-                Маршруты в этом радиусе не найдены. Попробуйте отдалить карту.
+            ) : state.excursions.length === 0 ? (
+              <p className="ep-catalog__empty">
+                Маршруты не найдены. Попробуйте другой фильтр или отдалите карту.
               </p>
             ) : (
-              <div className="routes-sheet__excursion-list">
-                {allExcursions.map((excursion) => (
-                  <ExcursionRow excursion={excursion} key={excursion.id} />
+              <div className="ep-catalog__grid">
+                {state.excursions.map((excursion) => (
+                  <ExcursionCard excursion={excursion} key={excursion.id} />
                 ))}
               </div>
             )}
           </section>
+
+          {/* ── Footer ────────────────────────────────────────────────────── */}
+          <footer className="ep-footer">
+            <div className="ep-footer__brand">
+              <span className="ep-footer__logo">T-GUIDE</span>
+              <p className="ep-footer__tagline">Аудиогид по городу</p>
+            </div>
+            <p className="ep-footer__desc">
+              Готовые маршруты с описаниями достопримечательностей, точки интереса
+              рядом с вами и удобная навигация по улицам — всё в одном месте.
+            </p>
+            <div className="ep-footer__features">
+              <span className="ep-footer__feature">🎧 Аудиоэкскурсии</span>
+              <span className="ep-footer__feature">🗺 Готовые маршруты</span>
+              <span className="ep-footer__feature">📍 Места рядом</span>
+              <span className="ep-footer__feature">🚶 Пешие прогулки</span>
+            </div>
+            <p className="ep-footer__copy">© T-Guide · Открывайте город пешком</p>
+          </footer>
         </div>
       </div>
     </div>
@@ -522,58 +407,65 @@ export function ExcursionsPage() {
 
 interface DraftStopCardProps {
   isExpanded: boolean
+  onRemove: () => void
   onToggle: () => void
   stop: RouteStop
 }
 
-function DraftStopCard({ isExpanded, onToggle, stop }: DraftStopCardProps) {
+function DraftStopCard({ isExpanded, onRemove, onToggle, stop }: DraftStopCardProps) {
   return (
-    <div className={`draft-stop${isExpanded ? ' draft-stop--expanded' : ''}`}>
-      <button className="draft-stop__header" onClick={onToggle} type="button">
-        <span className="draft-stop__order">{stop.order}</span>
-        <div className="draft-stop__info">
-          <span className="draft-stop__category">{formatPointCategory(stop.category)}</span>
-          <span className="draft-stop__title">{stop.title}</span>
+    <div className={`ep-stop${isExpanded ? ' ep-stop--open' : ''}`}>
+      <button className="ep-stop__header" onClick={onToggle} type="button">
+        <span className="ep-stop__order">{stop.order}</span>
+        <div className="ep-stop__info">
+          <span className="ep-stop__cat">{formatPointCategory(stop.category)}</span>
+          <span className="ep-stop__name">{stop.title}</span>
         </div>
-        <span aria-hidden="true" className="draft-stop__chevron">
-          {isExpanded ? '▴' : '▾'}
-        </span>
+        <span aria-hidden="true" className="ep-stop__chevron">{isExpanded ? '▴' : '▾'}</span>
       </button>
 
-      {isExpanded && (
-        <div className="draft-stop__detail">
+      <div className="ep-stop__body">
+        <div className="ep-stop__body-inner">
           {(stop.description || stop.shortDescription) && (
-            <p className="draft-stop__desc">{stop.description || stop.shortDescription}</p>
+            <p className="ep-stop__desc">{stop.description || stop.shortDescription}</p>
           )}
-          <div className="draft-stop__detail-meta">
+          <div className="ep-stop__meta">
             {stop.rating > 0 && (
-              <span className="draft-stop__stat">★ {stop.rating.toFixed(1)}</span>
+              <span className="ep-stop__chip">★ {stop.rating.toFixed(1)}</span>
             )}
             {stop.expectedVisitMinutes > 0 && (
-              <span className="draft-stop__stat">{formatDuration(stop.expectedVisitMinutes)}</span>
+              <span className="ep-stop__chip">{formatDuration(stop.expectedVisitMinutes)}</span>
             )}
             {stop.scheduleLabel && (
-              <span className="draft-stop__stat">{stop.scheduleLabel}</span>
+              <span className="ep-stop__chip">{stop.scheduleLabel}</span>
             )}
           </div>
+          <button
+            className="ep-stop__remove"
+            onClick={onRemove}
+            onPointerDown={(e) => e.stopPropagation()}
+            type="button"
+          >
+            Убрать из маршрута
+          </button>
         </div>
-      )}
+      </div>
     </div>
   )
 }
 
-// ── ExcursionRow ──────────────────────────────────────────────────────────────
+// ── ExcursionCard ─────────────────────────────────────────────────────────────
 
-interface ExcursionRowProps {
+interface ExcursionCardProps {
   excursion: Excursion
 }
 
-function ExcursionRow({ excursion }: ExcursionRowProps) {
+function ExcursionCard({ excursion }: ExcursionCardProps) {
   const placeholder = buildRoutePlaceholderImage(excursion.theme)
 
   return (
-    <article className="excursion-row">
-      <div className="excursion-row__cover">
+    <article className="ep-card">
+      <div className="ep-card__cover">
         <ResilientImage
           alt={excursion.title}
           fallbackSrcs={[placeholder]}
@@ -582,19 +474,18 @@ function ExcursionRow({ excursion }: ExcursionRowProps) {
           referrerPolicy="no-referrer"
           src={excursion.coverImageUrl}
         />
+        <span className="ep-card__theme">{formatTheme(excursion.theme)}</span>
       </div>
-
-      <div className="excursion-row__body">
-        <span className="excursion-row__theme">{formatTheme(excursion.theme)}</span>
-        <h3 className="excursion-row__title">{excursion.title}</h3>
-        <p className="excursion-row__tagline">{excursion.tagline}</p>
-        <div className="excursion-row__stats">
-          <span>{formatDistance(excursion.distanceKm)}</span>
-          <span>{formatStopCount(excursion.stops.length)}</span>
-          <span>{formatDuration(excursion.durationMinutes)}</span>
+      <div className="ep-card__body">
+        <h3 className="ep-card__title">{excursion.title}</h3>
+        <p className="ep-card__tagline">{excursion.tagline}</p>
+        <div className="ep-card__stats">
+          <span className="ep-card__stat">{formatDistance(excursion.distanceKm)}</span>
+          <span className="ep-card__stat">{formatStopCount(excursion.stops.length)}</span>
+          <span className="ep-card__stat">{formatDuration(excursion.durationMinutes)}</span>
         </div>
         <Link
-          className="button button--primary excursion-row__open"
+          className="button button--primary ep-card__open"
           to={appRoutes.excursion(excursion.slug)}
         >
           Открыть маршрут
@@ -608,15 +499,14 @@ function ExcursionRow({ excursion }: ExcursionRowProps) {
 
 function ExcursionsSkeleton() {
   return (
-    <div className="routes-sheet__skeleton">
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div className="excursion-row-skeleton" key={i}>
-          <div className="excursion-row-skeleton__cover" />
-          <div className="excursion-row-skeleton__body">
-            <div className="skeleton-chip" />
-            <div className="skeleton-line skeleton-line--wide" />
-            <div className="skeleton-line" />
-            <div className="skeleton-line skeleton-line--short" />
+    <div className="ep-catalog__skeleton">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div className="ep-card-skeleton" key={i}>
+          <div className="ep-card-skeleton__cover" />
+          <div className="ep-card-skeleton__body">
+            <div className="ep-skeleton-line ep-skeleton-line--wide" />
+            <div className="ep-skeleton-line" />
+            <div className="ep-skeleton-line ep-skeleton-line--short" />
           </div>
         </div>
       ))}

@@ -208,6 +208,53 @@ export function createSegmentedRoutePolyline(geometry: RouteGeometry) {
   return L.layerGroup(layers)
 }
 
+export function createPlannerRoutePolyline(
+  segments: [number, number][][],
+  options?: { hasLeadSegment?: boolean },
+) {
+  const segmentPalette = ['#0f4c81', '#1f8a70', '#7c3aed', '#d97706', '#4f772d', '#c2514b']
+  const hasLeadSegment = Boolean(options?.hasLeadSegment)
+
+  const layers = segments.flatMap((segment, index) => {
+    const path = segment.map(toLeafletLatLngFromLngLat)
+    const isLeadSegment = hasLeadSegment && index === 0
+    const routeColor = segmentPalette[index % segmentPalette.length]
+
+    const shadow = L.polyline(path, {
+      color: 'rgba(15, 23, 42, 0.12)',
+      lineCap: 'round',
+      lineJoin: 'round',
+      opacity: 1,
+      renderer: L.canvas(),
+      weight: isLeadSegment ? 10 : 12,
+    })
+
+    const line = L.polyline(path, {
+      color: routeColor,
+      dashArray: isLeadSegment ? '12 10' : undefined,
+      lineCap: 'round',
+      lineJoin: 'round',
+      opacity: isLeadSegment ? 0.88 : 0.94,
+      renderer: L.canvas(),
+      weight: isLeadSegment ? 5 : 6,
+    })
+
+    const highlight = L.polyline(path, {
+      color: 'rgba(255,255,255,0.46)',
+      dashArray: isLeadSegment ? '12 10' : undefined,
+      lineCap: 'round',
+      lineJoin: 'round',
+      opacity: 0.76,
+      renderer: L.canvas(),
+      weight: 2,
+    })
+
+    return [shadow, line, highlight]
+  })
+
+  return L.layerGroup(layers)
+}
+
 export function createGuidePolyline(geometry: RouteGeometry) {
   const segments = toLeafletPolylineSegments(geometry)
 

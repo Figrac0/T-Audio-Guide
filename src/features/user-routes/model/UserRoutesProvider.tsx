@@ -4,6 +4,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { useLocation } from 'react-router-dom'
 
 import { useAuth } from '@/app/providers/useAuth'
 import type {
@@ -31,15 +32,26 @@ interface UserRoutesProviderProps {
 
 export function UserRoutesProvider({ children }: UserRoutesProviderProps) {
   const { session } = useAuth()
+  const location = useLocation()
   const [savedRoutes, setSavedRoutes] = useState<Excursion[]>(() =>
     loadStoredRoutes(session?.profile?.id ?? 'guest').savedRoutes,
   )
   const [personalRoutes, setPersonalRoutes] = useState<Excursion[]>(() =>
     loadStoredRoutes(session?.profile?.id ?? 'guest').personalRoutes,
   )
-  const [draftStops, setDraftStops] = useState<RouteStop[]>([])
+  const [draftState, setDraftState] = useState<{
+    pathname: string
+    stops: RouteStop[]
+  }>({
+    pathname: location.pathname,
+    stops: [],
+  })
   const isAuthenticated = Boolean(session?.isAuthenticated && session.profile)
   const storageScope = session?.profile?.id ?? 'guest'
+  const draftStops = useMemo(
+    () => (draftState.pathname === location.pathname ? draftState.stops : []),
+    [draftState.pathname, draftState.stops, location.pathname],
+  )
 
   const persistRoutes = useCallback(
     (nextState: StoredUserRoutes) => {
@@ -115,44 +127,52 @@ export function UserRoutesProvider({ children }: UserRoutesProviderProps) {
   )
 
   const addPointToDraft = useCallback((point: NearbyPoint) => {
-    setDraftStops((currentStops) => {
+    setDraftState((currentState) => {
+      const currentStops =
+        currentState.pathname === location.pathname ? currentState.stops : []
+
       if (
         currentStops.length >= maxDraftStops ||
         currentStops.some((stop) => getSourcePointId(stop.id) === point.id)
       ) {
-        return currentStops
+        return currentState
       }
 
-      return [
-        ...currentStops,
-        createRouteStopFromPoint(point, currentStops.length + 1),
-      ]
+      return {
+        pathname: location.pathname,
+        stops: [
+          ...currentStops,
+          createRouteStopFromPoint(point, currentStops.length + 1),
+        ],
+      }
     })
-  }, [])
+  }, [location.pathname])
 
   const removeDraftStop = useCallback((stopId: string) => {
-    setDraftStops((currentStops) =>
-      currentStops
-        .filter((stop) => stop.id !== stopId)
-        .map((stop, index) => ({
-          ...stop,
-          order: index + 1,
-        })),
-    )
-  }, [])
+    setDraftState((currentState) => {
+      const currentStops =
+        currentState.pathname === location.pathname ? currentState.stops : []
+
+      return {
+        pathname: location.pathname,
+        stops: currentStops
+          .filter((stop) => stop.id !== stopId)
+          .map((stop, index) => ({
+            ...stop,
+            order: index + 1,
+          })),
+      }
+    })
+  }, [location.pathname])
 
   const clearDraftRoute = useCallback(() => {
-    setDraftStops([])
-  }, [])
+    setDraftState({
+      pathname: location.pathname,
+      stops: [],
+    })
+  }, [location.pathname])
 
   const saveDraftRoute = useCallback(() => {
-    if (!isAuthenticated) {
-      return {
-        route: null,
-        status: 'unauthorized' as const,
-      }
-    }
-
     if (draftStops.length < 2) {
       return {
         route: null,
@@ -185,7 +205,7 @@ export function UserRoutesProvider({ children }: UserRoutesProviderProps) {
       route,
       status: 'saved' as const,
     }
-  }, [draftStops, isAuthenticated, persistRoutes, personalRoutes, savedRoutes])
+  }, [draftStops, persistRoutes, personalRoutes, savedRoutes])
 
   const shareRoute = useCallback(async (route: Excursion) => {
     const fallbackRouteUrl = `${window.location.origin}/excursions/${route.slug}`

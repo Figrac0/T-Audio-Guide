@@ -1,42 +1,199 @@
-.rb-map {
+/* ── Map container ────────────────────────────────────────────────────────── */
+
+.rbm {
   position: relative;
   width: 100%;
   height: 100%;
 }
 
-.rb-map__container {
-  width: 100%;
-  height: 100%;
-}
-
-.rb-map__container .leaflet-container {
+.rbm__container,
+.rbm__container .leaflet-container {
   width: 100%;
   height: 100%;
   background: #e8edf4;
 }
 
-.rb-map__container .leaflet-control-attribution {
-  display: none !important;
+.rbm__container .leaflet-container {
+  font-family: inherit;
 }
 
-.rb-map__container .leaflet-tile-pane {
-  will-change: transform;
+/* Hide default Leaflet attribution (replaced by global style) */
+.rbm__container .leaflet-control-attribution {
+  display: none;
 }
 
-.rb-map__loader {
+/* ── Loading overlay ──────────────────────────────────────────────────────── */
+
+.rbm__loader {
   position: absolute;
-  top: 16px;
-  left: 16px;
+  bottom: 68px;
+  left: 50%;
+  z-index: 400;
+  transform: translateX(-50%);
   display: inline-flex;
   align-items: center;
-  min-height: 38px;
-  padding: 0 14px;
+  gap: 8px;
+  padding: 8px 16px;
   border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.94);
-  box-shadow: var(--shadow-pill);
-  color: var(--color-text);
-  font-size: 0.9rem;
+  box-shadow: 0 4px 16px rgba(31, 37, 51, 0.12);
+  backdrop-filter: blur(12px);
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
   font-weight: 700;
   pointer-events: none;
-  z-index: 10;
+  white-space: nowrap;
+}
+
+.rbm__loader::before {
+  content: '';
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(31, 138, 112, 0.2);
+  border-top-color: var(--color-brand);
+  border-radius: 50%;
+  animation: rbm-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes rbm-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Leaflet popup override ────────────────────────────────────────────────── */
+
+.rbm-leaflet-popup .leaflet-popup-content-wrapper {
+  padding: 0;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.22), 0 2px 8px rgba(15, 23, 42, 0.1);
+  border: 1px solid rgba(216, 220, 229, 0.6);
+}
+
+.rbm-leaflet-popup .leaflet-popup-content {
+  margin: 0;
+  width: auto !important;
+}
+
+.rbm-leaflet-popup .leaflet-popup-tip-container {
+  margin-top: -1px;
+}
+
+.rbm-leaflet-popup .leaflet-popup-tip {
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.rbm-leaflet-popup .leaflet-popup-close-button {
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(6px);
+  color: var(--color-text-secondary);
+  font-size: 1.1rem;
+  line-height: 1;
+  z-index: 2;
+  border: 1px solid rgba(216, 220, 229, 0.72);
+}
+
+/* ── Popup content ─────────────────────────────────────────────────────────── */
+
+.rbm-popup {
+  width: 240px;
+}
+
+.rbm-popup__cover {
+  height: 130px;
+  overflow: hidden;
+  background: var(--color-bg-soft);
+}
+
+.rbm-popup__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.rbm-popup__body {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px 14px;
+}
+
+.rbm-popup__cat {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-brand-soft);
+  color: var(--color-brand-strong);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.rbm-popup__title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 800;
+  line-height: 1.3;
+  color: var(--color-text);
+}
+
+.rbm-popup__desc {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.rbm-popup__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: #ffffff;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background-color 0.14s ease;
+}
+
+.rbm-popup__btn:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.rbm-popup__btn--primary {
+  border-color: rgba(31, 138, 112, 0.28);
+  background: linear-gradient(180deg, var(--color-brand), var(--color-brand-strong));
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgba(31, 138, 112, 0.22);
+}
+
+.rbm-popup__btn--primary:hover {
+  filter: brightness(1.06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rbm__loader::before {
+    animation: none;
+  }
 }
