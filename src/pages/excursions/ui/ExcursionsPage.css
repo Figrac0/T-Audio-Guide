@@ -1,243 +1,570 @@
-.excursions-page__hero,
-.excursions-page__filters {
-  position: relative;
+/* ── Fullscreen container ─────────────────────────────────────────────────── */
+
+body:has(.routes-page) {
   overflow: hidden;
-  padding: 32px;
 }
 
-.excursions-page__hero::before,
-.excursions-page__filters::before {
-  content: '';
+.routes-page {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #e8edf4;
+  overflow: hidden;
+}
+
+/* ── Map ──────────────────────────────────────────────────────────────────── */
+
+.routes-page__map {
   position: absolute;
   inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 0% 0%, rgba(255, 221, 45, 0.18), transparent 28%),
-    radial-gradient(circle at 100% 0%, rgba(31, 138, 112, 0.08), transparent 22%);
-}
-
-.excursions-page__hero > *,
-.excursions-page__filters > * {
-  position: relative;
   z-index: 1;
+  background: #e8edf4;
 }
 
-.excursions-page__hero {
-  display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(300px, 0.64fr);
-  gap: 24px;
-  align-items: end;
-  min-height: 232px;
+.routes-page__map .rb-map,
+.routes-page__map .rb-map__container,
+.routes-page__map .leaflet-container {
+  height: 100%;
 }
 
-.excursions-page__hero-copy {
-  display: grid;
-  gap: 18px;
+.routes-page__map .leaflet-container {
+  background: #e8edf4;
 }
 
-.excursions-page__hero-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
+/* ── Draft action bar ─────────────────────────────────────────────────────── */
 
-.excursions-page__stat {
-  display: grid;
+.routes-page__draft-bar {
+  position: absolute;
+  right: 14px;
+  bottom: calc(52px + 14px); /* sits just above the peek strip */
+  z-index: 400;
+  display: inline-flex;
   gap: 8px;
-  padding: 16px;
-  border: 1px solid rgba(216, 220, 229, 0.8);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 12px 26px rgba(31, 37, 51, 0.045);
+  padding: 6px;
+  border: 1px solid rgba(216, 220, 229, 0.72);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 16px 40px rgba(31, 37, 51, 0.14);
+  backdrop-filter: blur(16px);
+  animation: draft-bar-enter 0.22s ease both;
 }
 
-.excursions-page__stat-value {
-  font-size: 1.45rem;
+.routes-page__draft-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: #ffffff;
+  color: var(--color-text);
+  font-size: 0.84rem;
+  font-weight: 900;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.routes-page__draft-btn--primary {
+  border-color: rgba(31, 138, 112, 0.24);
+  background: linear-gradient(180deg, var(--color-brand), var(--color-brand-strong));
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(31, 138, 112, 0.22);
+}
+
+/* ── Save notice toast ────────────────────────────────────────────────────── */
+
+.routes-page__toast {
+  position: absolute;
+  top: 68px;
+  left: 50%;
+  z-index: 800;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  max-width: calc(100% - 32px);
+  min-height: 40px;
+  padding: 10px 16px;
+  border: 1px solid rgba(31, 138, 112, 0.2);
+  border-radius: 16px;
+  background: rgba(229, 250, 244, 0.97);
+  box-shadow: 0 16px 40px rgba(31, 37, 51, 0.14);
+  backdrop-filter: blur(12px);
+  color: var(--color-brand-strong);
+  font-size: 0.88rem;
+  font-weight: 800;
+  white-space: nowrap;
+  animation: routes-toast-enter 0.22s ease both;
+  pointer-events: none;
+}
+
+/* ── Geolocation error ────────────────────────────────────────────────────── */
+
+.routes-page__geo-error {
+  position: absolute;
+  bottom: calc(52px + 14px);
+  left: 14px;
+  z-index: 400;
+  max-width: 280px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-size: 0.82rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+/* ── Bottom sheet ─────────────────────────────────────────────────────────── */
+
+.routes-sheet {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(100% - 60px);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  border-radius: 24px 24px 0 0;
+  background: #ffffff;
+  box-shadow: 0 -2px 20px rgba(31, 37, 51, 0.1);
+  overflow: hidden;
+  will-change: transform;
+}
+
+/* ── Drag handle ──────────────────────────────────────────────────────────── */
+
+.routes-sheet__drag {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 52px;
+  z-index: 1;
+  background: #ffffff;
+  border-bottom: 1px solid rgba(31, 37, 51, 0.06);
+  box-shadow: 0 2px 8px rgba(31, 37, 51, 0.05);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.routes-sheet__drag:active {
+  cursor: grabbing;
+}
+
+.routes-sheet__handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(31, 37, 51, 0.18);
+}
+
+.routes-sheet__locate {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(216, 220, 229, 0.8);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--color-brand);
+  box-shadow: 0 4px 12px rgba(31, 37, 51, 0.1);
+  transition: box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.routes-sheet__locate:hover {
+  box-shadow: 0 6px 16px rgba(31, 37, 51, 0.14);
+  transform: translateY(calc(-50% - 1px));
+}
+
+.routes-sheet__locate:active {
+  transform: translateY(-50%) scale(0.91);
+}
+
+/* ── Scrollable body ──────────────────────────────────────────────────────── */
+
+.routes-sheet__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 80px;
+}
+
+/* ── Section layout ───────────────────────────────────────────────────────── */
+
+.routes-sheet__draft,
+.routes-sheet__excursions {
+  padding: 16px 16px 0;
+}
+
+.routes-sheet__draft {
+  border-bottom: 1px solid rgba(31, 37, 51, 0.07);
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+
+.routes-sheet__section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.routes-sheet__section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 900;
+  color: var(--color-text);
+}
+
+.routes-sheet__section-sub {
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  font-weight: 600;
+}
+
+.routes-sheet__stop-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-brand-soft);
+  color: var(--color-brand-strong);
+  font-size: 0.72rem;
   font-weight: 800;
 }
 
-.excursions-page__filter-stack {
+.routes-sheet__count {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-soft);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 800;
+  margin-top: 2px;
+}
+
+.routes-sheet__stops {
   display: grid;
-  gap: 14px;
-  width: 100%;
-  padding: 14px;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.routes-sheet__excursion-list {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 8px;
+}
+
+.routes-sheet__empty {
+  margin: 0;
+  padding: 16px 0 20px;
+  color: var(--color-text-secondary);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+/* ── Draft stop card ──────────────────────────────────────────────────────── */
+
+.draft-stop {
   border: 1px solid rgba(216, 220, 229, 0.72);
-  border-radius: 26px;
-  background: rgba(255, 255, 255, 0.66);
+  border-radius: 16px;
+  overflow: hidden;
+  background: #ffffff;
+  transition: border-color 0.16s ease;
 }
 
-.excursions-page__skeleton-hero {
-  grid-template-columns: 1fr;
-  align-items: start;
+.draft-stop--expanded {
+  border-color: rgba(31, 138, 112, 0.28);
 }
 
-.excursions-page__skeleton-filters {
+.draft-stop__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: transparent;
+  text-align: left;
+}
+
+.draft-stop__order {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, var(--color-brand), var(--color-brand-strong));
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.draft-stop__info {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.draft-stop__category {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+
+.draft-stop__title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.draft-stop__chevron {
+  flex-shrink: 0;
+  font-size: 0.6rem;
+  color: var(--color-text-tertiary);
+}
+
+.draft-stop__detail {
+  padding: 0 12px 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.draft-stop__desc {
+  margin: 0;
+  font-size: 0.83rem;
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+}
+
+.draft-stop__detail-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 6px;
 }
 
-.skeleton-block,
-.skeleton-pill,
-.route-skeleton-card__cover {
-  position: relative;
+.draft-stop__stat {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-soft);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* ── Excursion row ────────────────────────────────────────────────────────── */
+
+.excursion-row {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 0;
+  border: 1px solid rgba(216, 220, 229, 0.72);
+  border-radius: 20px;
   overflow: hidden;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(31, 37, 51, 0.05);
+}
+
+.excursion-row__cover {
+  width: 100px;
+  min-height: 120px;
+  overflow: hidden;
+  background: var(--color-bg-soft);
+  flex-shrink: 0;
+}
+
+.excursion-row__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.excursion-row__body {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  align-content: start;
+}
+
+.excursion-row__theme {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 221, 45, 0.18);
+  color: var(--color-accent-ink);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.excursion-row__title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 800;
+  line-height: 1.3;
+  color: var(--color-text);
+}
+
+.excursion-row__tagline {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.excursion-row__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.excursion-row__stats span {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--color-bg-soft);
+}
+
+.excursion-row__open {
+  align-self: start;
+  justify-self: start;
+  min-height: 32px;
+  padding: 0 14px;
+  font-size: 0.8rem;
+}
+
+/* ── Skeleton ─────────────────────────────────────────────────────────────── */
+
+.routes-sheet__skeleton {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 8px;
+}
+
+.excursion-row-skeleton {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  border: 1px solid rgba(216, 220, 229, 0.6);
+  border-radius: 20px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.excursion-row-skeleton__cover {
+  height: 120px;
+  background: linear-gradient(90deg, #eef1f7 0%, #f8fafc 48%, #eef1f7 100%);
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.15s ease-in-out infinite;
+}
+
+.excursion-row-skeleton__body {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  align-content: start;
+}
+
+.skeleton-chip {
+  width: 72px;
+  height: 22px;
   border-radius: var(--radius-pill);
   background: linear-gradient(90deg, #eef1f7 0%, #f8fafc 48%, #eef1f7 100%);
   background-size: 220% 100%;
   animation: skeleton-shimmer 1.15s ease-in-out infinite;
 }
 
-.skeleton-block--eyebrow {
-  width: 150px;
-  height: 30px;
+.skeleton-line {
+  height: 14px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #eef1f7 0%, #f8fafc 48%, #eef1f7 100%);
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.15s ease-in-out infinite;
+  width: 70%;
 }
 
-.skeleton-block--title {
-  width: min(100%, 560px);
-  height: 58px;
-  border-radius: 18px;
+.skeleton-line--wide { width: 90% }
+.skeleton-line--short { width: 50% }
+
+/* ── Animations ───────────────────────────────────────────────────────────── */
+
+@keyframes draft-bar-enter {
+  from { opacity: 0; transform: translateY(6px) scale(0.97) }
+  to   { opacity: 1; transform: translateY(0)  scale(1) }
 }
 
-.skeleton-block--text {
-  width: min(100%, 680px);
-  height: 18px;
-  border-radius: 10px;
-}
-
-.skeleton-block--text-short {
-  width: 54%;
-  height: 18px;
-  border-radius: 10px;
-}
-
-.skeleton-block--small {
-  width: 96px;
-  height: 30px;
-}
-
-.skeleton-block--wide {
-  width: 84%;
-  height: 30px;
-  border-radius: 12px;
-}
-
-.skeleton-pill {
-  width: 132px;
-  height: 42px;
-}
-
-.route-skeleton-card {
-  overflow: hidden;
-  border: 1px solid rgba(216, 220, 229, 0.86);
-  border-radius: 30px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 16px 34px rgba(31, 37, 51, 0.06);
-}
-
-.route-skeleton-card__cover {
-  height: 160px;
-  border-radius: 0;
-}
-
-.route-skeleton-card__body {
-  display: grid;
-  gap: 14px;
-  padding: 22px;
-}
-
-.excursions-page .status-card {
-  animation: excursions-empty-enter 0.32s ease both;
+@keyframes routes-toast-enter {
+  from { opacity: 0; transform: translateX(-50%) translateY(-6px) }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0) }
 }
 
 @keyframes skeleton-shimmer {
-  from {
-    background-position: 120% 0;
-  }
-
-  to {
-    background-position: -120% 0;
-  }
+  from { background-position: 120% 0 }
+  to   { background-position: -120% 0 }
 }
 
-@keyframes excursions-empty-enter {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.985);
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+  .routes-page__draft-bar {
+    right: 10px;
+    bottom: calc(52px + 10px);
   }
 
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@media (max-width: 980px) {
-  .excursions-page__hero {
-    grid-template-columns: 1fr;
-    min-height: 0;
-  }
-}
-
-@media (max-width: 760px) {
-  .excursions-page__hero,
-  .excursions-page__filters {
-    padding: 24px;
+  .routes-page__draft-btn {
+    min-height: 34px;
+    padding: 0 12px;
+    font-size: 0.8rem;
   }
 
-  .excursions-page__hero-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .excursions-page__filter-stack {
-    padding: 12px;
-    border-radius: 22px;
-  }
-
-  .excursions-page__stat {
-    gap: 6px;
-    padding: 14px;
-    border-radius: 18px;
-  }
-
-  .excursions-page__stat-value {
-    font-size: 1.2rem;
-  }
-
-  .route-skeleton-card__cover {
-    height: 128px;
-  }
-
-  .route-skeleton-card__body {
-    gap: 12px;
-    padding: 18px;
-  }
-}
-
-@media (max-width: 520px) {
-  .excursions-page__hero,
-  .excursions-page__filters {
-    padding: 18px;
-  }
-
-  .excursions-page__hero-copy {
-    gap: 14px;
-  }
-
-  .excursions-page__hero-stats {
-    grid-template-columns: 1fr;
-  }
-
-  .excursions-page__skeleton-filters {
-    gap: 8px;
+  .routes-sheet__draft,
+  .routes-sheet__excursions {
+    padding: 12px 12px 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton-block,
-  .skeleton-pill,
-  .route-skeleton-card__cover,
-  .excursions-page .status-card {
+  .excursion-row-skeleton__cover,
+  .skeleton-chip,
+  .skeleton-line,
+  .routes-page__draft-bar,
+  .routes-page__toast {
     animation: none;
   }
 }
