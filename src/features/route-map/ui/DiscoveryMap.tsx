@@ -153,6 +153,7 @@ export function DiscoveryMap({
   const routeLayerRef = useRef<L.LayerGroup | null>(null)
   const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const onChangeRadiusRef = useRef(onChangeRadius)
+  const selectedPointIdRef = useRef(selectedPointId)
   const [mapLoadError, setMapLoadError] = useState<string | null>(null)
   const [openMenu, setOpenMenu] = useState<'category' | 'radius' | null>(null)
   const [guideRoute, setGuideRoute] = useState<{
@@ -211,6 +212,7 @@ export function DiscoveryMap({
 
   // Keep radius callback ref current so zoomend listener always calls latest version
   onChangeRadiusRef.current = onChangeRadius
+  selectedPointIdRef.current = selectedPointId
   const guideGeometry =
     guideRoute.signature === guideSignature && guideRoute.geometry
       ? guideRoute.geometry
@@ -490,7 +492,7 @@ export function DiscoveryMap({
       const googleMapsUrl = buildGoogleMapsUrl(point.coordinates, userPosition)
       const isInDraft = visibleDraftPointIds.has(point.id)
       const marker = L.marker([point.coordinates.lat, point.coordinates.lng], {
-        icon: createPoiIcon(point, point.id === selectedPointId, isInDraft),
+        icon: createPoiIcon(point, point.id === selectedPointIdRef.current, isInDraft),
         title: buildMarkerTitle(point),
       })
         .bindPopup(
@@ -539,7 +541,7 @@ export function DiscoveryMap({
       marker.addTo(overlay)
       markerRefs.current.set(point.id, marker)
     })
-  }, [draftStops.length, nearbyPoints, onAddPointToDraft, onBuildRoute, onClearDraftRoute, onSelectPoint, routeTargetId, selectedPointId, showDirectRouteInPopup, showPopupRouteActions, userPosition, visibleDraftPointIds])
+  }, [draftStops.length, nearbyPoints, onAddPointToDraft, onBuildRoute, onClearDraftRoute, onSelectPoint, routeTargetId, showDirectRouteInPopup, showPopupRouteActions, userPosition, visibleDraftPointIds])
 
   // Animate radius circle smoothly when radiusMeters changes (no full redraw)
   useEffect(() => {

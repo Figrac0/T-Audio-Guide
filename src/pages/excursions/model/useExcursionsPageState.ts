@@ -10,6 +10,7 @@ import type {
 import { useDiscoveryRoutes } from '@/entities/excursion/model/useDiscoveryRoutes'
 import {
   buildOsmWalkingRouteGeometryFromPoints,
+  createLineGeometryFromPoints,
   type LngLat,
 } from '@/features/route-map/lib/route-geometry'
 import { useUserGeolocation } from '@/features/route-map/model/useUserGeolocation'
@@ -114,7 +115,6 @@ export function useExcursionsPageState() {
   // making segments[0] the guide segment (user → first stop), rendered dashed.
   useEffect(() => {
     if (draftStops.length === 0 || (draftStops.length === 1 && !userPosition)) {
-      setRouteSegmentsState({ signature: '', segments: [] })
       return
     }
 
@@ -169,21 +169,44 @@ export function useExcursionsPageState() {
     [draftStops],
   )
 
+  const routePoints = useMemo(
+    () => [
+      ...(userPosition ? [userPosition] : []),
+      ...draftStops.map((stop) => stop.coordinates),
+    ],
+    [draftStops, userPosition],
+  )
+
   // Recompute expected signature to detect when route is stale during fetching
   const routeSignature =
     draftStops.length === 0 || (draftStops.length === 1 && !userPosition)
       ? ''
-      : `${userPosition ? 'lead' : 'plain'}:${[
-          ...(userPosition ? [userPosition] : []),
-          ...draftStops.map((s) => s.coordinates),
-        ]
+      : `${userPosition ? 'lead' : 'plain'}:${routePoints
           .map((p) => `${p.lat.toFixed(5)}:${p.lng.toFixed(5)}`)
           .join('|')}`
 
+  const fallbackRouteSegments = useMemo(() => {
+    if (!routeSignature) {
+      return []
+    }
+
+    return routePoints.slice(0, -1).map((point, index) => {
+      const nextPoint = routePoints[index + 1]
+      const geometry = createLineGeometryFromPoints([point, nextPoint])
+      return geometry.type === 'LineString' ? geometry.coordinates : []
+    })
+  }, [routePoints, routeSignature])
+
   const routeState: PlannerRouteState =
     routeSegmentsState.signature === routeSignature
-      ? { hasLeadSegment: Boolean(userPosition), segments: routeSegmentsState.segments }
-      : { hasLeadSegment: false, segments: [] }
+      ? {
+          hasLeadSegment: Boolean(userPosition),
+          segments:
+            routeSegmentsState.segments.length > 0 ? routeSegmentsState.segments : fallbackRouteSegments,
+        }
+      : routeSignature
+        ? { hasLeadSegment: Boolean(userPosition), segments: fallbackRouteSegments }
+        : { hasLeadSegment: false, segments: [] }
 
   const handleSelectPoint = useCallback((pointId: string) => {
     setSelectedPointId(pointId)

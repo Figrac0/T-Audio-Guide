@@ -14,11 +14,13 @@ import {
   createUserIcon,
 } from '@/features/route-map/lib/leaflet-map'
 import {
+  formatMeters,
   getBoundsFromPoints,
   toLngLat,
 } from '@/features/route-map/lib/route-geometry'
-import { formatPointCategory } from '@/shared/lib/format'
 import { appMapConfig } from '@/shared/config/map'
+import { formatDuration, formatPointCategory } from '@/shared/lib/format'
+import { buildPlacePlaceholderImage } from '@/shared/lib/placeholder-images'
 import './RouteBuilderMap.css'
 
 interface RouteBuilderMapProps {
@@ -63,22 +65,27 @@ export function RouteBuilderMap({
   const hasAutoFittedRef = useRef(false)
   const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Stable refs so event-handler closures always call current callbacks
   const onAddPointRef = useRef(onAddPoint)
   const onSelectPointRef = useRef(onSelectPoint)
   const isPointInDraftRef = useRef(isPointInDraft)
   const isDraftFullRef = useRef(isDraftFull)
   const onChangeRadiusRef = useRef(onChangeRadius)
   const radiusMetersRef = useRef(radiusMeters)
+  const selectedPointIdRef = useRef(selectedPointId)
 
-  onAddPointRef.current = onAddPoint
-  onSelectPointRef.current = onSelectPoint
-  isPointInDraftRef.current = isPointInDraft
-  isDraftFullRef.current = isDraftFull
-  onChangeRadiusRef.current = onChangeRadius
-  radiusMetersRef.current = radiusMeters
+  useEffect(() => {
+    onAddPointRef.current = onAddPoint
+    onSelectPointRef.current = onSelectPoint
+    isPointInDraftRef.current = isPointInDraft
+    isDraftFullRef.current = isDraftFull
+    onChangeRadiusRef.current = onChangeRadius
+    radiusMetersRef.current = radiusMeters
+  }, [isDraftFull, isPointInDraft, onAddPoint, onChangeRadius, onSelectPoint, radiusMeters])
 
-  // ── Map init ────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    selectedPointIdRef.current = selectedPointId
+  }, [selectedPointId])
+
   useEffect(() => {
     const container = containerRef.current
     if (!container || mapRef.current) return
@@ -86,13 +93,17 @@ export function RouteBuilderMap({
     const map = createLeafletMap(container, appMapConfig.defaultCenter, appMapConfig.defaultZoom)
     const routeLayer = L.layerGroup().addTo(map)
     const markersLayer = L.layerGroup().addTo(map)
+    const markerMap = markerRefsMap.current
 
     mapRef.current = map
     routeLayerRef.current = routeLayer
     markersLayerRef.current = markersLayer
 
     map.on('zoomend', () => {
-      if (zoomDebounceRef.current !== null) clearTimeout(zoomDebounceRef.current)
+      if (zoomDebounceRef.current !== null) {
+        clearTimeout(zoomDebounceRef.current)
+      }
+
       zoomDebounceRef.current = setTimeout(() => {
         const bounds = map.getBounds()
         const center = bounds.getCenter()
@@ -102,21 +113,24 @@ export function RouteBuilderMap({
     })
 
     return () => {
-      if (zoomDebounceRef.current !== null) clearTimeout(zoomDebounceRef.current)
+      if (zoomDebounceRef.current !== null) {
+        clearTimeout(zoomDebounceRef.current)
+      }
+
       routeLayerRef.current?.clearLayers()
       markersLayerRef.current?.clearLayers()
       routeLayerRef.current = null
       markersLayerRef.current = null
-      markerRefsMap.current.clear()
+      markerMap.clear()
       mapRef.current?.remove()
       mapRef.current = null
     }
   }, [])
 
-  // ── Route layer: radius circle + dashed guide + solid segments + user marker ──
   useEffect(() => {
     const layer = routeLayerRef.current
     if (!layer) return
+
     layer.clearLayers()
 
     if (userPosition) {
@@ -127,7 +141,6 @@ export function RouteBuilderMap({
       radiusCircleRef.current = null
     }
 
-    // segments[0] when hasLeadSegment = user → first stop, rendered as dashed guide
     if (routeState.hasLeadSegment && routeState.segments.length > 0) {
       createGuidePolyline({
         type: 'LineString',
@@ -135,7 +148,6 @@ export function RouteBuilderMap({
       }).addTo(layer)
     }
 
-    // Remaining segments are stop-to-stop legs, solid and colored per segment
     const stopSegments = routeState.hasLeadSegment
       ? routeState.segments.slice(1)
       : routeState.segments
@@ -156,35 +168,44 @@ export function RouteBuilderMap({
     }
   }, [routeState, userPosition])
 
-  // ── Smooth radius animation ─────────────────────────────────────────────────
   useEffect(() => {
-    const circle = radiusCircleRef.current
-    if (!circle) return
+    const activeCircle = radiusCircleRef.current
+    if (!activeCircle) return
+    const circle = activeCircle
+
     const start = circle.getRadius()
     const end = radiusMeters
-    if (Math.abs(end - start) < 5) { circle.setRadius(end); return }
-    const duration = 380
-    const t0 = performance.now()
-    let raf: number
-    function step(now: number) {
-      const p = Math.min(1, (now - t0) / duration)
-      circle.setRadius(start + (end - start) * (1 - Math.pow(1 - p, 3)))
-      if (p < 1) raf = requestAnimationFrame(step)
+    if (Math.abs(end - start) < 5) {
+      circle.setRadius(end)
+      return
     }
-    raf = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(raf)
+
+    const duration = 380
+    const startedAt = performance.now()
+    let frameId = 0
+
+    function step(now: number) {
+      const progress = Math.min(1, (now - startedAt) / duration)
+      circle.setRadius(start + (end - start) * (1 - Math.pow(1 - progress, 3)))
+      if (progress < 1) {
+        frameId = requestAnimationFrame(step)
+      }
+    }
+
+    frameId = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(frameId)
   }, [radiusMeters])
 
-  // ── Markers: full rebuild only when point data changes ─────────────────────
   useEffect(() => {
     const layer = markersLayerRef.current
     if (!layer) return
+
     layer.clearLayers()
     markerRefsMap.current.clear()
 
     nearbyPoints.forEach((point) => {
       const marker = L.marker([point.coordinates.lat, point.coordinates.lng], {
-        icon: createPoiIcon(point, point.id === selectedPointId, draftPointIds.has(point.id)),
+        icon: createPoiIcon(point, point.id === selectedPointIdRef.current, draftPointIds.has(point.id)),
         title: buildMarkerTitle(point),
       })
 
@@ -205,8 +226,8 @@ export function RouteBuilderMap({
         L.popup({
           className: 'rbm-leaflet-popup',
           closeButton: true,
-          maxWidth: 280,
-          minWidth: 240,
+          maxWidth: 320,
+          minWidth: 252,
           offset: [0, -28],
         })
           .setContent(popupEl)
@@ -217,55 +238,53 @@ export function RouteBuilderMap({
       marker.addTo(layer)
       markerRefsMap.current.set(point.id, marker)
     })
-    // selectedPointId and draftPointIds excluded: icon updates happen in the effect below
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nearbyPoints])
+  }, [draftPointIds, nearbyPoints])
 
-  // ── Icon update on selection/draft change (no full rebuild) ─────────────────
   useEffect(() => {
     nearbyPoints.forEach((point) => {
       const marker = markerRefsMap.current.get(point.id)
       if (!marker) return
+
       marker.setIcon(createPoiIcon(point, point.id === selectedPointId, draftPointIds.has(point.id)))
     })
   }, [nearbyPoints, selectedPointId, draftPointIds])
 
-  // ── Auto-fit bounds on first data load ──────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current
     if (!map || hasAutoFittedRef.current) return
+
     const allPoints = [
-      ...nearbyPoints.map((p) => p.coordinates),
+      ...nearbyPoints.map((point) => point.coordinates),
       ...(userPosition ? [userPosition] : []),
     ]
+
     if (allPoints.length === 0) return
+
     hasAutoFittedRef.current = true
     applyLeafletLocation(map, {
       bounds: getBoundsFromPoints(allPoints),
-      padding: MAP_PADDING,
       duration: 800,
+      padding: MAP_PADDING,
     })
   }, [nearbyPoints, userPosition])
 
-  // ── Fly to user on recenter trigger ────────────────────────────────────────
   useEffect(() => {
     if (!recenterKey || !userPosition || !mapRef.current) return
+
     applyLeafletLocation(mapRef.current, {
       center: toLngLat(userPosition),
-      zoom: 15.5,
       duration: 700,
+      zoom: 15.5,
     })
   }, [recenterKey, userPosition])
 
   return (
     <div className="rbm">
       <div className="rbm__container" ref={containerRef} />
-      {isLoading && <div className="rbm__loader" role="status">Загрузка мест…</div>}
+      {isLoading ? <div className="rbm__loader" role="status">Загрузка мест…</div> : null}
     </div>
   )
 }
-
-// ── Popup DOM builder ──────────────────────────────────────────────────────────
 
 function buildPopupEl(
   point: NearbyPoint,
@@ -276,56 +295,103 @@ function buildPopupEl(
   const root = document.createElement('div')
   root.className = 'rbm-popup'
 
-  if (point.imageUrl) {
-    const cover = document.createElement('div')
-    cover.className = 'rbm-popup__cover'
-    const img = document.createElement('img')
-    img.src = point.imageUrl
-    img.alt = point.title
-    img.loading = 'lazy'
-    img.onerror = () => { cover.style.display = 'none' }
-    cover.appendChild(img)
-    root.appendChild(cover)
+  const cover = document.createElement('div')
+  cover.className = 'rbm-popup__cover'
+
+  const image = document.createElement('img')
+  const placeholder = buildPlacePlaceholderImage(point.category)
+  image.src = point.imageUrl || placeholder
+  image.alt = point.title
+  image.loading = 'lazy'
+  image.onerror = () => {
+    image.src = placeholder
   }
+  cover.appendChild(image)
+  root.appendChild(cover)
 
   const body = document.createElement('div')
   body.className = 'rbm-popup__body'
 
-  const cat = document.createElement('span')
-  cat.className = 'rbm-popup__cat'
-  cat.textContent = formatPointCategory(point.category)
-  body.appendChild(cat)
+  const category = document.createElement('span')
+  category.className = 'rbm-popup__cat'
+  category.textContent = formatPointCategory(point.category)
+  body.appendChild(category)
 
-  const titleEl = document.createElement('h3')
-  titleEl.className = 'rbm-popup__title'
-  titleEl.textContent = point.title
-  body.appendChild(titleEl)
+  const title = document.createElement('h3')
+  title.className = 'rbm-popup__title'
+  title.textContent = point.title
+  body.appendChild(title)
+
+  const meta = document.createElement('div')
+  meta.className = 'rbm-popup__meta'
+
+  const distance = document.createElement('span')
+  distance.className = 'rbm-popup__meta-chip'
+  distance.textContent = formatMeters(point.distanceMeters)
+  meta.appendChild(distance)
+
+  if (point.expectedVisitMinutes > 0) {
+    const duration = document.createElement('span')
+    duration.className = 'rbm-popup__meta-chip'
+    duration.textContent = formatDuration(point.expectedVisitMinutes)
+    meta.appendChild(duration)
+  }
+
+  if (point.rating > 0) {
+    const rating = document.createElement('span')
+    rating.className = 'rbm-popup__meta-chip rbm-popup__meta-chip--accent'
+    rating.textContent = `★ ${point.rating.toFixed(1)}`
+    meta.appendChild(rating)
+  }
+
+  body.appendChild(meta)
 
   if (point.shortDescription) {
-    const desc = document.createElement('p')
-    desc.className = 'rbm-popup__desc'
-    desc.textContent = point.shortDescription
-    body.appendChild(desc)
+    const description = document.createElement('p')
+    description.className = 'rbm-popup__desc'
+    description.textContent = point.shortDescription
+    body.appendChild(description)
   }
 
-  const btn = document.createElement('button')
-  btn.type = 'button'
+  if (point.addressLabel || point.scheduleLabel) {
+    const info = document.createElement('div')
+    info.className = 'rbm-popup__info'
+
+    if (point.addressLabel) {
+      const address = document.createElement('p')
+      address.className = 'rbm-popup__info-line'
+      address.textContent = point.addressLabel
+      info.appendChild(address)
+    }
+
+    if (point.scheduleLabel) {
+      const schedule = document.createElement('p')
+      schedule.className = 'rbm-popup__info-line'
+      schedule.textContent = point.scheduleLabel
+      info.appendChild(schedule)
+    }
+
+    body.appendChild(info)
+  }
+
+  const button = document.createElement('button')
+  button.type = 'button'
 
   if (isInDraft) {
-    btn.className = 'rbm-popup__btn'
-    btn.textContent = 'Уже в маршруте ✓'
-    btn.disabled = true
+    button.className = 'rbm-popup__btn'
+    button.textContent = 'Уже в маршруте'
+    button.disabled = true
   } else if (isDraftFull) {
-    btn.className = 'rbm-popup__btn'
-    btn.textContent = 'Маршрут заполнен'
-    btn.disabled = true
+    button.className = 'rbm-popup__btn'
+    button.textContent = 'Маршрут заполнен'
+    button.disabled = true
   } else {
-    btn.className = 'rbm-popup__btn rbm-popup__btn--primary'
-    btn.textContent = 'Добавить в маршрут'
-    btn.addEventListener('click', onAdd)
+    button.className = 'rbm-popup__btn rbm-popup__btn--primary'
+    button.textContent = 'Добавить в свой маршрут'
+    button.addEventListener('click', onAdd)
   }
 
-  body.appendChild(btn)
+  body.appendChild(button)
   root.appendChild(body)
 
   return root
