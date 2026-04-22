@@ -150,6 +150,8 @@ export function DiscoveryMap({
   // Tracks the route signature last fitted to — prevents re-fitting on every
   // nearbyPoints refresh while the same route is active.
   const lastFittedRouteRef = useRef<string>('')
+  const routeLayerRef = useRef<L.LayerGroup | null>(null)
+  const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const onChangeRadiusRef = useRef(onChangeRadius)
   const [mapLoadError, setMapLoadError] = useState<string | null>(null)
   const [openMenu, setOpenMenu] = useState<'category' | 'radius' | null>(null)
@@ -238,19 +240,25 @@ export function DiscoveryMap({
         initialCenterRef.current,
         appMapConfig.defaultZoom,
       )
+      // routeLayer (circle + polylines) rendered below markers layer
+      const routeLayer = L.layerGroup().addTo(map)
       const overlay = L.layerGroup().addTo(map)
 
       mapRef.current = map
+      routeLayerRef.current = routeLayer
       overlayRef.current = overlay
 
-      // Dynamic radius: update based on map zoom (1 km – 5 km)
+      // Dynamic radius: debounced to prevent rapid-fire API calls on every scroll tick
       map.on('zoomend', () => {
-        const bounds = map.getBounds()
-        const center = bounds.getCenter()
-        const east = L.latLng(center.lat, bounds.getEast())
-        const halfWidthMeters = center.distanceTo(east)
-        const clamped = Math.round(Math.min(5000, Math.max(1000, halfWidthMeters)))
-        onChangeRadiusRef.current(clamped)
+        if (zoomDebounceRef.current !== null) clearTimeout(zoomDebounceRef.current)
+        zoomDebounceRef.current = setTimeout(() => {
+          const bounds = map.getBounds()
+          const center = bounds.getCenter()
+          const east = L.latLng(center.lat, bounds.getEast())
+          const halfWidthMeters = center.distanceTo(east)
+          const clamped = Math.round(Math.min(5000, Math.max(1000, halfWidthMeters)))
+          onChangeRadiusRef.current(clamped)
+        }, 350)
       })
 
       queueMicrotask(() => setMapLoadError(null))
@@ -260,6 +268,9 @@ export function DiscoveryMap({
     }
 
     return () => {
+      if (zoomDebounceRef.current !== null) clearTimeout(zoomDebounceRef.current)
+      routeLayerRef.current?.clearLayers()
+      routeLayerRef.current = null
       overlayRef.current?.clearLayers()
       overlayRef.current = null
       markers.clear()
@@ -431,31 +442,47 @@ export function DiscoveryMap({
     })
   }, [draftBounds, guideBounds, nearbyPoints.length, pointsBounds, routeTargetId, userPosition, visibleDraftStops.length])
 
+  // Route layer: circle + polylines + user marker — rebuilt only when geometry/position changes.
+  // Intentionally excludes radiusMeters: the animation effect handles smooth radius updates.
   useEffect(() => {
-    const overlay = overlayRef.current
+    const routeLayer = routeLayerRef.current
+    if (!routeLayer) return
 
-    if (!overlay) {
-      return
-    }
-
-    overlay.clearLayers()
-    markerRefs.current.clear()
+    routeLayer.clearLayers()
 
     if (userPosition) {
       const circle = createDiscoveryRadiusCircle(userPosition, radiusMeters)
-      circle.addTo(overlay)
+      circle.addTo(routeLayer)
       radiusCircleRef.current = circle
     } else {
       radiusCircleRef.current = null
     }
 
     if (guideGeometry && !draftGeometry) {
-      createGuidePolyline(guideGeometry).addTo(overlay)
+      createGuidePolyline(guideGeometry).addTo(routeLayer)
     }
 
     if (draftGeometry) {
-      createSegmentedRoutePolyline(draftGeometry).addTo(overlay)
+      createSegmentedRoutePolyline(draftGeometry).addTo(routeLayer)
     }
+
+    if (userPosition) {
+      L.marker([userPosition.lat, userPosition.lng], {
+        icon: createUserIcon(),
+        title: 'Ваше местоположение',
+      }).addTo(routeLayer)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftGeometry, guideGeometry, userPosition])
+
+  // Markers layer: POI markers only — rebuilt when the point set or selection changes.
+  // Kept separate from the route layer so zoom/radius changes don't thrash polylines.
+  useEffect(() => {
+    const overlay = overlayRef.current
+    if (!overlay) return
+
+    overlay.clearLayers()
+    markerRefs.current.clear()
 
     nearbyPoints.forEach((point) => {
       const googleMapsUrl = buildGoogleMapsUrl(point.coordinates, userPosition)
@@ -510,14 +537,7 @@ export function DiscoveryMap({
       marker.addTo(overlay)
       markerRefs.current.set(point.id, marker)
     })
-
-    if (userPosition) {
-      L.marker([userPosition.lat, userPosition.lng], {
-        icon: createUserIcon(),
-        title: 'Ваше местоположение',
-      }).addTo(overlay)
-    }
-  }, [draftGeometry, draftStops.length, guideGeometry, nearbyPoints, onAddPointToDraft, onBuildRoute, onClearDraftRoute, onSelectPoint, routeTargetId, selectedPointId, userPosition, visibleDraftPointIds])
+  }, [draftStops.length, nearbyPoints, onAddPointToDraft, onBuildRoute, onClearDraftRoute, onSelectPoint, routeTargetId, selectedPointId, showDirectRouteInPopup, showPopupRouteActions, userPosition, visibleDraftPointIds])
 
   // Animate radius circle smoothly when radiusMeters changes (no full redraw)
   useEffect(() => {
@@ -696,7 +716,7 @@ export function DiscoveryMap({
               autoComplete="off"
               className="discovery-map__search-input"
               id="nearby-search"
-              onChange={(event) => onSearchQueryChange(event.target.value)}
+              onChange={(event) => onSearchQueryChange?.(event.target.value)}
               placeholder="Поиск мест в радиусе"
               type="search"
               value={searchQuery}

@@ -20,7 +20,6 @@ export function PlaceDetailsCard({ stop }: PlaceDetailsCardProps) {
         <SmartPlaceImage
           alt={stop.title}
           category={stop.category}
-          coordinates={stop.coordinates}
           loading="lazy"
           referrerPolicy="no-referrer"
           src={stop.imageUrl}

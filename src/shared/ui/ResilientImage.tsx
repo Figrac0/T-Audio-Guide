@@ -63,13 +63,14 @@ export function ResilientImage({
   return <img {...props} src={resolvedSrc} />
 }
 
-function preloadImage(src: string) {
+function preloadImage(src: string, timeoutMs = 5000) {
   return new Promise<boolean>((resolve) => {
     const image = new Image()
+    const timer = window.setTimeout(() => resolve(false), timeoutMs)
     image.decoding = 'async'
     image.loading = 'eager'
-    image.onload = () => resolve(true)
-    image.onerror = () => resolve(false)
+    image.onload = () => { clearTimeout(timer); resolve(true) }
+    image.onerror = () => { clearTimeout(timer); resolve(false) }
     image.src = src
   })
 }

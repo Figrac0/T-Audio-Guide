@@ -42,45 +42,50 @@ export function useDiscoveryRoutes({
 
     let isActive = true
 
-    async function loadDiscoveryFeed() {
-      setIsLoading(true)
-      setError(null)
+    // Debounce: wait 300 ms before firing the API call so rapid radius changes
+    // from scroll events don't flood the network.
+    const debounceTimer = setTimeout(() => {
+      async function loadDiscoveryFeed() {
+        setIsLoading(true)
+        setError(null)
 
-      try {
-        const response = await appApi.getDiscoveryFeed({
-          category: activePointCategory,
-          center,
-          locale,
-          radiusMeters,
-          search,
-        })
+        try {
+          const response = await appApi.getDiscoveryFeed({
+            category: activePointCategory,
+            center,
+            locale,
+            radiusMeters,
+            search,
+          })
 
-        if (!isActive) {
-          return
-        }
+          if (!isActive) {
+            return
+          }
 
-        setNearbyPoints(response.nearbyPoints)
-        setExcursions(response.excursions)
-      } catch (loadError) {
-        if (!isActive) {
-          return
-        }
+          setNearbyPoints(response.nearbyPoints)
+          setExcursions(response.excursions)
+        } catch (loadError) {
+          if (!isActive) {
+            return
+          }
 
-        console.error(loadError)
-        setNearbyPoints([])
-        setExcursions([])
-        setError('Не удалось загрузить данные для экрана.')
-      } finally {
-        if (isActive) {
-          setIsLoading(false)
+          console.error(loadError)
+          setNearbyPoints([])
+          setExcursions([])
+          setError('Не удалось загрузить данные для экрана.')
+        } finally {
+          if (isActive) {
+            setIsLoading(false)
+          }
         }
       }
-    }
 
-    void loadDiscoveryFeed()
+      void loadDiscoveryFeed()
+    }, 300)
 
     return () => {
       isActive = false
+      clearTimeout(debounceTimer)
     }
   }, [activePointCategory, center, enabled, locale, radiusMeters, search])
 

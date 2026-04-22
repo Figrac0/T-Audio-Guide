@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 
 import { useAuth } from '@/app/providers/useAuth'
 import type { Excursion } from '@/entities/excursion/model/types'
-import { buildStaticPlaceImageUrl } from '@/entities/place/lib/place-images'
 import { useUserRoutes } from '@/features/user-routes/model/useUserRoutes'
 import { appRoutes } from '@/shared/config/routes'
 import { buildRoutePlaceholderImage } from '@/shared/lib/placeholder-images'
@@ -28,15 +27,9 @@ export function ExcursionCard({ excursion }: ExcursionCardProps) {
     toggleSavedRoute,
   } = useUserRoutes()
   const isAuthenticated = Boolean(session?.isAuthenticated && session.profile)
-  const firstStop = excursion.stops[0]
   const routeUrl = appRoutes.excursion(excursion.slug)
   const isSaved = isRouteSaved(excursion.slug)
-  const coverFallbacks = firstStop
-    ? [
-        buildStaticPlaceImageUrl(firstStop.coordinates, firstStop.category, 15),
-        buildRoutePlaceholderImage(excursion.theme),
-      ]
-    : [buildRoutePlaceholderImage(excursion.theme)]
+  const coverFallbacks = [buildRoutePlaceholderImage(excursion.theme)]
   const routePlaceholder = buildRoutePlaceholderImage(excursion.theme)
   const coverSrc =
     excursion.coverImageUrl && !excursion.coverImageUrl.startsWith('/illustrations/')

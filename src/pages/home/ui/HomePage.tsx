@@ -762,7 +762,6 @@ export function HomePage() {
                                             <SmartPlaceImage
                                                 alt={point.title}
                                                 category={point.category}
-                                                coordinates={point.coordinates}
                                                 loading="lazy"
                                                 referrerPolicy="no-referrer"
                                                 src={point.imageUrl}
