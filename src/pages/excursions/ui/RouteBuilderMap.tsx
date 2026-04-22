@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import * as L from 'leaflet'
 
 import type { GeoPoint, NearbyPoint } from '@/entities/excursion/model/types'
@@ -23,6 +23,10 @@ import { formatDuration, formatPointCategory } from '@/shared/lib/format'
 import { buildPlacePlaceholderImage } from '@/shared/lib/placeholder-images'
 import './RouteBuilderMap.css'
 
+export interface RouteBuilderMapHandle {
+  closePopup: () => void
+}
+
 interface RouteBuilderMapProps {
   draftPointIds: Set<string>
   isDraftFull: boolean
@@ -41,7 +45,7 @@ interface RouteBuilderMapProps {
 
 const MAP_PADDING: [number, number, number, number] = [72, 24, 24, 24]
 
-export function RouteBuilderMap({
+export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMapProps>(function RouteBuilderMap({
   draftPointIds,
   isDraftFull,
   isLoading,
@@ -55,15 +59,20 @@ export function RouteBuilderMap({
   routeState,
   selectedPointId,
   userPosition,
-}: RouteBuilderMapProps) {
+}: RouteBuilderMapProps, ref) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const routeLayerRef = useRef<L.LayerGroup | null>(null)
   const markersLayerRef = useRef<L.LayerGroup | null>(null)
+  const userLayerRef = useRef<L.LayerGroup | null>(null)
   const radiusCircleRef = useRef<L.Circle | null>(null)
   const markerRefsMap = useRef(new Map<string, L.Marker>())
   const hasAutoFittedRef = useRef(false)
   const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useImperativeHandle(ref, () => ({
+    closePopup: () => { mapRef.current?.closePopup() },
+  }), [])
 
   const onAddPointRef = useRef(onAddPoint)
   const onSelectPointRef = useRef(onSelectPoint)
@@ -93,11 +102,13 @@ export function RouteBuilderMap({
     const map = createLeafletMap(container, appMapConfig.defaultCenter, appMapConfig.defaultZoom)
     const routeLayer = L.layerGroup().addTo(map)
     const markersLayer = L.layerGroup().addTo(map)
+    const userLayer = L.layerGroup().addTo(map)
     const markerMap = markerRefsMap.current
 
     mapRef.current = map
     routeLayerRef.current = routeLayer
     markersLayerRef.current = markersLayer
+    userLayerRef.current = userLayer
 
     map.on('zoomend', () => {
       if (zoomDebounceRef.current !== null) {
@@ -119,8 +130,10 @@ export function RouteBuilderMap({
 
       routeLayerRef.current?.clearLayers()
       markersLayerRef.current?.clearLayers()
+      userLayerRef.current?.clearLayers()
       routeLayerRef.current = null
       markersLayerRef.current = null
+      userLayerRef.current = null
       markerMap.clear()
       mapRef.current?.remove()
       mapRef.current = null
@@ -158,20 +171,24 @@ export function RouteBuilderMap({
         coordinates: stopSegments,
       }).addTo(layer)
     }
+  }, [routeState, userPosition])
 
+  useEffect(() => {
+    const layer = userLayerRef.current
+    if (!layer) return
+    layer.clearLayers()
     if (userPosition) {
       L.marker([userPosition.lat, userPosition.lng], {
         icon: createUserIcon(),
         title: 'Ваше местоположение',
-        zIndexOffset: 100,
+        zIndexOffset: 1000,
       }).addTo(layer)
     }
-  }, [routeState, userPosition])
+  }, [userPosition])
 
   useEffect(() => {
-    const activeCircle = radiusCircleRef.current
-    if (!activeCircle) return
-    const circle = activeCircle
+    const circle = radiusCircleRef.current
+    if (!circle) return
 
     const start = circle.getRadius()
     const end = radiusMeters
@@ -187,9 +204,7 @@ export function RouteBuilderMap({
     function step(now: number) {
       const progress = Math.min(1, (now - startedAt) / duration)
       circle.setRadius(start + (end - start) * (1 - Math.pow(1 - progress, 3)))
-      if (progress < 1) {
-        frameId = requestAnimationFrame(step)
-      }
+      if (progress < 1) frameId = requestAnimationFrame(step)
     }
 
     frameId = requestAnimationFrame(step)
@@ -228,7 +243,7 @@ export function RouteBuilderMap({
           closeButton: true,
           maxWidth: 320,
           minWidth: 252,
-          offset: [0, -28],
+          offset: [0, -38],
         })
           .setContent(popupEl)
           .setLatLng([point.coordinates.lat, point.coordinates.lng])
@@ -284,7 +299,7 @@ export function RouteBuilderMap({
       {isLoading ? <div className="rbm__loader" role="status">Загрузка мест…</div> : null}
     </div>
   )
-}
+})
 
 function buildPopupEl(
   point: NearbyPoint,

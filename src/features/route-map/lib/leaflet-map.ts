@@ -172,6 +172,7 @@ export function createSegmentedRoutePolyline(geometry: RouteGeometry) {
   const segmentPalette = ['#1f8a70', '#0f4c81', '#7c3aed', '#d97706', '#4f772d', '#c2514b']
   const segments =
     geometry.type === 'LineString' ? [geometry.coordinates] : geometry.coordinates
+  const renderer = L.canvas({ padding: 0.5 })
 
   const layers = segments.flatMap((segment, index) => {
     const path = segment.map(toLeafletLatLngFromLngLat)
@@ -183,7 +184,7 @@ export function createSegmentedRoutePolyline(geometry: RouteGeometry) {
         lineCap: 'round',
         lineJoin: 'round',
         opacity: 1,
-        renderer: L.canvas(),
+        renderer,
         weight: 12,
       }),
       L.polyline(path, {
@@ -191,7 +192,7 @@ export function createSegmentedRoutePolyline(geometry: RouteGeometry) {
         lineCap: 'round',
         lineJoin: 'round',
         opacity: 0.92,
-        renderer: L.canvas(),
+        renderer,
         weight: 6,
       }),
       L.polyline(path, {
@@ -199,7 +200,7 @@ export function createSegmentedRoutePolyline(geometry: RouteGeometry) {
         lineCap: 'round',
         lineJoin: 'round',
         opacity: 0.78,
-        renderer: L.canvas(),
+        renderer,
         weight: 2,
       }),
     ]
@@ -257,13 +258,14 @@ export function createPlannerRoutePolyline(
 
 export function createGuidePolyline(geometry: RouteGeometry) {
   const segments = toLeafletPolylineSegments(geometry)
+  const renderer = L.canvas({ padding: 0.5 })
 
   const shadow = L.polyline(segments, {
     color: 'rgba(23, 48, 66, 0.16)',
     lineCap: 'round',
     lineJoin: 'round',
     opacity: 1,
-    renderer: L.canvas(),
+    renderer,
     weight: 14,
   })
 
@@ -273,7 +275,7 @@ export function createGuidePolyline(geometry: RouteGeometry) {
     lineCap: 'round',
     lineJoin: 'round',
     opacity: 0.92,
-    renderer: L.canvas(),
+    renderer,
     weight: 5,
   })
 
@@ -283,7 +285,7 @@ export function createGuidePolyline(geometry: RouteGeometry) {
     lineCap: 'round',
     lineJoin: 'round',
     opacity: 0.72,
-    renderer: L.canvas(),
+    renderer,
     weight: 2,
   })
 

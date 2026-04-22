@@ -21,20 +21,20 @@
 
 .rbm__loader {
   position: absolute;
-  bottom: 68px;
-  left: 50%;
+  /* Top-left under the page header, not centered */
+  top: 72px;
+  left: 14px;
   z-index: 400;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  transform: translateX(-50%);
-  padding: 8px 16px;
+  padding: 7px 14px;
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.94);
+  /* Solid background — no backdrop-filter to avoid compositor repaints */
+  background: rgba(255, 255, 255, 0.97);
   box-shadow: 0 4px 16px rgba(31, 37, 51, 0.12);
-  backdrop-filter: blur(12px);
   color: var(--color-text-secondary);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 700;
   pointer-events: none;
   white-space: nowrap;
@@ -105,7 +105,6 @@
 }
 
 .rbm-popup__cover {
-  aspect-ratio: 16 / 8.2;
   overflow: hidden;
   background: var(--color-bg-soft);
 }
@@ -113,14 +112,13 @@
 .rbm-popup__cover img {
   display: block;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
 }
 
 .rbm-popup__body {
   display: grid;
-  gap: 8px;
-  padding: 12px 12px 14px;
+  gap: 4px;
+  padding: 8px 11px 10px;
 }
 
 .rbm-popup__cat {
@@ -150,7 +148,8 @@
 .rbm-popup__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 4px;
+  justify-content: center;
 }
 
 .rbm-popup__meta-chip {
@@ -178,7 +177,7 @@
   font-size: 0.77rem;
   line-height: 1.48;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
 }
 
 .rbm-popup__info {

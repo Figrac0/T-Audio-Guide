@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import type {
-  Excursion,
   ExcursionTheme,
   NearbyPoint,
   SupportedLocale,
@@ -157,7 +156,7 @@ export function useExcursionsPageState() {
   const filteredExcursions = useMemo(
     () =>
       excursions.filter(
-        (ex: Excursion) =>
+        (ex) =>
           (activeTheme === 'all' || ex.theme === activeTheme) &&
           (maxDuration === null || ex.durationMinutes <= maxDuration),
       ),
@@ -177,13 +176,11 @@ export function useExcursionsPageState() {
     [draftStops, userPosition],
   )
 
-  // Recompute expected signature to detect when route is stale during fetching
-  const routeSignature =
-    draftStops.length === 0 || (draftStops.length === 1 && !userPosition)
-      ? ''
-      : `${userPosition ? 'lead' : 'plain'}:${routePoints
-          .map((p) => `${p.lat.toFixed(5)}:${p.lng.toFixed(5)}`)
-          .join('|')}`
+  const routeSignature = useMemo(() => {
+    if (draftStops.length === 0 || (draftStops.length === 1 && !userPosition)) return ''
+    const prefix = userPosition ? 'lead' : 'plain'
+    return `${prefix}:${routePoints.map((p) => `${p.lat.toFixed(5)}:${p.lng.toFixed(5)}`).join('|')}`
+  }, [draftStops.length, routePoints, userPosition])
 
   const fallbackRouteSegments = useMemo(() => {
     if (!routeSignature) {
@@ -197,16 +194,19 @@ export function useExcursionsPageState() {
     })
   }, [routePoints, routeSignature])
 
-  const routeState: PlannerRouteState =
-    routeSegmentsState.signature === routeSignature
-      ? {
-          hasLeadSegment: Boolean(userPosition),
-          segments:
-            routeSegmentsState.segments.length > 0 ? routeSegmentsState.segments : fallbackRouteSegments,
-        }
-      : routeSignature
-        ? { hasLeadSegment: Boolean(userPosition), segments: fallbackRouteSegments }
-        : { hasLeadSegment: false, segments: [] }
+  const routeState = useMemo<PlannerRouteState>(() => {
+    if (routeSegmentsState.signature === routeSignature) {
+      return {
+        hasLeadSegment: Boolean(userPosition),
+        segments:
+          routeSegmentsState.segments.length > 0 ? routeSegmentsState.segments : fallbackRouteSegments,
+      }
+    }
+    if (routeSignature) {
+      return { hasLeadSegment: Boolean(userPosition), segments: fallbackRouteSegments }
+    }
+    return { hasLeadSegment: false, segments: [] }
+  }, [fallbackRouteSegments, routeSegmentsState.signature, routeSegmentsState.segments, routeSignature, userPosition])
 
   const handleSelectPoint = useCallback((pointId: string) => {
     setSelectedPointId(pointId)
