@@ -10,6 +10,7 @@ import { useDiscoveryRoutes } from '@/entities/excursion/model/useDiscoveryRoute
 import {
   buildOsmWalkingRouteGeometryFromPoints,
   createLineGeometryFromPoints,
+  getCachedWalkingRouteBuildResult,
   type LngLat,
 } from '@/features/route-map/lib/route-geometry'
 import { useUserGeolocation } from '@/features/route-map/model/useUserGeolocation'
@@ -36,6 +37,10 @@ export const durationOptions = [30, 45, 60, 90, 120] as const
 export interface PlannerRouteState {
   hasLeadSegment: boolean
   segments: LngLat[][]
+}
+
+function toPlannerSegments(geometry: { type: 'LineString' | 'MultiLineString'; coordinates: LngLat[] | LngLat[][] }) {
+  return geometry.type === 'LineString' ? [geometry.coordinates as LngLat[]] : (geometry.coordinates as LngLat[][])
 }
 
 export function useExcursionsPageState() {
@@ -112,6 +117,31 @@ export function useExcursionsPageState() {
 
   // Build route segments. When userPosition is available it is prepended as point[0],
   // making segments[0] the guide segment (user → first stop), rendered dashed.
+  const cachedRouteSegments = useMemo(() => {
+    if (draftStops.length === 0 || (draftStops.length === 1 && !userPosition)) {
+      return null
+    }
+
+    const points = [
+      ...(userPosition ? [userPosition] : []),
+      ...draftStops.map((stop) => stop.coordinates),
+    ]
+    const hasLeadSegment = Boolean(userPosition)
+    const signature = `${hasLeadSegment ? 'lead' : 'plain'}:${points
+      .map((point) => `${point.lat.toFixed(5)}:${point.lng.toFixed(5)}`)
+      .join('|')}`
+    const cachedResult = getCachedWalkingRouteBuildResult(points)
+
+    if (!cachedResult?.geometry) {
+      return null
+    }
+
+    return {
+      signature,
+      segments: toPlannerSegments(cachedResult.geometry),
+    }
+  }, [draftStops, userPosition])
+
   useEffect(() => {
     if (draftStops.length === 0 || (draftStops.length === 1 && !userPosition)) {
       return
@@ -163,11 +193,6 @@ export function useExcursionsPageState() {
     [excursions, activeTheme, maxDuration],
   )
 
-  const draftPointIds = useMemo(
-    () => new Set(draftStops.map((s) => s.id.replace(/-draft-stop(?:-\d+)?$/, ''))),
-    [draftStops],
-  )
-
   const routePoints = useMemo(
     () => [
       ...(userPosition ? [userPosition] : []),
@@ -202,11 +227,29 @@ export function useExcursionsPageState() {
           routeSegmentsState.segments.length > 0 ? routeSegmentsState.segments : fallbackRouteSegments,
       }
     }
+
+    if (cachedRouteSegments?.signature === routeSignature) {
+      return {
+        hasLeadSegment: Boolean(userPosition),
+        segments:
+          cachedRouteSegments.segments.length > 0
+            ? cachedRouteSegments.segments
+            : fallbackRouteSegments,
+      }
+    }
+
     if (routeSignature) {
       return { hasLeadSegment: Boolean(userPosition), segments: fallbackRouteSegments }
     }
     return { hasLeadSegment: false, segments: [] }
-  }, [fallbackRouteSegments, routeSegmentsState.signature, routeSegmentsState.segments, routeSignature, userPosition])
+  }, [
+    cachedRouteSegments,
+    fallbackRouteSegments,
+    routeSegmentsState.segments,
+    routeSegmentsState.signature,
+    routeSignature,
+    userPosition,
+  ])
 
   const handleSelectPoint = useCallback((pointId: string) => {
     setSelectedPointId(pointId)
@@ -275,7 +318,6 @@ export function useExcursionsPageState() {
   return {
     activeTheme,
     canLoadNearbyPlaces,
-    draftPointIds,
     draftStops,
     excursions: filteredExcursions,
     expandedStopId,

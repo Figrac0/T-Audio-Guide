@@ -53,6 +53,7 @@ const fallbackBounds: LngLatBounds = [
 ]
 const singlePointPadding = 0.006
 const osrmWalkingEndpoint = 'https://router.project-osrm.org/route/v1/foot'
+const walkingRouteCache = new Map<string, WalkingRouteBuildResult>()
 
 export function toLngLat(point: GeoPoint): LngLat {
   return [point.lng, point.lat]
@@ -92,6 +93,16 @@ export function buildOsmWalkingRouteGeometry(stops: RouteStop[], signal?: AbortS
   )
 }
 
+export function getWalkingRouteCacheKey(points: GeoPoint[]) {
+  return points
+    .map((point) => `${point.lat.toFixed(5)}:${point.lng.toFixed(5)}`)
+    .join('|')
+}
+
+export function getCachedWalkingRouteBuildResult(points: GeoPoint[]) {
+  return walkingRouteCache.get(getWalkingRouteCacheKey(points)) ?? null
+}
+
 export async function buildOsmWalkingRouteGeometryFromPoints(
   points: GeoPoint[],
   signal?: AbortSignal,
@@ -101,6 +112,13 @@ export async function buildOsmWalkingRouteGeometryFromPoints(
       geometry: null,
       status: 'fallback',
     }
+  }
+
+  const cacheKey = getWalkingRouteCacheKey(points)
+  const cachedResult = walkingRouteCache.get(cacheKey)
+
+  if (cachedResult) {
+    return cachedResult
   }
 
   try {
@@ -138,7 +156,13 @@ export async function buildOsmWalkingRouteGeometryFromPoints(
       }),
     )
 
-    return toWalkingRouteBuildResult(segmentGeometries)
+    const result = toWalkingRouteBuildResult(segmentGeometries)
+
+    if (result.geometry && result.status !== 'fallback') {
+      walkingRouteCache.set(cacheKey, result)
+    }
+
+    return result
   } catch (error) {
     if (isAbortError(error)) {
       throw error

@@ -21,6 +21,7 @@ import {
 import { appMapConfig } from '@/shared/config/map'
 import { formatDuration, formatPointCategory } from '@/shared/lib/format'
 import { buildPlacePlaceholderImage } from '@/shared/lib/placeholder-images'
+import '@/features/route-map/ui/map-marker-skin.css'
 import './RouteBuilderMap.css'
 
 export interface RouteBuilderMapHandle {
@@ -28,10 +29,9 @@ export interface RouteBuilderMapHandle {
 }
 
 interface RouteBuilderMapProps {
-  draftPointIds: Set<string>
+  draftPointOrders: ReadonlyMap<string, number>
   isDraftFull: boolean
   isLoading: boolean
-  isPointInDraft: (id: string) => boolean
   nearbyPoints: NearbyPoint[]
   onAddPoint: (point: NearbyPoint) => void
   onChangeRadius: (meters: number) => void
@@ -47,10 +47,9 @@ interface RouteBuilderMapProps {
 const MAP_PADDING: [number, number, number, number] = [72, 24, 24, 24]
 
 export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMapProps>(function RouteBuilderMap({
-  draftPointIds,
+  draftPointOrders,
   isDraftFull,
   isLoading,
-  isPointInDraft,
   nearbyPoints,
   onAddPoint,
   onChangeRadius,
@@ -79,7 +78,6 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
   const onAddPointRef = useRef(onAddPoint)
   const onRemovePointRef = useRef(onRemovePoint)
   const onSelectPointRef = useRef(onSelectPoint)
-  const isPointInDraftRef = useRef(isPointInDraft)
   const isDraftFullRef = useRef(isDraftFull)
   const onChangeRadiusRef = useRef(onChangeRadius)
   const radiusMetersRef = useRef(radiusMeters)
@@ -89,11 +87,10 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
     onAddPointRef.current = onAddPoint
     onRemovePointRef.current = onRemovePoint
     onSelectPointRef.current = onSelectPoint
-    isPointInDraftRef.current = isPointInDraft
     isDraftFullRef.current = isDraftFull
     onChangeRadiusRef.current = onChangeRadius
     radiusMetersRef.current = radiusMeters
-  }, [isDraftFull, isPointInDraft, onAddPoint, onChangeRadius, onRemovePoint, onSelectPoint, radiusMeters])
+  }, [isDraftFull, onAddPoint, onChangeRadius, onRemovePoint, onSelectPoint, radiusMeters])
 
   useEffect(() => {
     selectedPointIdRef.current = selectedPointId
@@ -204,10 +201,11 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
     const duration = 380
     const startedAt = performance.now()
     let frameId = 0
+    const circleLayer = circle
 
     function step(now: number) {
       const progress = Math.min(1, (now - startedAt) / duration)
-      circle.setRadius(start + (end - start) * (1 - Math.pow(1 - progress, 3)))
+      circleLayer.setRadius(start + (end - start) * (1 - Math.pow(1 - progress, 3)))
       if (progress < 1) frameId = requestAnimationFrame(step)
     }
 
@@ -223,8 +221,9 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
     markerRefsMap.current.clear()
 
     nearbyPoints.forEach((point) => {
+      const draftOrder = draftPointOrders.get(point.id) ?? null
       const marker = L.marker([point.coordinates.lat, point.coordinates.lng], {
-        icon: createPoiIcon(point, point.id === selectedPointIdRef.current, draftPointIds.has(point.id)),
+        icon: createPoiIcon(point, point.id === selectedPointIdRef.current, draftOrder),
         title: buildMarkerTitle(point),
       })
 
@@ -232,7 +231,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
         onSelectPointRef.current(point.id)
         mapRef.current?.closePopup()
 
-        const isInDraft = isPointInDraftRef.current(point.id)
+        const isInDraft = draftOrder !== null
         const closePopup = () => mapRef.current?.closePopup()
 
         const popupEl = buildPopupEl(
@@ -258,16 +257,22 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
       marker.addTo(layer)
       markerRefsMap.current.set(point.id, marker)
     })
-  }, [draftPointIds, nearbyPoints])
+  }, [draftPointOrders, nearbyPoints])
 
   useEffect(() => {
     nearbyPoints.forEach((point) => {
       const marker = markerRefsMap.current.get(point.id)
       if (!marker) return
 
-      marker.setIcon(createPoiIcon(point, point.id === selectedPointId, draftPointIds.has(point.id)))
+      marker.setIcon(
+        createPoiIcon(
+          point,
+          point.id === selectedPointId,
+          draftPointOrders.get(point.id) ?? null,
+        ),
+      )
     })
-  }, [nearbyPoints, selectedPointId, draftPointIds])
+  }, [draftPointOrders, nearbyPoints, selectedPointId])
 
   useEffect(() => {
     const map = mapRef.current

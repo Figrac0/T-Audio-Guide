@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import type { Excursion, RouteStop } from '@/entities/excursion/model/types'
@@ -56,6 +56,16 @@ export function ExcursionsPage() {
   const state = useExcursionsPageState()
   const [showAll, setShowAll] = useState(false)
   const catalogInitial = useCatalogInitial()
+  const draftPointOrders = useMemo(
+    () =>
+      new Map(
+        state.draftStops.map((stop, index) => [
+          stop.id.replace(/-draft-stop(?:-\d+)?$/, ''),
+          index + 1,
+        ]),
+      ),
+    [state.draftStops],
+  )
 
   const [peekTranslate, setPeekTranslate] = useState(0)
   const [sheetTranslate, setSheetTranslate] = useState(0)
@@ -195,10 +205,9 @@ export function ExcursionsPage() {
       <div className="ep__map">
         <RouteBuilderMap
           ref={mapHandleRef}
-          draftPointIds={state.draftPointIds}
+          draftPointOrders={draftPointOrders}
           isDraftFull={state.draftStops.length >= 6}
           isLoading={state.isLoading || !state.canLoadNearbyPlaces}
-          isPointInDraft={state.isPointInDraft}
           nearbyPoints={state.nearbyPoints}
           onAddPoint={state.handleAddPoint}
           onChangeRadius={state.setRadiusMeters}

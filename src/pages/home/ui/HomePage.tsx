@@ -136,6 +136,11 @@ export function HomePage() {
         session?.isAuthenticated && session.profile,
     );
 
+    useEffect(() => {
+        document.body.classList.add("app-body--home-page");
+        return () => document.body.classList.remove("app-body--home-page");
+    }, []);
+
     const {
         error: geolocationError,
         requestLocation,

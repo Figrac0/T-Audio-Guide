@@ -10,6 +10,7 @@ import type {
 } from '@/entities/excursion/model/types'
 import {
   buildOsmWalkingRouteGeometryFromPoints,
+  getCachedWalkingRouteBuildResult,
   getBoundsFromGeometry,
   getBoundsFromPoints,
   toLngLat,
@@ -31,6 +32,7 @@ import { appMapConfig } from '@/shared/config/map'
 import { appRoutes } from '@/shared/config/routes'
 import { buildGoogleMapsUrl } from '@/shared/lib/maps'
 import './DiscoveryMap.css'
+import '@/features/route-map/ui/map-marker-skin.css'
 
 export interface DiscoveryCategoryOption {
   id: PointCategory | 'all'
@@ -191,6 +193,13 @@ export function DiscoveryMap({
     () => new Set(visibleDraftStops.map(getSourcePointId)),
     [visibleDraftStops],
   )
+  const visibleDraftOrderMap = useMemo(
+    () =>
+      new Map(
+        visibleDraftStops.map((stop, index) => [getSourcePointId(stop), index + 1]),
+      ),
+    [visibleDraftStops],
+  )
   const visibleDraftStopsSignature = useMemo(
     () => visibleDraftStops.map((stop) => stop.id).join(','),
     [visibleDraftStops],
@@ -308,6 +317,18 @@ export function DiscoveryMap({
         return
       }
 
+      const cachedResult = getCachedWalkingRouteBuildResult([
+        userPosition,
+        guidedPoint.coordinates,
+      ])
+
+      if (cachedResult?.geometry) {
+        setGuideRoute({
+          geometry: cachedResult.geometry,
+          signature: guideSignature,
+        })
+      }
+
       try {
         const result = await buildOsmWalkingRouteGeometryFromPoints(
           [userPosition, guidedPoint.coordinates],
@@ -350,6 +371,15 @@ export function DiscoveryMap({
           setDraftRoute({ geometry: null, signature: '' })
         })
         return
+      }
+
+      const cachedResult = getCachedWalkingRouteBuildResult(points)
+
+      if (cachedResult?.geometry) {
+        setDraftRoute({
+          geometry: cachedResult.geometry,
+          signature: draftSignature,
+        })
       }
 
       try {
@@ -491,8 +521,9 @@ export function DiscoveryMap({
     nearbyPoints.forEach((point) => {
       const googleMapsUrl = buildGoogleMapsUrl(point.coordinates, userPosition)
       const isInDraft = visibleDraftPointIds.has(point.id)
+      const draftOrder = visibleDraftOrderMap.get(point.id) ?? null
       const marker = L.marker([point.coordinates.lat, point.coordinates.lng], {
-        icon: createPoiIcon(point, point.id === selectedPointIdRef.current, isInDraft),
+        icon: createPoiIcon(point, point.id === selectedPointIdRef.current, draftOrder),
         title: buildMarkerTitle(point),
       })
         .bindPopup(
@@ -541,7 +572,7 @@ export function DiscoveryMap({
       marker.addTo(overlay)
       markerRefs.current.set(point.id, marker)
     })
-  }, [draftStops.length, nearbyPoints, onAddPointToDraft, onBuildRoute, onClearDraftRoute, onSelectPoint, routeTargetId, showDirectRouteInPopup, showPopupRouteActions, userPosition, visibleDraftPointIds])
+  }, [draftStops.length, nearbyPoints, onAddPointToDraft, onBuildRoute, onClearDraftRoute, onSelectPoint, routeTargetId, showDirectRouteInPopup, showPopupRouteActions, userPosition, visibleDraftOrderMap, visibleDraftPointIds])
 
   // Animate radius circle smoothly when radiusMeters changes (no full redraw)
   useEffect(() => {
@@ -575,9 +606,15 @@ export function DiscoveryMap({
         return
       }
 
-      marker.setIcon(createPoiIcon(point, point.id === selectedPointId, visibleDraftPointIds.has(point.id)))
+      marker.setIcon(
+        createPoiIcon(
+          point,
+          point.id === selectedPointId,
+          visibleDraftOrderMap.get(point.id) ?? null,
+        ),
+      )
     })
-  }, [nearbyPoints, selectedPointId, visibleDraftPointIds])
+  }, [nearbyPoints, selectedPointId, visibleDraftOrderMap])
 
   useEffect(() => {
     if (!selectedPointId) return

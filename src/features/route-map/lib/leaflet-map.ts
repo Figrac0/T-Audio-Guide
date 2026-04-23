@@ -89,10 +89,16 @@ export function toLeafletPolylineSegments(
   return geometry.coordinates.map((segment) => segment.map(toLeafletLatLngFromLngLat))
 }
 
-export function createPoiIcon(point: NearbyPoint, isActive: boolean, isInDraft = false) {
+export function createPoiIcon(
+  point: NearbyPoint,
+  isActive: boolean,
+  draftOrder: number | null = null,
+) {
+  const isInDraft = draftOrder !== null
+
   return L.divIcon({
     className: emptyDivIconClassName,
-    html: `<div class="poi-marker${isActive ? ' poi-marker--active' : ''}${isInDraft ? ' poi-marker--draft' : ''}"><span class="poi-marker__glyph poi-marker__glyph--${point.category}" aria-hidden="true">${getCategoryIcon(point.category)}</span></div>`,
+    html: `<div class="poi-marker${isActive ? ' poi-marker--active' : ''}${isInDraft ? ' poi-marker--draft' : ''}"><span class="poi-marker__glyph poi-marker__glyph--${point.category}" aria-hidden="true">${getCategoryIcon(point.category)}</span>${draftOrder !== null ? `<span class="poi-marker__order" aria-hidden="true">${draftOrder}</span>` : ''}</div>`,
     iconSize: [34, 34],
     iconAnchor: [17, 30],
     popupAnchor: [0, -28],
