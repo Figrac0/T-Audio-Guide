@@ -237,6 +237,16 @@ export function useExcursionsPageState() {
     [removeDraftStop],
   )
 
+  const handleRemovePointFromDraft = useCallback(
+    (pointId: string) => {
+      const stop = draftStops.find(
+        (s) => s.id.replace(/-draft-stop(?:-\d+)?$/, '') === pointId,
+      )
+      if (stop) removeDraftStop(stop.id)
+    },
+    [draftStops, removeDraftStop],
+  )
+
   const handleSaveRoute = useCallback(() => {
     const result = saveDraftRoute()
     if (result.status === 'invalid') {
@@ -273,6 +283,7 @@ export function useExcursionsPageState() {
     handleAddPoint,
     handleClearRoute,
     handleLocateUser,
+    handleRemovePointFromDraft,
     handleRemoveStop,
     handleSaveRoute,
     handleSelectPoint,

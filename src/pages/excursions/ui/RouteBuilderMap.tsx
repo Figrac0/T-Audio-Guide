@@ -35,6 +35,7 @@ interface RouteBuilderMapProps {
   nearbyPoints: NearbyPoint[]
   onAddPoint: (point: NearbyPoint) => void
   onChangeRadius: (meters: number) => void
+  onRemovePoint: (pointId: string) => void
   onSelectPoint: (id: string) => void
   radiusMeters: number
   recenterKey: number
@@ -53,6 +54,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
   nearbyPoints,
   onAddPoint,
   onChangeRadius,
+  onRemovePoint,
   onSelectPoint,
   radiusMeters,
   recenterKey,
@@ -75,6 +77,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
   }), [])
 
   const onAddPointRef = useRef(onAddPoint)
+  const onRemovePointRef = useRef(onRemovePoint)
   const onSelectPointRef = useRef(onSelectPoint)
   const isPointInDraftRef = useRef(isPointInDraft)
   const isDraftFullRef = useRef(isDraftFull)
@@ -84,12 +87,13 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
 
   useEffect(() => {
     onAddPointRef.current = onAddPoint
+    onRemovePointRef.current = onRemovePoint
     onSelectPointRef.current = onSelectPoint
     isPointInDraftRef.current = isPointInDraft
     isDraftFullRef.current = isDraftFull
     onChangeRadiusRef.current = onChangeRadius
     radiusMetersRef.current = radiusMeters
-  }, [isDraftFull, isPointInDraft, onAddPoint, onChangeRadius, onSelectPoint, radiusMeters])
+  }, [isDraftFull, isPointInDraft, onAddPoint, onChangeRadius, onRemovePoint, onSelectPoint, radiusMeters])
 
   useEffect(() => {
     selectedPointIdRef.current = selectedPointId
@@ -228,14 +232,15 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
         onSelectPointRef.current(point.id)
         mapRef.current?.closePopup()
 
+        const isInDraft = isPointInDraftRef.current(point.id)
+        const closePopup = () => mapRef.current?.closePopup()
+
         const popupEl = buildPopupEl(
           point,
-          isPointInDraftRef.current(point.id),
+          isInDraft,
           isDraftFullRef.current,
-          () => {
-            onAddPointRef.current(point)
-            mapRef.current?.closePopup()
-          },
+          () => { onAddPointRef.current(point); closePopup() },
+          () => { onRemovePointRef.current(point.id); closePopup() },
         )
 
         L.popup({
@@ -306,61 +311,69 @@ function buildPopupEl(
   isInDraft: boolean,
   isDraftFull: boolean,
   onAdd: () => void,
+  onRemove: () => void,
 ): HTMLElement {
+  const placeholder = buildPlacePlaceholderImage(point.category)
+
   const root = document.createElement('div')
   root.className = 'rbm-popup'
 
+  // Cover image
   const cover = document.createElement('div')
   cover.className = 'rbm-popup__cover'
-
   const image = document.createElement('img')
-  const placeholder = buildPlacePlaceholderImage(point.category)
   image.src = point.imageUrl || placeholder
   image.alt = point.title
   image.loading = 'lazy'
-  image.onerror = () => {
-    image.src = placeholder
-  }
+  image.onerror = () => { image.src = placeholder }
   cover.appendChild(image)
   root.appendChild(cover)
 
+  // Body
   const body = document.createElement('div')
   body.className = 'rbm-popup__body'
+
+  // Top row: category badge + meta chips on the same line
+  const topRow = document.createElement('div')
+  topRow.className = 'rbm-popup__toprow'
 
   const category = document.createElement('span')
   category.className = 'rbm-popup__cat'
   category.textContent = formatPointCategory(point.category)
-  body.appendChild(category)
+  topRow.appendChild(category)
 
-  const title = document.createElement('h3')
-  title.className = 'rbm-popup__title'
-  title.textContent = point.title
-  body.appendChild(title)
-
-  const meta = document.createElement('div')
-  meta.className = 'rbm-popup__meta'
+  const chips = document.createElement('div')
+  chips.className = 'rbm-popup__chips'
 
   const distance = document.createElement('span')
   distance.className = 'rbm-popup__meta-chip'
   distance.textContent = formatMeters(point.distanceMeters)
-  meta.appendChild(distance)
+  chips.appendChild(distance)
 
   if (point.expectedVisitMinutes > 0) {
     const duration = document.createElement('span')
     duration.className = 'rbm-popup__meta-chip'
     duration.textContent = formatDuration(point.expectedVisitMinutes)
-    meta.appendChild(duration)
+    chips.appendChild(duration)
   }
 
   if (point.rating > 0) {
     const rating = document.createElement('span')
     rating.className = 'rbm-popup__meta-chip rbm-popup__meta-chip--accent'
     rating.textContent = `★ ${point.rating.toFixed(1)}`
-    meta.appendChild(rating)
+    chips.appendChild(rating)
   }
 
-  body.appendChild(meta)
+  topRow.appendChild(chips)
+  body.appendChild(topRow)
 
+  // Title
+  const title = document.createElement('h3')
+  title.className = 'rbm-popup__title'
+  title.textContent = point.title
+  body.appendChild(title)
+
+  // Description
   if (point.shortDescription) {
     const description = document.createElement('p')
     description.className = 'rbm-popup__desc'
@@ -368,6 +381,7 @@ function buildPopupEl(
     body.appendChild(description)
   }
 
+  // Schedule / address
   if (point.addressLabel || point.scheduleLabel) {
     const info = document.createElement('div')
     info.className = 'rbm-popup__info'
@@ -389,13 +403,14 @@ function buildPopupEl(
     body.appendChild(info)
   }
 
+  // Action button
   const button = document.createElement('button')
   button.type = 'button'
 
   if (isInDraft) {
-    button.className = 'rbm-popup__btn'
-    button.textContent = 'Уже в маршруте'
-    button.disabled = true
+    button.className = 'rbm-popup__btn rbm-popup__btn--danger'
+    button.textContent = 'Удалить из маршрута'
+    button.addEventListener('click', onRemove)
   } else if (isDraftFull) {
     button.className = 'rbm-popup__btn'
     button.textContent = 'Маршрут заполнен'

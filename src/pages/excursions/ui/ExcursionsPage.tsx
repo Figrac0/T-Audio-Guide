@@ -202,6 +202,7 @@ export function ExcursionsPage() {
           nearbyPoints={state.nearbyPoints}
           onAddPoint={state.handleAddPoint}
           onChangeRadius={state.setRadiusMeters}
+          onRemovePoint={state.handleRemovePointFromDraft}
           onSelectPoint={state.handleSelectPoint}
           radiusMeters={state.radiusMeters}
           recenterKey={state.recenterKey}
