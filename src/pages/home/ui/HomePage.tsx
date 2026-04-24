@@ -534,14 +534,16 @@ export function HomePage() {
         };
     }, []);
 
-    const handleDragStart = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    function handleDragStart(e: React.PointerEvent<HTMLDivElement>) {
         const sheet = sheetRef.current;
         if (!sheet) return;
         e.currentTarget.setPointerCapture(e.pointerId);
-        const match = sheet.style.transform.match(/translateY\((-?\d+(?:\.\d+)?)px\)/);
+        const match = sheet.style.transform.match(
+            /translateY\((-?\d+(?:\.\d+)?)px\)/,
+        );
         const current = match
             ? parseFloat(match[1])
-            : getSnapTranslate(sheetStateRef.current, sheet.offsetHeight, peekHeightRef.current);
+            : getSnapTranslate(sheetState, sheet.offsetHeight, peekHeightRef.current);
         dragRef.current = {
             active: true,
             startPointerY: e.clientY,
@@ -552,29 +554,36 @@ export function HomePage() {
         };
         sheet.style.transition = "none";
         sheet.style.willChange = "transform";
-    }, []);
+    }
 
-    const handleDragMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    function handleDragMove(e: React.PointerEvent<HTMLDivElement>) {
         if (!dragRef.current.active) return;
         const sheet = sheetRef.current;
         if (!sheet) return;
         const sheetHeight = sheet.offsetHeight;
-        const raw = dragRef.current.startTranslate + (e.clientY - dragRef.current.startPointerY);
-        const newTranslate = Math.min(sheetHeight - CLOSED_HEIGHT, Math.max(DRAG_MIN, raw));
+        const dy = e.clientY - dragRef.current.startPointerY;
+        const raw = dragRef.current.startTranslate + dy;
+        const newTranslate = Math.min(
+            sheetHeight - CLOSED_HEIGHT,
+            Math.max(DRAG_MIN, raw),
+        );
         const now = Date.now();
         const dt = Math.max(1, now - dragRef.current.lastTime);
-        dragRef.current.velocity = ((e.clientY - dragRef.current.lastPointerY) / dt) * 16;
+        dragRef.current.velocity =
+            ((e.clientY - dragRef.current.lastPointerY) / dt) * 16;
         dragRef.current.lastPointerY = e.clientY;
         dragRef.current.lastTime = now;
         sheet.style.transform = `translateY(${newTranslate}px)`;
-    }, []);
+    }
 
-    const handleDragEnd = useCallback(() => {
+    function handleDragEnd() {
         if (!dragRef.current.active) return;
         dragRef.current.active = false;
         const sheet = sheetRef.current;
         if (!sheet) return;
-        const match = sheet.style.transform.match(/translateY\((-?\d+(?:\.\d+)?)px\)/);
+        const match = sheet.style.transform.match(
+            /translateY\((-?\d+(?:\.\d+)?)px\)/,
+        );
         const currentTranslate = match ? parseFloat(match[1]) : 0;
         const sheetHeight = sheet.offsetHeight;
         const velocity = dragRef.current.velocity;
@@ -607,7 +616,7 @@ export function HomePage() {
         const clearWillChange = () => { sheet.style.willChange = ""; };
         sheet.addEventListener("transitionend", clearWillChange, { once: true });
         setTimeout(clearWillChange, 450);
-    }, []);
+    }
 
     return (
         <div className="home-page">
@@ -647,7 +656,7 @@ export function HomePage() {
                 />
             </div>
 
-            <div className="home-sheet" data-state={sheetState} ref={sheetRef}>
+            <div className="home-sheet" ref={sheetRef}>
                 {/* Drag handle — the only thing visible in peek state */}
                 <div
                     aria-label="Потяните вверх чтобы открыть панель"
