@@ -133,10 +133,10 @@ body.app-body--routes-page {
   background: rgba(31, 37, 51, 0.18);
 }
 
+.ep-sheet__profile,
 .ep-sheet__locate {
   position: absolute;
   top: 50%;
-  right: 12px;
   display: inline-flex;
   width: 34px;
   height: 34px;
@@ -151,12 +151,101 @@ body.app-body--routes-page {
   transition: box-shadow 0.16s ease, transform 0.16s ease;
 }
 
+.ep-sheet__profile {
+  left: 12px;
+  text-decoration: none;
+}
+
+.ep-sheet__locate {
+  right: 12px;
+}
+
+.ep-sheet__profile:hover,
 .ep-sheet__locate:hover {
   box-shadow: 0 6px 16px rgba(31, 37, 51, 0.14);
   transform: translateY(calc(-50% - 1px));
 }
 
+.ep-sheet__profile:active,
 .ep-sheet__locate:active { transform: translateY(-50%) scale(0.92); }
+
+.ep-sheet__empty-hint {
+  position: relative;
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin: 14px 16px 0;
+  padding: 12px 72px;
+  border: 1px solid rgba(31, 138, 112, 0.12);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 50% 100%, rgba(255, 221, 45, 0.1), transparent 42%),
+    linear-gradient(135deg, rgba(229, 250, 244, 0.6), rgba(255, 255, 255, 0.96));
+  box-shadow: 0 10px 24px rgba(31, 37, 51, 0.05);
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.ep-sheet__empty-hint span {
+  position: relative;
+  z-index: 1;
+  max-width: 360px;
+}
+
+.ep-sheet__empty-hint::before,
+.ep-sheet__empty-hint::after {
+  content: '';
+  position: absolute;
+  top: -20px;
+  bottom: -20px;
+  width: clamp(130px, 34vw, 420px);
+  background-image: var(--decor-root-vine);
+  background-size: 100% 116%;
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: 0.11;
+  pointer-events: none;
+}
+
+.ep-sheet__empty-hint::before {
+  left: clamp(-112px, -8vw, 8px);
+  transform: rotate(-7deg) scaleX(-1);
+}
+
+.ep-sheet__empty-hint::after {
+  right: clamp(-112px, -8vw, 8px);
+  transform: rotate(7deg);
+}
+
+@media (min-width: 768px) {
+  .ep-sheet__empty-hint {
+    max-width: 980px;
+    margin-right: auto;
+    margin-left: auto;
+    padding-right: 120px;
+    padding-left: 120px;
+  }
+
+  .ep-sheet__empty-hint::before,
+  .ep-sheet__empty-hint::after {
+    width: clamp(420px, 46vw, 820px);
+    background-size: 100% 124%;
+    opacity: 0.1;
+  }
+
+  .ep-sheet__empty-hint::before {
+    left: clamp(-260px, -14vw, -72px);
+  }
+
+  .ep-sheet__empty-hint::after {
+    right: clamp(-260px, -14vw, -72px);
+  }
+}
 
 /* Draft preview bar — visible only at peek (partial) snap position.
    max-height + overflow: hidden lets us collapse the space to zero. */
@@ -1052,6 +1141,14 @@ body.app-body--routes-page {
     left: 20px;
     right: 20px;
     border-radius: 28px 28px 0 0;
+  }
+
+  .ep-sheet__profile {
+    left: calc(50% - 92px);
+  }
+
+  .ep-sheet__locate {
+    right: calc(50% - 92px);
   }
 
   .ep-catalog__grid,

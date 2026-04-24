@@ -27,8 +27,8 @@
   border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 0 0 22px 22px;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(246, 248, 252, 0.56)),
-    radial-gradient(circle at 10% 0%, rgba(255, 221, 45, 0.18), transparent 30%);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.64), rgba(246, 248, 252, 0.42)),
+    radial-gradient(circle at 10% 0%, rgba(255, 221, 45, 0.14), transparent 30%);
   backdrop-filter: blur(24px) saturate(1.18);
   box-shadow:
     0 12px 32px rgba(31, 37, 51, 0.06),
@@ -153,12 +153,14 @@
 .app-nav {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 6px;
-  width: 100%;
+  width: auto;
 }
 
 .app-nav__link {
   display: flex;
+  width: min(240px, calc(100vw - 72px));
   align-items: center;
   justify-content: center;
   min-height: 42px;
@@ -181,14 +183,21 @@
 
 .app-header__actions {
   display: flex;
-  width: 100%;
+  width: auto;
   justify-content: center;
 }
 
 .app-header__actions .button {
+  width: min(240px, calc(100vw - 72px));
   min-height: 42px;
   padding: 0 22px;
   white-space: nowrap;
+}
+
+.app-header__actions .button--ghost {
+  border-color: rgba(194, 81, 75, 0.22);
+  background: rgba(255, 244, 242, 0.72);
+  color: var(--color-danger);
 }
 
 /* ─── Page content ───────────────────────────────────────────────────────── */
@@ -248,6 +257,7 @@
   }
 
   .app-nav__link {
+    width: auto;
     min-height: 36px;
     padding: 0 16px;
     border: 1px solid transparent;
@@ -273,6 +283,7 @@
   }
 
   .app-header__actions .button {
+    width: auto;
     min-height: 36px;
     padding: 0 18px;
   }

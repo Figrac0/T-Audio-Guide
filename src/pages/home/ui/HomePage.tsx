@@ -675,6 +675,26 @@ export function HomePage() {
                     role="button"
                     tabIndex={0}>
                     <div className="home-sheet__handle" />
+                    <Link
+                        aria-label="Открыть профиль"
+                        className="home-sheet__profile"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        to={appRoutes.profile}>
+                        <svg
+                            aria-hidden="true"
+                            fill="none"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            width="16">
+                            <circle cx="12" cy="8" r="3.2" stroke="currentColor" strokeWidth="2" />
+                            <path
+                                d="M5.5 20c1.1-4 3.4-6 6.5-6s5.4 2 6.5 6"
+                                stroke="currentColor"
+                                strokeLinecap="round"
+                                strokeWidth="2"
+                            />
+                        </svg>
+                    </Link>
 
                     {/* Locate button lives inside drag area — always visible */}
                     <button

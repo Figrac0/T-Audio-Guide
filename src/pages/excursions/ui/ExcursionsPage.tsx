@@ -390,6 +390,22 @@ export function ExcursionsPage() {
         >
           <div className="ep-sheet__bar-row">
             <div className="ep-sheet__handle" />
+            <Link
+              aria-label="Открыть профиль"
+              className="ep-sheet__profile"
+              onPointerDown={(e) => e.stopPropagation()}
+              to={appRoutes.profile}
+            >
+              <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16">
+                <circle cx="12" cy="8" r="3.2" stroke="currentColor" strokeWidth="2" />
+                <path
+                  d="M5.5 20c1.1-4 3.4-6 6.5-6s5.4 2 6.5 6"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeWidth="2"
+                />
+              </svg>
+            </Link>
             <button
               aria-label="Найти моё местоположение"
               className="ep-sheet__locate"
@@ -476,6 +492,12 @@ export function ExcursionsPage() {
                 ) : null}
               </div>
             </section>
+          ) : null}
+
+          {state.draftStops.length === 0 ? (
+            <div className="ep-sheet__empty-hint">
+              <span>Выбирайте точки на карте и составляйте свой маршрут</span>
+            </div>
           ) : null}
 
           <section className="ep-catalog">

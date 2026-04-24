@@ -101,9 +101,9 @@ body.app-body--home-page {
 }
 
 /* Locate / GPS button — always visible, inside the drag strip */
+.home-sheet__profile,
 .home-sheet__locate {
   position: absolute;
-  right: 12px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
@@ -119,11 +119,22 @@ body.app-body--home-page {
   transition: box-shadow 0.16s ease, transform 0.16s ease;
 }
 
+.home-sheet__profile {
+  left: 12px;
+  text-decoration: none;
+}
+
+.home-sheet__locate {
+  right: 12px;
+}
+
+.home-sheet__profile:hover,
 .home-sheet__locate:hover {
   box-shadow: 0 6px 16px rgba(31, 37, 51, 0.14);
   transform: translateY(calc(-50% - 1px));
 }
 
+.home-sheet__profile:active,
 .home-sheet__locate:active {
   transform: translateY(-50%) scale(0.91);
 }
@@ -178,26 +189,26 @@ body.app-body--home-page {
   .home-sheet__filter-group:not(.home-sheet__filter-group--inline)::after {
     content: '';
     position: absolute;
-    top: -18px;
-    bottom: -18px;
-    width: clamp(260px, 42vw, 640px);
+    top: -22px;
+    bottom: -22px;
+    width: clamp(340px, 58vw, 860px);
     background-image: var(--decor-root-vine);
-    background-size: 100% 110%;
+    background-size: 100% 118%;
     background-repeat: no-repeat;
     background-position: center;
-    opacity: 0.13;
+    opacity: 0.12;
     pointer-events: none;
     z-index: 0;
   }
 
   .home-sheet__filter-group:not(.home-sheet__filter-group--inline)::before {
-    left: clamp(-56px, 2vw, 76px);
+    left: clamp(-140px, -4vw, 18px);
     transform: scaleX(-1);
     transform-origin: center;
   }
 
   .home-sheet__filter-group:not(.home-sheet__filter-group--inline)::after {
-    right: clamp(-56px, 2vw, 76px);
+    right: clamp(-140px, -4vw, 18px);
   }
 }
 
@@ -794,10 +805,33 @@ body.app-body--home-page {
 ───────────────────────────────────────────────────────────────────────────── */
 
 @media (min-width: 768px) {
+  .home-sheet__filter-group:not(.home-sheet__filter-group--inline)::before,
+  .home-sheet__filter-group:not(.home-sheet__filter-group--inline)::after {
+    width: clamp(520px, 68vw, 1180px);
+    background-size: 100% 126%;
+    opacity: 0.1;
+  }
+
+  .home-sheet__filter-group:not(.home-sheet__filter-group--inline)::before {
+    left: clamp(-320px, -16vw, -96px);
+  }
+
+  .home-sheet__filter-group:not(.home-sheet__filter-group--inline)::after {
+    right: clamp(-320px, -16vw, -96px);
+  }
+
   .home-sheet {
     left: 20px;
     right: 20px;
     border-radius: 28px 28px 0 0;
+  }
+
+  .home-sheet__profile {
+    left: calc(50% - 92px);
+  }
+
+  .home-sheet__locate {
+    right: calc(50% - 92px);
   }
 
   /* Center the excursions block heading and filters */
