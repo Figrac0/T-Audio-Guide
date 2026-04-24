@@ -20,8 +20,6 @@ body.app-body--routes-page {
   inset: 0;
   z-index: 1;
   background: #e8edf4;
-  /* Force a dedicated GPU compositing layer so Leaflet repaints don't bleed
-     into the sheet layer and cause white-flash on wide screens */
   transform: translateZ(0);
 }
 
@@ -30,7 +28,6 @@ body.app-body--routes-page {
 .ep__map .rbm__container .leaflet-container {
   height: 100%;
 }
-
 
 /* ── Toast notice ─────────────────────────────────────────────────────────── */
 
@@ -92,9 +89,7 @@ body.app-body--routes-page {
   border-radius: 24px 24px 0 0;
   background: #fff;
   box-shadow: 0 -2px 20px rgba(31, 37, 51, 0.1);
-  transform: translateY(calc(100% - 52px)); /* closed by default; JS overrides */
-  /* will-change is set via JS only during active drag to avoid
-     persistent compositor layers that cause white-flash on wide screens */
+  transform: translateY(calc(100% - 52px));
 }
 
 /* ── Drag handle ──────────────────────────────────────────────────────────── */
@@ -116,7 +111,6 @@ body.app-body--routes-page {
 
 .ep-sheet__drag:active { cursor: grabbing; }
 
-/* Fixed-height row that holds the knob + locate button */
 .ep-sheet__bar-row {
   position: relative;
   display: flex;
@@ -133,10 +127,11 @@ body.app-body--routes-page {
   background: rgba(31, 37, 51, 0.18);
 }
 
-.ep-sheet__profile,
-.ep-sheet__locate {
+/* Profile link — left side of the bar row */
+.ep-sheet__profile {
   position: absolute;
   top: 50%;
+  left: 12px;
   display: inline-flex;
   width: 34px;
   height: 34px;
@@ -151,114 +146,52 @@ body.app-body--routes-page {
   transition: box-shadow 0.16s ease, transform 0.16s ease;
 }
 
-.ep-sheet__profile {
-  left: 12px;
-  text-decoration: none;
+.ep-sheet__profile:hover {
+  box-shadow: 0 6px 16px rgba(31, 37, 51, 0.14);
+  transform: translateY(calc(-50% - 1px));
 }
 
+.ep-sheet__profile:active { transform: translateY(-50%) scale(0.92); }
+
+/* Locate / GPS button — right side of the bar row */
 .ep-sheet__locate {
+  position: absolute;
+  top: 50%;
   right: 12px;
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+  border: 1px solid rgba(216, 220, 229, 0.8);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 4px 12px rgba(31, 37, 51, 0.1);
+  color: var(--color-brand);
+  transition: box-shadow 0.16s ease, transform 0.16s ease;
 }
 
-.ep-sheet__profile:hover,
 .ep-sheet__locate:hover {
   box-shadow: 0 6px 16px rgba(31, 37, 51, 0.14);
   transform: translateY(calc(-50% - 1px));
 }
 
-.ep-sheet__profile:active,
 .ep-sheet__locate:active { transform: translateY(-50%) scale(0.92); }
 
-.ep-sheet__empty-hint {
-  position: relative;
-  display: flex;
-  min-height: 58px;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  margin: 14px 16px 0;
-  padding: 12px 72px;
-  border: 1px solid rgba(31, 138, 112, 0.12);
-  border-radius: 20px;
-  background:
-    radial-gradient(circle at 50% 100%, rgba(255, 221, 45, 0.1), transparent 42%),
-    linear-gradient(135deg, rgba(229, 250, 244, 0.6), rgba(255, 255, 255, 0.96));
-  box-shadow: 0 10px 24px rgba(31, 37, 51, 0.05);
-  color: var(--color-text-secondary);
-  font-size: 0.78rem;
-  font-weight: 800;
-  line-height: 1.35;
-  text-align: center;
-}
+/* ── Draft preview bar ────────────────────────────────────────────────────── */
 
-.ep-sheet__empty-hint span {
-  position: relative;
-  z-index: 1;
-  max-width: 360px;
-}
-
-.ep-sheet__empty-hint::before,
-.ep-sheet__empty-hint::after {
-  content: '';
-  position: absolute;
-  top: -20px;
-  bottom: -20px;
-  width: clamp(130px, 34vw, 420px);
-  background-image: var(--decor-root-vine);
-  background-size: 100% 116%;
-  background-repeat: no-repeat;
-  background-position: center;
-  opacity: 0.11;
-  pointer-events: none;
-}
-
-.ep-sheet__empty-hint::before {
-  left: clamp(-112px, -8vw, 8px);
-  transform: rotate(-7deg) scaleX(-1);
-}
-
-.ep-sheet__empty-hint::after {
-  right: clamp(-112px, -8vw, 8px);
-  transform: rotate(7deg);
-}
-
-@media (min-width: 768px) {
-  .ep-sheet__empty-hint {
-    max-width: 980px;
-    margin-right: auto;
-    margin-left: auto;
-    padding-right: 120px;
-    padding-left: 120px;
-  }
-
-  .ep-sheet__empty-hint::before,
-  .ep-sheet__empty-hint::after {
-    width: clamp(420px, 46vw, 820px);
-    background-size: 100% 124%;
-    opacity: 0.1;
-  }
-
-  .ep-sheet__empty-hint::before {
-    left: clamp(-260px, -14vw, -72px);
-  }
-
-  .ep-sheet__empty-hint::after {
-    right: clamp(-260px, -14vw, -72px);
-  }
-}
-
-/* Draft preview bar — visible only at peek (partial) snap position.
-   max-height + overflow: hidden lets us collapse the space to zero. */
+/* Visible at peek (partial) state only — collapses when fully open.
+   height holds the reserved space; max-height drives the CSS transition
+   and is overridden inline by JS during drag. */
 .ep-sheet__draft-preview {
-  position: relative; /* vine pseudo-elements anchor here */
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  box-sizing: border-box;
   height: 72px;
   max-height: 72px;
-  min-height: 72px;
   padding: 0 14px 0 16px;
   overflow: hidden;
   border-top: 1px solid rgba(31, 37, 51, 0.06);
@@ -268,20 +201,17 @@ body.app-body--routes-page {
     rgba(255, 255, 255, 0.95) 100%
   );
   flex-shrink: 0;
-  transition:
-    height 0.32s cubic-bezier(0.32, 0, 0.16, 1),
-    min-height 0.32s cubic-bezier(0.32, 0, 0.16, 1),
-    max-height 0.32s cubic-bezier(0.32, 0, 0.16, 1),
-    border-color 0.22s ease;
+  opacity: 1;
+  transition: opacity 0.24s ease, max-height 0.24s ease,
+    padding 0.24s ease, border-color 0.24s ease;
   pointer-events: auto;
 }
 
 .ep-sheet__draft-preview--hidden {
-  height: 0;
   max-height: 0;
-  min-height: 0;
   padding-top: 0;
   padding-bottom: 0;
+  opacity: 0;
   border-top-color: transparent;
   pointer-events: none;
 }
@@ -309,7 +239,6 @@ body.app-body--routes-page {
   box-shadow: 0 2px 6px rgba(31, 138, 112, 0.3);
 }
 
-/* Text column: category + name + schedule stacked */
 .ep-sheet__dp-text {
   display: flex;
   flex-direction: column;
@@ -345,7 +274,6 @@ body.app-body--routes-page {
   line-height: 1.2;
 }
 
-/* "Убрать" — removes the last stop from the draft */
 .ep-sheet__dp-remove {
   flex-shrink: 0;
   display: inline-flex;
@@ -369,12 +297,9 @@ body.app-body--routes-page {
   transform: scale(0.97);
 }
 
-.ep-sheet__dp-remove:active {
-  transform: scale(0.94);
-}
+.ep-sheet__dp-remove:active { transform: scale(0.94); }
 
-/* Decorative vine accents — shown flanking the preview bar on wider viewports.
-   z-index: 0 keeps them behind the actual content (dp-info, dp-remove sit on z=1). */
+/* Decorative vine accents flanking the preview bar on wider viewports */
 @media (min-width: 580px) {
   .ep-sheet__dp-info,
   .ep-sheet__dp-remove {
@@ -386,44 +311,38 @@ body.app-body--routes-page {
   .ep-sheet__draft-preview::after {
     content: '';
     position: absolute;
-    top: -14px;
-    bottom: -14px;
-    width: clamp(168px, 24vw, 340px);
+    top: 0;
+    bottom: 0;
+    width: 160px;
     background-image: var(--decor-root-vine);
-    background-size: 100% 100%;
+    background-size: 160px 100%;
     background-repeat: no-repeat;
     background-position: center;
-    opacity: 0.16;
+    opacity: 0.26;
     pointer-events: none;
     z-index: 0;
   }
 
   .ep-sheet__draft-preview::before {
-    left: clamp(8px, 10vw, 150px);
+    left: 0;
     transform: scaleX(-1);
     transform-origin: center;
   }
 
-  .ep-sheet__draft-preview::after {
-    right: clamp(8px, 10vw, 150px);
-  }
+  .ep-sheet__draft-preview::after { right: 0; }
 }
 
-@media (min-width: 768px) {
-  .ep-sheet__draft-preview {
-    justify-content: center;
-    gap: 14px;
-    padding-left: max(32px, calc((100% - 640px) / 2));
-    padding-right: max(32px, calc((100% - 640px) / 2));
-  }
+/* ── Empty state hint ─────────────────────────────────────────────────────── */
 
-  .ep-sheet__dp-info {
-    flex: 0 1 460px;
-  }
-
-  .ep-sheet__dp-remove {
-    margin-left: 2px;
-  }
+.ep-sheet__empty-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 24px;
+  color: var(--color-text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  text-align: center;
 }
 
 /* ── Scrollable body ──────────────────────────────────────────────────────── */
@@ -439,14 +358,8 @@ body.app-body--routes-page {
   scrollbar-color: #1f8a70 transparent;
 }
 
-.ep-sheet__body::-webkit-scrollbar {
-  width: 4px;
-}
-
-.ep-sheet__body::-webkit-scrollbar-track {
-  background: transparent;
-}
-
+.ep-sheet__body::-webkit-scrollbar { width: 4px; }
+.ep-sheet__body::-webkit-scrollbar-track { background: transparent; }
 .ep-sheet__body::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, #ffdd2d 0%, #1f8a70 100%);
   border-radius: 4px;
@@ -553,7 +466,6 @@ body.app-body--routes-page {
   width: 100%;
   align-items: center;
   gap: 10px;
-  /* Compact padding: reduced from 14px to save vertical space */
   padding: 9px 12px;
   border: none;
   outline: none;
@@ -571,7 +483,6 @@ body.app-body--routes-page {
 
 .ep-stop__order {
   display: inline-flex;
-  /* Reduced from 30×30 to 26×26 for more compact cards */
   width: 26px;
   height: 26px;
   flex-shrink: 0;
@@ -658,7 +569,7 @@ body.app-body--routes-page {
   display: grid;
   gap: 8px;
   overflow: hidden;
-  /* Left padding aligns with stop name: header-padding(12) + order(26) + gap(10) = 48 */
+  /* left padding aligns content with stop name: 12 (pad) + 26 (order) + 10 (gap) = 48 */
   padding: 0 12px 12px 48px;
 }
 
@@ -690,8 +601,7 @@ body.app-body--routes-page {
 
 .ep-stop__remove {
   justify-self: center;
-  /* compensate for asymmetric parent padding (48px left, 12px right) so the
-     button appears centered in the full card width, not just the content area */
+  /* compensate for asymmetric padding (48px left vs 12px right) to visually center */
   margin-left: -18px;
   display: inline-flex;
   min-height: 30px;
@@ -814,7 +724,7 @@ body.app-body--routes-page {
   gap: 12px;
 }
 
-/* ── Pagination collapse animation ───────────────────────────────────────── */
+/* ── Show-more expand animation ──────────────────────────────────────────── */
 
 .ep-catalog__extra {
   display: grid;
@@ -822,19 +732,14 @@ body.app-body--routes-page {
   transition: grid-template-rows 0.42s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.ep-catalog__extra--open {
-  grid-template-rows: 1fr;
-}
+.ep-catalog__extra--open { grid-template-rows: 1fr; }
 
 .ep-catalog__extra-inner {
   min-height: 0;
   overflow: hidden;
 }
 
-/* Gap between first 6 and extra batch */
-.ep-catalog__extra .ep-catalog__grid {
-  padding-top: 12px;
-}
+.ep-catalog__extra .ep-catalog__grid { padding-top: 12px; }
 
 /* ── Show-more toggle button ──────────────────────────────────────────────── */
 
@@ -930,10 +835,7 @@ body.app-body--routes-page {
   padding: 16px;
 }
 
-.ep-card__header {
-  display: grid;
-  gap: 5px;
-}
+.ep-card__header { display: grid; gap: 5px; }
 
 .ep-card__district {
   color: var(--color-text-tertiary);
@@ -965,7 +867,6 @@ body.app-body--routes-page {
 .ep-card__tagline { -webkit-line-clamp: 2; }
 .ep-card__description { -webkit-line-clamp: 4; }
 
-/* Stats row: flex + center so cells are content-width, not stretched */
 .ep-card__stats {
   display: flex;
   flex-wrap: wrap;
@@ -987,10 +888,7 @@ body.app-body--routes-page {
   white-space: nowrap;
 }
 
-.ep-card__details {
-  display: grid;
-  gap: 5px;
-}
+.ep-card__details { display: grid; gap: 5px; }
 
 .ep-card__detail {
   color: var(--color-text-secondary);
@@ -998,9 +896,7 @@ body.app-body--routes-page {
   line-height: 1.45;
 }
 
-.ep-card__detail strong {
-  color: var(--color-text);
-}
+.ep-card__detail strong { color: var(--color-text); }
 
 .ep-card__open {
   justify-self: center;
@@ -1143,14 +1039,6 @@ body.app-body--routes-page {
     border-radius: 28px 28px 0 0;
   }
 
-  .ep-sheet__profile {
-    left: calc(50% - 92px);
-  }
-
-  .ep-sheet__locate {
-    right: calc(50% - 92px);
-  }
-
   .ep-catalog__grid,
   .ep-catalog__skeleton {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1241,12 +1129,12 @@ body.app-body--routes-page {
   }
 }
 
-
 @media (prefers-reduced-motion: reduce) {
   .ep-card,
   .ep-stop,
   .ep-stop__body,
   .ep-sheet__locate,
+  .ep-sheet__profile,
   .ep-catalog__extra,
   .ep-card-skeleton__cover,
   .ep-skeleton-line {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import type { Excursion, RouteStop } from '@/entities/excursion/model/types'
@@ -48,8 +48,8 @@ function useCatalogInitial(): number {
   return initial
 }
 
-function clampSheetTranslate(value: number, peekTranslate: number) {
-  return Math.min(peekTranslate, Math.max(DRAG_MIN, value))
+function clampSheetTranslate(value: number, maxTranslate: number) {
+  return Math.min(maxTranslate, Math.max(DRAG_MIN, value))
 }
 
 export function ExcursionsPage() {
@@ -278,19 +278,14 @@ export function ExcursionsPage() {
     sheet.style.transform = `translateY(${nextY}px)`
     sheetTranslateRef.current = nextY
 
-    // Keep the preview tied to sheet height during drag, so the content below
-    // moves with it instead of jumping when the sheet snaps to full height.
+    // Animate preview bar height during drag so it tracks the sheet position.
     const preview = draftPreviewRef.current
     if (preview && hasDraftStopsRef.current) {
-      const peekT = peekTranslateRef.current
-      const range = peekT - DRAG_MIN
+      const range = peekTranslateRef.current - DRAG_MIN
       const progress = range > 0
         ? Math.max(0, Math.min(1, (nextY - DRAG_MIN) / range))
         : (nextY > DRAG_MIN ? 1 : 0)
-      const previewHeight = `${72 * progress}px`
-      preview.style.height = previewHeight
-      preview.style.maxHeight = previewHeight
-      preview.style.minHeight = previewHeight
+      preview.style.maxHeight = `${72 * progress}px`
     }
 
     const now = Date.now()
@@ -310,11 +305,7 @@ export function ExcursionsPage() {
 
     // Clear drag-time inline styles — CSS transitions + isFullyOpen class take over
     const preview = draftPreviewRef.current
-    if (preview) {
-      preview.style.height = ''
-      preview.style.maxHeight = ''
-      preview.style.minHeight = ''
-    }
+    if (preview) preview.style.maxHeight = ''
 
     const current = sheetTranslateRef.current
     const velocity = dragRef.current.velocity
@@ -481,7 +472,7 @@ export function ExcursionsPage() {
                 <button className="ep-draft__action-btn" onClick={state.handleClearRoute} type="button">
                   Сбросить маршрут
                 </button>
-                {state.draftStops.length >= 2 ? (
+                {state.draftStops.length >= 2 && (
                   <button
                     className="ep-draft__action-btn ep-draft__action-btn--primary"
                     onClick={state.handleSaveRoute}
@@ -489,16 +480,14 @@ export function ExcursionsPage() {
                   >
                     Сохранить маршрут
                   </button>
-                ) : null}
+                )}
               </div>
             </section>
-          ) : null}
-
-          {state.draftStops.length === 0 ? (
+          ) : (
             <div className="ep-sheet__empty-hint">
-              <span>Выбирайте точки на карте и составляйте свой маршрут</span>
+              Выбирайте точки на карте и составляйте свой маршрут
             </div>
-          ) : null}
+          )}
 
           <section className="ep-catalog">
             <div className="ep-catalog__head">
@@ -614,7 +603,7 @@ interface DraftStopCardProps {
   stop: RouteStop
 }
 
-function DraftStopCard({ isExpanded, onRemove, onToggle, stop }: DraftStopCardProps) {
+const DraftStopCard = memo(function DraftStopCard({ isExpanded, onRemove, onToggle, stop }: DraftStopCardProps) {
   const text = stop.description || stop.shortDescription
   const preview = [
     stop.expectedVisitMinutes > 0 && formatDuration(stop.expectedVisitMinutes),
@@ -655,7 +644,7 @@ function DraftStopCard({ isExpanded, onRemove, onToggle, stop }: DraftStopCardPr
       </div>
     </div>
   )
-}
+})
 
 // ── ExcursionCard ─────────────────────────────────────────────────────────────
 
@@ -663,7 +652,7 @@ interface ExcursionCardProps {
   excursion: Excursion
 }
 
-function ExcursionCard({ excursion }: ExcursionCardProps) {
+const ExcursionCard = memo(function ExcursionCard({ excursion }: ExcursionCardProps) {
   const placeholder = buildRoutePlaceholderImage(excursion.theme)
 
   return (
@@ -707,7 +696,7 @@ function ExcursionCard({ excursion }: ExcursionCardProps) {
       </div>
     </article>
   )
-}
+})
 
 // ── ExcursionsSkeleton ────────────────────────────────────────────────────────
 
