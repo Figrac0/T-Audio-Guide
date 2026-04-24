@@ -130,16 +130,24 @@ export function useExcursionsPageState() {
     const signature = `${hasLeadSegment ? 'lead' : 'plain'}:${points
       .map((point) => `${point.lat.toFixed(5)}:${point.lng.toFixed(5)}`)
       .join('|')}`
-    const cachedResult = getCachedWalkingRouteBuildResult(points)
 
-    if (!cachedResult?.geometry) {
-      return null
+    // Check each adjacent pair individually — the async effect caches pairs, not the full path
+    const segments: LngLat[][] = []
+    for (let i = 0; i < points.length - 1; i++) {
+      const from = points[i]
+      const to = points[i + 1]
+      const cached = getCachedWalkingRouteBuildResult([from, to])
+      if (!cached) return null
+      if (cached.geometry?.type === 'LineString') {
+        segments.push(cached.geometry.coordinates)
+      } else if (cached.geometry?.type === 'MultiLineString') {
+        segments.push(cached.geometry.coordinates[0] ?? [[from.lng, from.lat], [to.lng, to.lat]])
+      } else {
+        segments.push([[from.lng, from.lat], [to.lng, to.lat]])
+      }
     }
 
-    return {
-      signature,
-      segments: toPlannerSegments(cachedResult.geometry),
-    }
+    return { signature, segments }
   }, [draftStops, userPosition])
 
   useEffect(() => {

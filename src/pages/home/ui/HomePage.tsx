@@ -37,19 +37,15 @@ import { SmartPlaceImage } from "@/shared/ui/SmartPlaceImage";
 import { ExcursionCatalog } from "@/widgets/excursion-catalog/ui/ExcursionCatalog";
 import "./HomePage.css";
 
-// Height of the peek bar (drag handle + locate button row)
-const PEEK_HEIGHT = 52;
-// Minimum translateY — leaves a gap below the app header
+const CLOSED_HEIGHT = 52; // drag handle bar only
 const DRAG_MIN = 10;
-const HALF_RATIO = 0.48;
 
-type SheetState = "peek" | "half" | "full";
+type SheetState = "closed" | "peek" | "full";
 
-function getSnapTranslate(state: SheetState, sheetHeight: number): number {
+function getSnapTranslate(state: SheetState, sheetHeight: number, peekHeight: number): number {
     if (state === "full") return DRAG_MIN;
-    if (state === "half")
-        return sheetHeight - Math.round(window.innerHeight * HALF_RATIO);
-    return sheetHeight - PEEK_HEIGHT;
+    if (state === "peek") return Math.max(DRAG_MIN, sheetHeight - peekHeight);
+    return Math.max(DRAG_MIN, sheetHeight - CLOSED_HEIGHT);
 }
 
 const nearbyCategoryOptions: DiscoveryCategoryOption[] = [
@@ -374,20 +370,34 @@ export function HomePage() {
 
     // ── Bottom sheet ────────────────────────────────────────────────────────────
 
-    const [sheetState, setSheetState] = useState<SheetState>("peek");
-    const sheetStateRef = useRef<SheetState>("peek");
+    const [sheetState, setSheetState] = useState<SheetState>("closed");
+    const sheetStateRef = useRef<SheetState>("closed");
     const sheetRef = useRef<HTMLDivElement>(null);
+    const filterGroupRef = useRef<HTMLDivElement>(null);
+    const bodyRef = useRef<HTMLDivElement>(null);
+    const peekHeightRef = useRef(170); // fallback; measured by ResizeObserver
     // Prevents the sheetState useEffect from overriding a manually set transform
     const skipSnapRef = useRef(false);
 
     const snapToPeek = useCallback(() => {
         const sheet = sheetRef.current;
         if (!sheet) return;
-        const peekT = getSnapTranslate("peek", sheet.offsetHeight);
+        const peekT = getSnapTranslate("peek", sheet.offsetHeight, peekHeightRef.current);
+        if (bodyRef.current) bodyRef.current.scrollTop = 0;
         skipSnapRef.current = true;
         setSheetState("peek");
         sheet.style.transition = "transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)";
         sheet.style.transform = `translateY(${peekT}px)`;
+    }, []);
+
+    const snapToClosed = useCallback(() => {
+        const sheet = sheetRef.current;
+        if (!sheet) return;
+        const closedT = sheet.offsetHeight - CLOSED_HEIGHT;
+        skipSnapRef.current = true;
+        setSheetState("closed");
+        sheet.style.transition = "transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)";
+        sheet.style.transform = `translateY(${closedT}px)`;
     }, []);
 
     const handleGoToPlace = useCallback(
@@ -400,11 +410,17 @@ export function HomePage() {
         [requestLocation, snapToPeek, userPosition],
     );
 
-    // Collapse sheet when the app nav menu opens
+    // Close sheet when burger opens; close burger when sheet opens
     useEffect(() => {
-        window.addEventListener("app-menu-open", snapToPeek);
-        return () => window.removeEventListener("app-menu-open", snapToPeek);
-    }, [snapToPeek]);
+        window.addEventListener("app-menu-open", snapToClosed);
+        return () => window.removeEventListener("app-menu-open", snapToClosed);
+    }, [snapToClosed]);
+
+    useEffect(() => {
+        if (sheetState !== "closed") {
+            window.dispatchEvent(new CustomEvent("app-sheet-open"));
+        }
+    }, [sheetState]);
     const dragRef = useRef({
         active: false,
         startPointerY: 0,
@@ -426,7 +442,8 @@ export function HomePage() {
         }
         const sheet = sheetRef.current;
         if (!sheet || sheet.offsetHeight === 0) return;
-        const target = getSnapTranslate(sheetState, sheet.offsetHeight);
+        const target = getSnapTranslate(sheetState, sheet.offsetHeight, peekHeightRef.current);
+        if (sheetState === "peek" && bodyRef.current) bodyRef.current.scrollTop = 0;
         sheet.style.transition = "transform 0.36s cubic-bezier(0.4, 0, 0.2, 1)";
         sheet.style.transform = `translateY(${target}px)`;
     }, [sheetState]);
@@ -438,7 +455,7 @@ export function HomePage() {
         const applyInitial = () => {
             if (sheet.offsetHeight > 0) {
                 sheet.style.transition = "none";
-                sheet.style.transform = `translateY(${sheet.offsetHeight - PEEK_HEIGHT}px)`;
+                sheet.style.transform = `translateY(${sheet.offsetHeight - CLOSED_HEIGHT}px)`;
             }
         };
         applyInitial();
@@ -448,12 +465,73 @@ export function HomePage() {
             const target = getSnapTranslate(
                 sheetStateRef.current,
                 sheet.offsetHeight,
+                peekHeightRef.current,
             );
             sheet.style.transition = "none";
             sheet.style.transform = `translateY(${target}px)`;
         };
         window.addEventListener("resize", onResize);
         return () => window.removeEventListener("resize", onResize);
+    }, []);
+
+    // Measure filter group height for dynamic peek snapping
+    useEffect(() => {
+        const el = filterGroupRef.current;
+        if (!el) return;
+        const update = () => {
+            peekHeightRef.current = CLOSED_HEIGHT + el.offsetHeight;
+        };
+        update();
+        const ro = new ResizeObserver(update);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
+
+    // Scroll-to-close: when fully open and user overscrolls past the top edge.
+    // We only close after the user has *continued* swiping ≥52 px beyond the
+    // moment the content hit scrollTop=0 — so "scroll to top" alone never
+    // accidentally closes the sheet.
+    useEffect(() => {
+        const bodyEl = bodyRef.current;
+        if (!bodyEl) return;
+        let reachedTopAt = -1; // clientY where scrollTop first became 0
+
+        const onTouchStart = (e: TouchEvent) => {
+            // If already at top, start counting overscroll immediately
+            reachedTopAt = bodyEl.scrollTop === 0 ? e.touches[0].clientY : -1;
+        };
+        const onTouchMove = (e: TouchEvent) => {
+            if (sheetStateRef.current !== "full") return;
+            const currentY = e.touches[0].clientY;
+            // Record the exact y when content reaches the top mid-gesture
+            if (bodyEl.scrollTop === 0 && reachedTopAt < 0) {
+                reachedTopAt = currentY;
+            }
+            // Bail if we haven't reached the top yet, or scrolled back down
+            if (reachedTopAt < 0 || bodyEl.scrollTop > 0) return;
+            // Require an intentional 52 px overscroll beyond the top edge
+            if (currentY - reachedTopAt > 52) {
+                reachedTopAt = Infinity; // prevent re-trigger
+                const sheet = sheetRef.current;
+                if (!sheet) return;
+                const closedT = sheet.offsetHeight - CLOSED_HEIGHT;
+                skipSnapRef.current = true;
+                setSheetState("closed");
+                sheet.style.transition =
+                    "transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)";
+                sheet.style.transform = `translateY(${closedT}px)`;
+            }
+        };
+        const onTouchEnd = () => { reachedTopAt = -1; };
+
+        bodyEl.addEventListener("touchstart", onTouchStart, { passive: true });
+        bodyEl.addEventListener("touchmove", onTouchMove, { passive: true });
+        bodyEl.addEventListener("touchend", onTouchEnd, { passive: true });
+        return () => {
+            bodyEl.removeEventListener("touchstart", onTouchStart);
+            bodyEl.removeEventListener("touchmove", onTouchMove);
+            bodyEl.removeEventListener("touchend", onTouchEnd);
+        };
     }, []);
 
     function handleDragStart(e: React.PointerEvent<HTMLDivElement>) {
@@ -465,7 +543,7 @@ export function HomePage() {
         );
         const current = match
             ? parseFloat(match[1])
-            : getSnapTranslate(sheetState, sheet.offsetHeight);
+            : getSnapTranslate(sheetState, sheet.offsetHeight, peekHeightRef.current);
         dragRef.current = {
             active: true,
             startPointerY: e.clientY,
@@ -475,6 +553,7 @@ export function HomePage() {
             velocity: 0,
         };
         sheet.style.transition = "none";
+        sheet.style.willChange = "transform";
     }
 
     function handleDragMove(e: React.PointerEvent<HTMLDivElement>) {
@@ -484,9 +563,8 @@ export function HomePage() {
         const sheetHeight = sheet.offsetHeight;
         const dy = e.clientY - dragRef.current.startPointerY;
         const raw = dragRef.current.startTranslate + dy;
-        // Clamp: prevent touching header (DRAG_MIN) and hide below peek
         const newTranslate = Math.min(
-            sheetHeight - PEEK_HEIGHT,
+            sheetHeight - CLOSED_HEIGHT,
             Math.max(DRAG_MIN, raw),
         );
         const now = Date.now();
@@ -509,37 +587,35 @@ export function HomePage() {
         const currentTranslate = match ? parseFloat(match[1]) : 0;
         const sheetHeight = sheet.offsetHeight;
         const velocity = dragRef.current.velocity;
-        const peekT = getSnapTranslate("peek", sheetHeight);
-        const halfT = getSnapTranslate("half", sheetHeight);
+        const fullT = DRAG_MIN;
+        const peekT = getSnapTranslate("peek", sheetHeight, peekHeightRef.current);
+        const closedT = sheetHeight - CLOSED_HEIGHT;
 
-        if (velocity > 8) {
-            // Fast fling down → collapse to peek
-            skipSnapRef.current = true;
-            setSheetState("peek");
-            sheet.style.transition =
-                "transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)";
-            sheet.style.transform = `translateY(${peekT}px)`;
-        } else if (velocity < -8) {
-            // Fast fling up → expand to full
-            skipSnapRef.current = true;
-            setSheetState("full");
-            sheet.style.transition =
-                "transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)";
-            sheet.style.transform = `translateY(${DRAG_MIN}px)`;
-        } else if (currentTranslate >= peekT - 10) {
-            // Within 10px of peek — snap fully closed
-            skipSnapRef.current = true;
-            setSheetState("peek");
-            sheet.style.transition =
-                "transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)";
-            sheet.style.transform = `translateY(${peekT}px)`;
-        } else {
-            // Free position — stay exactly where released
-            sheet.style.transition = "none";
-            skipSnapRef.current = true;
-            if (currentTranslate >= halfT * 0.5) setSheetState("half");
-            else setSheetState("full");
+        const snaps: [SheetState, number][] = [
+            ["full", fullT],
+            ["peek", peekT],
+            ["closed", closedT],
+        ];
+
+        let bestIdx = 0;
+        let bestDist = Infinity;
+        for (let i = 0; i < snaps.length; i++) {
+            const d = Math.abs(currentTranslate - snaps[i][1]);
+            if (d < bestDist) { bestDist = d; bestIdx = i; }
         }
+        if (velocity > 5 && bestIdx < snaps.length - 1) bestIdx++;
+        else if (velocity < -5 && bestIdx > 0) bestIdx--;
+
+        const [nextState, targetT] = snaps[bestIdx];
+        skipSnapRef.current = true;
+        setSheetState(nextState);
+        sheet.style.transition = "transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)";
+        sheet.style.transform = `translateY(${targetT}px)`;
+        if (nextState === "peek" && bodyRef.current) bodyRef.current.scrollTop = 0;
+
+        const clearWillChange = () => { sheet.style.willChange = ""; };
+        sheet.addEventListener("transitionend", clearWillChange, { once: true });
+        setTimeout(clearWillChange, 450);
     }
 
     return (
@@ -588,11 +664,7 @@ export function HomePage() {
                     onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                             setSheetState((s) =>
-                                s === "peek"
-                                    ? "half"
-                                    : s === "half"
-                                      ? "full"
-                                      : "peek",
+                                s === "closed" ? "peek" : s === "peek" ? "full" : "closed",
                             );
                         }
                     }}
@@ -634,9 +706,13 @@ export function HomePage() {
                 </div>
 
                 {/* Scrollable content */}
-                <div className="home-sheet__body">
+                <div
+                    className="home-sheet__body"
+                    ref={bodyRef}
+                    style={{ overflowY: sheetState === "full" ? undefined : "hidden" }}
+                >
                     {/* ── Categories ── */}
-                    <div className="home-sheet__filter-group">
+                    <div className="home-sheet__filter-group" ref={filterGroupRef}>
                         <p className="home-sheet__filter-label">Места рядом</p>
                         <div className="home-sheet__cats">
                             {nearbyCategoryOptions.map((opt) => (

@@ -50,6 +50,13 @@ function AppFrame() {
     }
   }, [isMenuOpen])
 
+  // Close burger when a bottom sheet opens
+  useEffect(() => {
+    const close = () => setIsMenuOpen(false)
+    window.addEventListener('app-sheet-open', close)
+    return () => window.removeEventListener('app-sheet-open', close)
+  }, [])
+
   return (
     <div className="app-shell">
       <header className="app-header" ref={headerRef}>

@@ -31,37 +31,6 @@ body.app-body--routes-page {
   height: 100%;
 }
 
-/* ── Corner action buttons (peek-only, mobile only) ───────────────────────── */
-
-.ep__corner-btn {
-  position: absolute;
-  bottom: calc(52px + 14px);
-  z-index: 400;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 40px;
-  padding: 0 18px;
-  border: 1px solid rgba(216, 220, 229, 0.76);
-  border-radius: var(--radius-pill);
-  /* Solid bg — no backdrop-filter to avoid compositor stalls on map repaint */
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 10px 24px rgba(31, 37, 51, 0.14);
-  color: var(--color-text);
-  font-size: 0.84rem;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.ep__corner-btn--left { left: 14px; }
-
-.ep__corner-btn--right {
-  right: 14px;
-  border-color: rgba(31, 138, 112, 0.26);
-  background: linear-gradient(180deg, var(--color-brand), var(--color-brand-strong));
-  box-shadow: 0 10px 24px rgba(31, 138, 112, 0.24);
-  color: #fff;
-}
 
 /* ── Toast notice ─────────────────────────────────────────────────────────── */
 
@@ -123,6 +92,7 @@ body.app-body--routes-page {
   border-radius: 24px 24px 0 0;
   background: #fff;
   box-shadow: 0 -2px 20px rgba(31, 37, 51, 0.1);
+  transform: translateY(calc(100% - 52px)); /* closed by default; JS overrides */
   /* will-change is set via JS only during active drag to avoid
      persistent compositor layers that cause white-flash on wide screens */
 }
@@ -132,11 +102,9 @@ body.app-body--routes-page {
 .ep-sheet__drag {
   position: relative;
   z-index: 2;
-  display: flex;
-  height: 52px;
   flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
+  display: flex;
+  flex-direction: column;
   border-bottom: 1px solid rgba(31, 37, 51, 0.06);
   background: #fff;
   box-shadow: 0 2px 8px rgba(31, 37, 51, 0.05);
@@ -147,6 +115,16 @@ body.app-body--routes-page {
 }
 
 .ep-sheet__drag:active { cursor: grabbing; }
+
+/* Fixed-height row that holds the knob + locate button */
+.ep-sheet__bar-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 52px;
+  flex-shrink: 0;
+}
 
 .ep-sheet__handle {
   width: 36px;
@@ -180,7 +158,161 @@ body.app-body--routes-page {
 
 .ep-sheet__locate:active { transform: translateY(-50%) scale(0.92); }
 
-.ep-sheet__top-actions { display: none; }
+/* Draft preview bar — visible only at peek (partial) snap position.
+   max-height + overflow: hidden lets us collapse the space to zero. */
+.ep-sheet__draft-preview {
+  position: relative; /* vine pseudo-elements anchor here */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  max-height: 72px;
+  padding: 0 14px 0 16px;
+  overflow: hidden;
+  border-top: 1px solid rgba(31, 37, 51, 0.06);
+  background: linear-gradient(
+    135deg,
+    rgba(227, 248, 240, 0.7) 0%,
+    rgba(255, 255, 255, 0.95) 100%
+  );
+  flex-shrink: 0;
+  opacity: 1;
+  transition: opacity 0.24s ease, max-height 0.24s ease,
+    padding 0.24s ease, border-color 0.24s ease;
+  pointer-events: auto;
+}
+
+.ep-sheet__draft-preview--hidden {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  opacity: 0;
+  border-top-color: transparent;
+  pointer-events: none;
+}
+
+.ep-sheet__dp-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.ep-sheet__dp-order {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--color-brand);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 900;
+  box-shadow: 0 2px 6px rgba(31, 138, 112, 0.3);
+}
+
+/* Text column: category + name + schedule stacked */
+.ep-sheet__dp-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.ep-sheet__dp-cat {
+  font-size: 0.64rem;
+  font-weight: 700;
+  color: var(--color-brand);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+.ep-sheet__dp-name {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.25;
+}
+
+.ep-sheet__dp-schedule {
+  font-size: 0.68rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+/* "Убрать" — removes the last stop from the draft */
+.ep-sheet__dp-remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid rgba(194, 81, 75, 0.22);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 244, 242, 0.9);
+  color: var(--color-danger, #c2514b);
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: border-color 0.16s ease, background-color 0.16s ease, transform 0.12s ease;
+}
+
+.ep-sheet__dp-remove:hover {
+  border-color: rgba(194, 81, 75, 0.42);
+  background: rgba(255, 232, 228, 0.95);
+  transform: scale(0.97);
+}
+
+.ep-sheet__dp-remove:active {
+  transform: scale(0.94);
+}
+
+/* Decorative vine accents — shown flanking the preview bar on wider viewports.
+   z-index: 0 keeps them behind the actual content (dp-info, dp-remove sit on z=1). */
+@media (min-width: 580px) {
+  .ep-sheet__dp-info,
+  .ep-sheet__dp-remove {
+    position: relative;
+    z-index: 1;
+  }
+
+  .ep-sheet__draft-preview::before,
+  .ep-sheet__draft-preview::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 72px;
+    background-image: var(--decor-root-vine);
+    background-size: 72px 100%;
+    background-repeat: no-repeat;
+    background-position: center;
+    opacity: 0.28;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .ep-sheet__draft-preview::before {
+    left: 0;
+    transform: scaleX(-1);
+    transform-origin: center;
+  }
+
+  .ep-sheet__draft-preview::after {
+    right: 0;
+  }
+}
 
 /* ── Scrollable body ──────────────────────────────────────────────────────── */
 
@@ -920,47 +1052,9 @@ body.app-body--routes-page {
 }
 
 @media (min-width: 1024px) {
-  .ep__corner-btn { display: none; }
-
   .ep-sheet {
     left: 28px;
     right: 28px;
-  }
-
-  .ep-sheet__top-actions {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    z-index: 1;
-    display: flex;
-    width: min(360px, calc(100% - 168px));
-    height: 52px;
-    align-items: center;
-    transform: translateX(-50%);
-    justify-content: space-between;
-    pointer-events: none;
-  }
-
-  .ep-sheet__top-action {
-    pointer-events: auto;
-    display: inline-flex;
-    min-height: 34px;
-    align-items: center;
-    justify-content: center;
-    padding: 0 14px;
-    border: 1px solid rgba(216, 220, 229, 0.74);
-    border-radius: var(--radius-pill);
-    background: rgba(255, 255, 255, 0.96);
-    box-shadow: 0 8px 18px rgba(31, 37, 51, 0.08);
-    color: var(--color-text);
-    font-size: 0.78rem;
-    font-weight: 800;
-  }
-
-  .ep-sheet__top-action--primary {
-    border-color: rgba(31, 138, 112, 0.24);
-    background: linear-gradient(180deg, var(--color-brand), var(--color-brand-strong));
-    color: #fff;
   }
 
   .ep-draft {
@@ -1027,17 +1121,6 @@ body.app-body--routes-page {
   }
 }
 
-@media (max-width: 480px) {
-  .ep__corner-btn {
-    bottom: calc(52px + 10px);
-    min-height: 36px;
-    padding: 0 14px;
-    font-size: 0.8rem;
-  }
-
-  .ep__corner-btn--left { left: 10px; }
-  .ep__corner-btn--right { right: 10px; }
-}
 
 @media (prefers-reduced-motion: reduce) {
   .ep-card,

@@ -21,9 +21,10 @@ import { ResilientImage } from '@/shared/ui/ResilientImage'
 import { RouteBuilderMap, type RouteBuilderMapHandle } from './RouteBuilderMap'
 import './ExcursionsPage.css'
 
-const PEEK_HEIGHT = 52
 const DRAG_MIN = 10
 const PEEK_SNAP_THRESHOLD = 18
+const CLOSED_HEIGHT = 52        // drag handle bar only — always visible
+const INTERMEDIATE_PEEK_HEIGHT = 124 // 52px bar + 72px draft-preview bar
 
 function getCatalogInitial(): number {
   if (typeof window === 'undefined') return 6
@@ -67,25 +68,45 @@ export function ExcursionsPage() {
     [state.draftStops],
   )
 
+  const hasDraftStops = state.draftStops.length > 0
+  const lastDraftStop = hasDraftStops ? state.draftStops[state.draftStops.length - 1] : null
+
   const [peekTranslate, setPeekTranslate] = useState(0)
   const [sheetTranslate, setSheetTranslate] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const sheetRef = useRef<HTMLDivElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
   const mapHandleRef = useRef<RouteBuilderMapHandle>(null)
   const hasMeasuredRef = useRef(false)
   const peekTranslateRef = useRef(0)
+  const closedTranslateRef = useRef(0)
   const sheetTranslateRef = useRef(0)
-  const dragRef = useRef({ active: false, startPointerY: 0, startTranslate: 0 })
+  const hasDraftStopsRef = useRef(hasDraftStops)
+  const prevHasDraftRef = useRef(false)
+  const draftPreviewRef = useRef<HTMLDivElement>(null)
+  const dragRef = useRef({
+    active: false,
+    startPointerY: 0,
+    startTranslate: 0,
+    lastPointerY: 0,
+    lastTime: 0,
+    velocity: 0,
+  })
 
   useEffect(() => {
     document.body.classList.add('app-body--routes-page')
     return () => document.body.classList.remove('app-body--routes-page')
   }, [])
 
+  useEffect(() => { hasDraftStopsRef.current = hasDraftStops }, [hasDraftStops])
+
+  // Derived display state — must be declared before any effect that reads it
+  const isFullyOpen = !isDragging && sheetTranslate <= DRAG_MIN + 2
+
   const syncSheetPosition = useCallback((nextTranslate: number) => {
     const sheet = sheetRef.current
     if (!sheet) return
-    const safe = clampSheetTranslate(nextTranslate, peekTranslateRef.current)
+    const safe = clampSheetTranslate(nextTranslate, closedTranslateRef.current)
     sheet.style.transition = 'none'
     sheet.style.transform = `translateY(${safe}px)`
     sheetTranslateRef.current = safe
@@ -95,7 +116,7 @@ export function ExcursionsPage() {
   const animateSheetPosition = useCallback((nextTranslate: number, duration = 0.32) => {
     const sheet = sheetRef.current
     if (!sheet) return
-    const safe = clampSheetTranslate(nextTranslate, peekTranslateRef.current)
+    const safe = clampSheetTranslate(nextTranslate, closedTranslateRef.current)
     sheet.style.transition = `transform ${duration}s cubic-bezier(0.4, 0, 0.2, 1)`
     sheet.style.transform = `translateY(${safe}px)`
     sheetTranslateRef.current = safe
@@ -106,50 +127,136 @@ export function ExcursionsPage() {
     animateSheetPosition(peekTranslateRef.current)
   }, [animateSheetPosition])
 
-  const updateSheetBounds = useCallback(() => {
+  const snapToClosed = useCallback(() => {
+    animateSheetPosition(closedTranslateRef.current)
+  }, [animateSheetPosition])
+
+  const updateSheetBounds = useCallback((hasDraft: boolean) => {
+    if (!hasMeasuredRef.current) return // first-measure is handled by useLayoutEffect
     const sheet = sheetRef.current
     if (!sheet || sheet.offsetHeight === 0) return
-    const prevPeek = peekTranslateRef.current
-    const nextPeek = Math.max(DRAG_MIN, sheet.offsetHeight - PEEK_HEIGHT)
-    const isNearPeek =
-      !hasMeasuredRef.current ||
-      Math.abs(sheetTranslateRef.current - prevPeek) <= PEEK_SNAP_THRESHOLD
-    hasMeasuredRef.current = true
-    peekTranslateRef.current = nextPeek
-    setPeekTranslate(nextPeek)
-    syncSheetPosition(isNearPeek ? nextPeek : clampSheetTranslate(sheetTranslateRef.current, nextPeek))
+    const sheetH = sheet.offsetHeight
+    const closedT = Math.max(DRAG_MIN, sheetH - CLOSED_HEIGHT)
+    const peekT = hasDraft
+      ? Math.max(DRAG_MIN, sheetH - INTERMEDIATE_PEEK_HEIGHT)
+      : closedT
+    closedTranslateRef.current = closedT
+    peekTranslateRef.current = peekT
+    setPeekTranslate(peekT)
+    // Clamp current position only if it's out of the valid range
+    const curr = sheetTranslateRef.current
+    if (curr > closedT || curr < DRAG_MIN) {
+      syncSheetPosition(Math.min(closedT, Math.max(DRAG_MIN, curr)))
+    }
   }, [syncSheetPosition])
 
-  useEffect(() => { peekTranslateRef.current = peekTranslate }, [peekTranslate])
-  useEffect(() => { sheetTranslateRef.current = sheetTranslate }, [sheetTranslate])
+  // NOTE: refs are always written directly by syncSheetPosition / animateSheetPosition /
+  // useLayoutEffect.  These state-to-ref syncs would overwrite the freshly-set ref values
+  // with stale initial state (0) on the first render cycle, causing the sheet to snap to
+  // full-open.  They are intentionally omitted.
 
-  useEffect(() => {
-    window.addEventListener('app-menu-open', snapToPeek)
-    return () => window.removeEventListener('app-menu-open', snapToPeek)
-  }, [snapToPeek])
-
+  // First measure: position sheet at closed, then track resize
   useLayoutEffect(() => {
-    updateSheetBounds()
-    const frameId = window.requestAnimationFrame(updateSheetBounds)
-    const onResize = () => { if (!dragRef.current.active) updateSheetBounds() }
+    const sheet = sheetRef.current
+    if (!sheet) return
+
+    const doFirstMeasure = () => {
+      if (sheet.offsetHeight === 0 || hasMeasuredRef.current) return
+      const sheetH = sheet.offsetHeight
+      const closedT = Math.max(DRAG_MIN, sheetH - CLOSED_HEIGHT)
+      const peekT = hasDraftStopsRef.current
+        ? Math.max(DRAG_MIN, sheetH - INTERMEDIATE_PEEK_HEIGHT)
+        : closedT
+      hasMeasuredRef.current = true
+      closedTranslateRef.current = closedT
+      peekTranslateRef.current = peekT
+      setPeekTranslate(peekT)
+      syncSheetPosition(closedT)
+    }
+    doFirstMeasure()
+    const frameId = window.requestAnimationFrame(doFirstMeasure)
+
+    const onResize = () => {
+      if (!dragRef.current.active) updateSheetBounds(hasDraftStopsRef.current)
+    }
     window.addEventListener('resize', onResize)
     return () => {
       window.cancelAnimationFrame(frameId)
       window.removeEventListener('resize', onResize)
     }
-  }, [updateSheetBounds])
+  }, [syncSheetPosition, updateSheetBounds])
 
-  const isSheetCollapsed = !isDragging && Math.abs(sheetTranslate - peekTranslate) <= 1
+  // Update bounds when draft count changes; snap to correct position
+  useEffect(() => {
+    updateSheetBounds(hasDraftStops)
+  }, [hasDraftStops, updateSheetBounds])
+
+  useEffect(() => {
+    const prev = prevHasDraftRef.current
+    prevHasDraftRef.current = hasDraftStops
+    if (!hasMeasuredRef.current) return
+    if (!prev && hasDraftStops) {
+      // First draft added → peek to show the draft preview bar
+      animateSheetPosition(peekTranslateRef.current)
+    } else if (prev && !hasDraftStops) {
+      // All drafts cleared/saved → collapse to closed
+      animateSheetPosition(closedTranslateRef.current)
+    }
+  }, [hasDraftStops, animateSheetPosition])
+
+  // Close sheet when burger opens; close burger when sheet is fully open
+  useEffect(() => {
+    window.addEventListener('app-menu-open', snapToClosed)
+    return () => window.removeEventListener('app-menu-open', snapToClosed)
+  }, [snapToClosed])
+
+  useEffect(() => {
+    if (isFullyOpen) window.dispatchEvent(new CustomEvent('app-sheet-open'))
+  }, [isFullyOpen])
+
+  // Scroll-to-close: fully open + deliberate overscroll past the top → close.
+  // Uses reachedTopAt to distinguish "scrolled to top" from "swiping down to close".
+  useEffect(() => {
+    const body = bodyRef.current
+    if (!body) return
+    let reachedTopAt = -1
+
+    const onTouchStart = (e: TouchEvent) => {
+      reachedTopAt = body.scrollTop === 0 ? e.touches[0].clientY : -1
+    }
+    const onTouchMove = (e: TouchEvent) => {
+      if (sheetTranslateRef.current > DRAG_MIN + 2) return // only when fully open
+      const currentY = e.touches[0].clientY
+      if (body.scrollTop === 0 && reachedTopAt < 0) reachedTopAt = currentY
+      if (reachedTopAt < 0 || body.scrollTop > 0) return
+      if (currentY - reachedTopAt > 52) {
+        reachedTopAt = Infinity
+        animateSheetPosition(closedTranslateRef.current)
+      }
+    }
+    const onTouchEnd = () => { reachedTopAt = -1 }
+
+    body.addEventListener('touchstart', onTouchStart, { passive: true })
+    body.addEventListener('touchmove', onTouchMove, { passive: true })
+    body.addEventListener('touchend', onTouchEnd, { passive: true })
+    return () => {
+      body.removeEventListener('touchstart', onTouchStart)
+      body.removeEventListener('touchmove', onTouchMove)
+      body.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [animateSheetPosition])
 
   const handleSheetToggle = useCallback(() => {
     if (isDragging) return
-    if (Math.abs(sheetTranslateRef.current - peekTranslateRef.current) <= PEEK_SNAP_THRESHOLD) {
+    if (sheetTranslateRef.current <= DRAG_MIN + 2) {
+      // Fully open → collapse to closed
+      animateSheetPosition(closedTranslateRef.current)
+    } else {
+      // Closed or peeking → expand to full
       mapHandleRef.current?.closePopup()
       animateSheetPosition(DRAG_MIN)
-    } else {
-      animateSheetPosition(peekTranslateRef.current)
     }
-  }, [animateSheetPosition, isDragging])
+  }, [isDragging, animateSheetPosition])
 
   const handleDragStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const sheet = sheetRef.current
@@ -160,6 +267,9 @@ export function ExcursionsPage() {
       active: true,
       startPointerY: event.clientY,
       startTranslate: sheetTranslateRef.current,
+      lastPointerY: event.clientY,
+      lastTime: Date.now(),
+      velocity: 0,
     }
     sheet.style.transition = 'none'
     sheet.style.willChange = 'transform'
@@ -171,9 +281,29 @@ export function ExcursionsPage() {
     const sheet = sheetRef.current
     if (!sheet) return
     const raw = dragRef.current.startTranslate + (event.clientY - dragRef.current.startPointerY)
-    const nextY = clampSheetTranslate(raw, peekTranslateRef.current)
+    const nextY = clampSheetTranslate(raw, closedTranslateRef.current)
     sheet.style.transform = `translateY(${nextY}px)`
     sheetTranslateRef.current = nextY
+
+    // Animate draft preview in real-time during drag (no React re-render)
+    const preview = draftPreviewRef.current
+    if (preview && hasDraftStopsRef.current) {
+      const peekT = peekTranslateRef.current
+      const range = peekT - DRAG_MIN
+      const progress = range > 0
+        ? Math.max(0, Math.min(1, (nextY - DRAG_MIN) / range))
+        : (nextY > DRAG_MIN ? 1 : 0)
+      preview.style.opacity = String(progress)
+      preview.style.maxHeight = `${72 * progress}px`
+      preview.style.paddingTop = progress < 0.01 ? '0' : ''
+      preview.style.paddingBottom = progress < 0.01 ? '0' : ''
+    }
+
+    const now = Date.now()
+    const dt = Math.max(1, now - dragRef.current.lastTime)
+    dragRef.current.velocity = ((event.clientY - dragRef.current.lastPointerY) / dt) * 16
+    dragRef.current.lastPointerY = event.clientY
+    dragRef.current.lastTime = now
   }, [])
 
   const handleDragEnd = useCallback(() => {
@@ -184,20 +314,40 @@ export function ExcursionsPage() {
     const sheet = sheetRef.current
     if (!sheet) return
 
-    const current = sheetTranslateRef.current
-    if (Math.abs(current - peekTranslateRef.current) <= PEEK_SNAP_THRESHOLD) {
-      animateSheetPosition(peekTranslateRef.current, 0.26)
-    } else {
-      syncSheetPosition(current)
+    // Clear drag-time inline styles — CSS transitions + isFullyOpen class take over
+    const preview = draftPreviewRef.current
+    if (preview) {
+      preview.style.opacity = ''
+      preview.style.maxHeight = ''
+      preview.style.paddingTop = ''
+      preview.style.paddingBottom = ''
     }
 
-    // Clear will-change after transition to avoid persistent compositor layer
+    const current = sheetTranslateRef.current
+    const velocity = dragRef.current.velocity
+    const fullT = DRAG_MIN
+    const peekT = peekTranslateRef.current
+    const closedT = closedTranslateRef.current
+    const hasDraft = hasDraftStopsRef.current
+
+    const snaps = hasDraft ? [fullT, peekT, closedT] : [fullT, closedT]
+
+    let bestIdx = 0
+    let bestDist = Infinity
+    for (let i = 0; i < snaps.length; i++) {
+      const d = Math.abs(current - snaps[i])
+      if (d < bestDist) { bestDist = d; bestIdx = i }
+    }
+    if (velocity > 5 && bestIdx < snaps.length - 1) bestIdx++
+    else if (velocity < -5 && bestIdx > 0) bestIdx--
+
+    animateSheetPosition(snaps[bestIdx], 0.28)
+
     const clear = () => { sheet.style.willChange = '' }
     sheet.addEventListener('transitionend', clear, { once: true })
     setTimeout(clear, 450)
-  }, [animateSheetPosition, syncSheetPosition])
+  }, [animateSheetPosition])
 
-  const showRouteActions = state.draftStops.length > 0 && isSheetCollapsed
   const hasMoreExcursions = state.excursions.length > catalogInitial
 
   return (
@@ -221,19 +371,6 @@ export function ExcursionsPage() {
         />
       </div>
 
-      {showRouteActions ? (
-        <>
-          <button className="ep__corner-btn ep__corner-btn--left" onClick={state.handleClearRoute} type="button">
-            Сбросить
-          </button>
-          {state.draftStops.length >= 2 ? (
-            <button className="ep__corner-btn ep__corner-btn--right" onClick={state.handleSaveRoute} type="button">
-              Сохранить
-            </button>
-          ) : null}
-        </>
-      ) : null}
-
       {state.notice ? (
         <div className="ep__notice" role="status">{state.notice}</div>
       ) : null}
@@ -241,6 +378,7 @@ export function ExcursionsPage() {
       {state.geolocationError ? <p className="ep__geo-error">{state.geolocationError}</p> : null}
 
       <div className="ep-sheet" ref={sheetRef}>
+        {/* ── Drag handle bar ── */}
         <div
           aria-label="Потяните вверх чтобы открыть панель"
           className="ep-sheet__drag"
@@ -257,46 +395,58 @@ export function ExcursionsPage() {
           role="button"
           tabIndex={0}
         >
-          {showRouteActions ? (
-            <div className="ep-sheet__top-actions">
+          <div className="ep-sheet__bar-row">
+            <div className="ep-sheet__handle" />
+            <button
+              aria-label="Найти моё местоположение"
+              className="ep-sheet__locate"
+              onClick={state.handleLocateUser}
+              onPointerDown={(e) => e.stopPropagation()}
+              type="button"
+            >
+              <svg fill="none" height="16" viewBox="0 0 24 24" width="16">
+                <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="2" />
+                <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Draft preview: visible only when sheet is at peek (partial) */}
+          {lastDraftStop && (
+            <div
+              className={`ep-sheet__draft-preview${isFullyOpen ? ' ep-sheet__draft-preview--hidden' : ''}`}
+              ref={draftPreviewRef}
+            >
+              <div className="ep-sheet__dp-info">
+                <span className="ep-sheet__dp-order">{state.draftStops.length}</span>
+                <div className="ep-sheet__dp-text">
+                  <span className="ep-sheet__dp-cat">
+                    {formatPointCategory(lastDraftStop.category)}
+                  </span>
+                  <span className="ep-sheet__dp-name">{lastDraftStop.title}</span>
+                  {lastDraftStop.scheduleLabel && (
+                    <span className="ep-sheet__dp-schedule">{lastDraftStop.scheduleLabel}</span>
+                  )}
+                </div>
+              </div>
               <button
-                className="ep-sheet__top-action"
-                onClick={state.handleClearRoute}
+                className="ep-sheet__dp-remove"
+                onClick={() => state.handleRemoveStop(lastDraftStop.id)}
                 onPointerDown={(e) => e.stopPropagation()}
                 type="button"
               >
-                Сбросить
+                Убрать
               </button>
-              {state.draftStops.length >= 2 ? (
-                <button
-                  className="ep-sheet__top-action ep-sheet__top-action--primary"
-                  onClick={state.handleSaveRoute}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  type="button"
-                >
-                  Сохранить
-                </button>
-              ) : null}
             </div>
-          ) : null}
-
-          <div className="ep-sheet__handle" />
-
-          <button
-            aria-label="Найти моё местоположение"
-            className="ep-sheet__locate"
-            onClick={state.handleLocateUser}
-            onPointerDown={(e) => e.stopPropagation()}
-            type="button"
-          >
-            <svg fill="none" height="16" viewBox="0 0 24 24" width="16">
-              <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="2" />
-              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-            </svg>
-          </button>
+          )}
         </div>
 
-        <div className="ep-sheet__body">
+        {/* ── Scrollable body ── */}
+        <div
+          className="ep-sheet__body"
+          ref={bodyRef}
+          style={{ overflowY: isFullyOpen ? undefined : 'hidden' }}
+        >
           {state.draftStops.length > 0 ? (
             <section className="ep-draft">
               <div className="ep-draft__head">

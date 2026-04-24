@@ -64,7 +64,6 @@ body.app-body--home-page {
   background: #ffffff;
   box-shadow: 0 -2px 20px rgba(31, 37, 51, 0.1);
   overflow: hidden;
-  will-change: transform;
   transform: translateY(calc(100% - 52px));
   transition: transform 0.38s cubic-bezier(0.32, 0, 0.16, 1);
 }
@@ -162,7 +161,44 @@ body.app-body--home-page {
 ───────────────────────────────────────────────────────────────────────────── */
 
 .home-sheet__filter-group {
+  position: relative;
   padding: 6px 16px 6px;
+}
+
+/* Decorative vine accents flanking the category filter on wider viewports.
+   The buttons/label stay on z:1 so the vines never cover interactive elements. */
+@media (min-width: 580px) {
+  .home-sheet__filter-group:not(.home-sheet__filter-group--inline) .home-sheet__filter-label,
+  .home-sheet__filter-group:not(.home-sheet__filter-group--inline) .home-sheet__cats {
+    position: relative;
+    z-index: 1;
+  }
+
+  .home-sheet__filter-group:not(.home-sheet__filter-group--inline)::before,
+  .home-sheet__filter-group:not(.home-sheet__filter-group--inline)::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 88px;
+    background-image: var(--decor-root-vine);
+    background-size: 88px 100%;
+    background-repeat: no-repeat;
+    background-position: center;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .home-sheet__filter-group:not(.home-sheet__filter-group--inline)::before {
+    left: 0;
+    transform: scaleX(-1);
+    transform-origin: center;
+  }
+
+  .home-sheet__filter-group:not(.home-sheet__filter-group--inline)::after {
+    right: 0;
+  }
 }
 
 .home-sheet__filter-label {
