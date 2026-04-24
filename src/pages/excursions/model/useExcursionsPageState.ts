@@ -39,10 +39,6 @@ export interface PlannerRouteState {
   segments: LngLat[][]
 }
 
-function toPlannerSegments(geometry: { type: 'LineString' | 'MultiLineString'; coordinates: LngLat[] | LngLat[][] }) {
-  return geometry.type === 'LineString' ? [geometry.coordinates as LngLat[]] : (geometry.coordinates as LngLat[][])
-}
-
 export function useExcursionsPageState() {
   const navigate = useNavigate()
   const {

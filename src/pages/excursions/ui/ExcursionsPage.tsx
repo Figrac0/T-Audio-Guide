@@ -22,7 +22,6 @@ import { RouteBuilderMap, type RouteBuilderMapHandle } from './RouteBuilderMap'
 import './ExcursionsPage.css'
 
 const DRAG_MIN = 10
-const PEEK_SNAP_THRESHOLD = 18
 const CLOSED_HEIGHT = 52        // drag handle bar only — always visible
 const INTERMEDIATE_PEEK_HEIGHT = 124 // 52px bar + 72px draft-preview bar
 
@@ -71,7 +70,6 @@ export function ExcursionsPage() {
   const hasDraftStops = state.draftStops.length > 0
   const lastDraftStop = hasDraftStops ? state.draftStops[state.draftStops.length - 1] : null
 
-  const [peekTranslate, setPeekTranslate] = useState(0)
   const [sheetTranslate, setSheetTranslate] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const sheetRef = useRef<HTMLDivElement>(null)
@@ -123,10 +121,6 @@ export function ExcursionsPage() {
     setSheetTranslate(safe)
   }, [])
 
-  const snapToPeek = useCallback(() => {
-    animateSheetPosition(peekTranslateRef.current)
-  }, [animateSheetPosition])
-
   const snapToClosed = useCallback(() => {
     animateSheetPosition(closedTranslateRef.current)
   }, [animateSheetPosition])
@@ -142,7 +136,6 @@ export function ExcursionsPage() {
       : closedT
     closedTranslateRef.current = closedT
     peekTranslateRef.current = peekT
-    setPeekTranslate(peekT)
     // Clamp current position only if it's out of the valid range
     const curr = sheetTranslateRef.current
     if (curr > closedT || curr < DRAG_MIN) {
@@ -170,7 +163,6 @@ export function ExcursionsPage() {
       hasMeasuredRef.current = true
       closedTranslateRef.current = closedT
       peekTranslateRef.current = peekT
-      setPeekTranslate(peekT)
       syncSheetPosition(closedT)
     }
     doFirstMeasure()
@@ -188,7 +180,8 @@ export function ExcursionsPage() {
 
   // Update bounds when draft count changes; snap to correct position
   useEffect(() => {
-    updateSheetBounds(hasDraftStops)
+    const frameId = window.requestAnimationFrame(() => updateSheetBounds(hasDraftStops))
+    return () => window.cancelAnimationFrame(frameId)
   }, [hasDraftStops, updateSheetBounds])
 
   useEffect(() => {
@@ -285,7 +278,8 @@ export function ExcursionsPage() {
     sheet.style.transform = `translateY(${nextY}px)`
     sheetTranslateRef.current = nextY
 
-    // Animate draft preview in real-time during drag (no React re-render)
+    // Keep the preview tied to sheet height during drag, so the content below
+    // moves with it instead of jumping when the sheet snaps to full height.
     const preview = draftPreviewRef.current
     if (preview && hasDraftStopsRef.current) {
       const peekT = peekTranslateRef.current
@@ -293,10 +287,10 @@ export function ExcursionsPage() {
       const progress = range > 0
         ? Math.max(0, Math.min(1, (nextY - DRAG_MIN) / range))
         : (nextY > DRAG_MIN ? 1 : 0)
-      preview.style.opacity = String(progress)
-      preview.style.maxHeight = `${72 * progress}px`
-      preview.style.paddingTop = progress < 0.01 ? '0' : ''
-      preview.style.paddingBottom = progress < 0.01 ? '0' : ''
+      const previewHeight = `${72 * progress}px`
+      preview.style.height = previewHeight
+      preview.style.maxHeight = previewHeight
+      preview.style.minHeight = previewHeight
     }
 
     const now = Date.now()
@@ -317,10 +311,9 @@ export function ExcursionsPage() {
     // Clear drag-time inline styles — CSS transitions + isFullyOpen class take over
     const preview = draftPreviewRef.current
     if (preview) {
-      preview.style.opacity = ''
+      preview.style.height = ''
       preview.style.maxHeight = ''
-      preview.style.paddingTop = ''
-      preview.style.paddingBottom = ''
+      preview.style.minHeight = ''
     }
 
     const current = sheetTranslateRef.current

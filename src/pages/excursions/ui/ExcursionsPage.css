@@ -166,7 +166,10 @@ body.app-body--routes-page {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  box-sizing: border-box;
+  height: 72px;
   max-height: 72px;
+  min-height: 72px;
   padding: 0 14px 0 16px;
   overflow: hidden;
   border-top: 1px solid rgba(31, 37, 51, 0.06);
@@ -176,17 +179,20 @@ body.app-body--routes-page {
     rgba(255, 255, 255, 0.95) 100%
   );
   flex-shrink: 0;
-  opacity: 1;
-  transition: opacity 0.24s ease, max-height 0.24s ease,
-    padding 0.24s ease, border-color 0.24s ease;
+  transition:
+    height 0.32s cubic-bezier(0.32, 0, 0.16, 1),
+    min-height 0.32s cubic-bezier(0.32, 0, 0.16, 1),
+    max-height 0.32s cubic-bezier(0.32, 0, 0.16, 1),
+    border-color 0.22s ease;
   pointer-events: auto;
 }
 
 .ep-sheet__draft-preview--hidden {
+  height: 0;
   max-height: 0;
+  min-height: 0;
   padding-top: 0;
   padding-bottom: 0;
-  opacity: 0;
   border-top-color: transparent;
   pointer-events: none;
 }
@@ -291,26 +297,43 @@ body.app-body--routes-page {
   .ep-sheet__draft-preview::after {
     content: '';
     position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 72px;
+    top: -14px;
+    bottom: -14px;
+    width: clamp(168px, 24vw, 340px);
     background-image: var(--decor-root-vine);
-    background-size: 72px 100%;
+    background-size: 100% 100%;
     background-repeat: no-repeat;
     background-position: center;
-    opacity: 0.28;
+    opacity: 0.16;
     pointer-events: none;
     z-index: 0;
   }
 
   .ep-sheet__draft-preview::before {
-    left: 0;
+    left: clamp(8px, 10vw, 150px);
     transform: scaleX(-1);
     transform-origin: center;
   }
 
   .ep-sheet__draft-preview::after {
-    right: 0;
+    right: clamp(8px, 10vw, 150px);
+  }
+}
+
+@media (min-width: 768px) {
+  .ep-sheet__draft-preview {
+    justify-content: center;
+    gap: 14px;
+    padding-left: max(32px, calc((100% - 640px) / 2));
+    padding-right: max(32px, calc((100% - 640px) / 2));
+  }
+
+  .ep-sheet__dp-info {
+    flex: 0 1 460px;
+  }
+
+  .ep-sheet__dp-remove {
+    margin-left: 2px;
   }
 }
 
