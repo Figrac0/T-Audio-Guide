@@ -1,131 +1,918 @@
-.excursion-page__hero {
+/* ═══════════════════════════════════════════════════════════════════════════
+   PHASE 1 — INFO SCREEN
+═══════════════════════════════════════════════════════════════════════════ */
+
+.ep-info {
   display: grid;
-  gap: 22px;
-  padding: 32px;
+  gap: 0;
+  padding-bottom: 88px; /* clear the sticky CTA */
 }
 
-.excursion-page__hero-main {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
-}
+/* ── Back link ── */
 
-.excursion-page__hero-copy {
-  display: grid;
-  gap: 14px;
-}
-
-.excursion-page__difficulty {
+.ep-info__back {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  min-height: 40px;
+  gap: 6px;
+  margin-bottom: 20px;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.16s;
+}
+
+.ep-info__back:hover {
+  color: var(--color-brand);
+}
+
+/* ── Hero ── */
+
+.ep-info__hero {
+  display: grid;
+  gap: 18px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.ep-info__cover {
+  border-radius: 20px;
+  overflow: hidden;
+  aspect-ratio: 16 / 7;
+  background: var(--color-bg-elevated);
+}
+
+.ep-info__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ep-info__hero-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ep-info__difficulty {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
   padding: 0 14px;
   border-radius: var(--radius-pill);
   background: rgba(255, 221, 45, 0.18);
   color: var(--color-accent-ink);
+  font-size: 0.78rem;
   font-weight: 800;
+  white-space: nowrap;
 }
 
-.excursion-page__hero-meta {
+.ep-info__title {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.ep-info__tagline {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.975rem;
+  line-height: 1.55;
+}
+
+/* ── Stats grid ── */
+
+.ep-info__stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
-.excursion-page__hero-stat {
+.ep-info__stat {
   display: grid;
-  gap: 8px;
-  padding: 16px;
+  gap: 5px;
+  padding: 14px;
   border: 1px solid var(--color-line);
-  border-radius: 20px;
+  border-radius: 18px;
   background: var(--color-bg-elevated);
 }
 
-.excursion-page__hero-value {
-  font-size: 1.15rem;
+.ep-info__stat-value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  line-height: 1.2;
+}
+
+.ep-info__stat .meta-label {
+  font-size: 0.68rem;
+}
+
+/* ── Chips ── */
+
+.ep-info__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ── Description ── */
+
+.ep-info__desc {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.925rem;
+  line-height: 1.75;
+}
+
+/* ── Save / share ── */
+
+.ep-info__secondary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ep-info__geo-error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 0.875rem;
+}
+
+/* ── Stops section ── */
+
+.ep-info__stops {
+  padding: 28px 0;
+}
+
+.ep-info__stops-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 20px;
+  font-size: 1.2rem;
   font-weight: 800;
 }
 
-.excursion-page__hero-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+.ep-info__stops-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--color-brand);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
 }
 
-.excursion-page__hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.excursion-page__hero-note {
-  margin: 0;
-  color: var(--color-danger);
-}
-
-.excursion-page__layout {
+.ep-info__stops-list {
   display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(340px, 0.92fr);
-  gap: 24px;
+  gap: 0;
 }
 
-.excursion-page__column {
+/* ── Stop card ── */
+
+.ep-info__stop {
+  display: flex;
+  gap: 14px;
+  padding: 0 0 24px;
+}
+
+.ep-info__stop:not(:first-child) {
+  padding-top: 24px;
+  border-top: 1px solid var(--color-line);
+}
+
+.ep-info__stop-aside {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding-top: 2px;
+}
+
+.ep-info__stop-num {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-brand);
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  z-index: 1;
+}
+
+.ep-info__stop-line {
+  flex: 1;
+  width: 2px;
+  margin-top: 4px;
+  background: var(--color-line);
+  border-radius: 999px;
+  min-height: 16px;
+}
+
+.ep-info__stop:last-child .ep-info__stop-line {
+  display: none;
+}
+
+.ep-info__stop-body {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  padding-bottom: 4px;
+}
+
+.ep-info__stop-img {
+  border-radius: 16px;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background: var(--color-bg-elevated);
+}
+
+.ep-info__stop-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ep-info__stop-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.ep-info__stop-rating {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-accent-ink);
+}
+
+.ep-info__stop-time {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.ep-info__stop-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.ep-info__stop-schedule {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-tertiary);
+}
+
+.ep-info__stop-desc {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  line-height: 1.65;
+}
+
+.ep-info__stop-audio {
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-line);
+  align-items: flex-start;
+}
+
+.ep-info__stop-audio-icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.ep-info__stop-audio-preview {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Sticky start CTA ── */
+
+.ep-info__cta {
+  position: sticky;
+  bottom: 0;
+  padding: 14px 0 calc(16px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, #ffffff 22px);
+}
+
+.ep-info__start-btn {
+  width: 100%;
+  height: 52px;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+/* ── Small chip variant ── */
+
+.chip--sm {
+  font-size: 0.72rem;
+  height: 26px;
+  padding: 0 10px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PHASE 2 — NAVIGATION (fullscreen map + bottom sheet)
+═══════════════════════════════════════════════════════════════════════════ */
+
+body.app-body--excursion-nav {
+  overflow: hidden;
+}
+
+.ep-nav {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #e8edf4;
+  overflow: hidden;
+}
+
+/* ── Map ── */
+
+.ep-nav__map {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: #e8edf4;
+}
+
+.ep-nav__map .map-card {
+  height: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.ep-nav__map .map-card__header,
+.ep-nav__map .map-card__controls,
+.ep-nav__map .map-card__legend {
+  display: none;
+}
+
+.ep-nav__map .map-card__canvas,
+.ep-nav__map .map-card__canvas--interactive {
+  flex: 1;
+  height: 100% !important;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+}
+
+.ep-nav__map .map-card__map-root {
+  height: 100%;
+}
+
+.ep-nav__map .leaflet-container {
+  background: #e8edf4;
+}
+
+/* ── Bottom sheet ── */
+
+.ep-nav__sheet {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(100% - 60px);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  border-radius: 24px 24px 0 0;
+  background: #ffffff;
+  box-shadow: 0 -2px 20px rgba(31, 37, 51, 0.1);
+  overflow: hidden;
+  transform: translateY(calc(100% - 52px));
+  transition: transform 0.38s cubic-bezier(0.32, 0, 0.16, 1);
+}
+
+/* ── Drag handle (52px bar, always visible) ── */
+
+.ep-nav__drag {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 52px;
+  z-index: 1;
+  background: #ffffff;
+  border-bottom: 1px solid rgba(31, 37, 51, 0.06);
+  box-shadow: 0 2px 8px rgba(31, 37, 51, 0.05);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ep-nav__drag:active {
+  cursor: grabbing;
+}
+
+.ep-nav__handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(31, 37, 51, 0.18);
+}
+
+.ep-nav__back,
+.ep-nav__locate {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(216, 220, 229, 0.8);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--color-brand);
+  box-shadow: 0 4px 12px rgba(31, 37, 51, 0.1);
+  transition: box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.ep-nav__back {
+  left: 12px;
+}
+
+.ep-nav__locate {
+  right: 12px;
+}
+
+.ep-nav__back:hover,
+.ep-nav__locate:hover {
+  box-shadow: 0 6px 16px rgba(31, 37, 51, 0.14);
+  transform: translateY(calc(-50% - 1px));
+}
+
+.ep-nav__back:active,
+.ep-nav__locate:active {
+  transform: translateY(-50%) scale(0.91);
+}
+
+/* ── Scrollable body ── */
+
+.ep-nav__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 40px;
+  scrollbar-width: thin;
+  scrollbar-color: #ffdd2d transparent;
+}
+
+.ep-nav__body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.ep-nav__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ep-nav__body::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #ffdd2d 0%, #1f8a70 100%);
+  border-radius: 4px;
+}
+
+/* ── Navigation row (peek state content) ── */
+
+.ep-nav__nav-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.ep-nav__arrow {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1.5px solid var(--color-line);
+  border-radius: 50%;
+  background: #ffffff;
+  color: var(--color-brand);
+  transition: background 0.16s, border-color 0.16s, transform 0.12s;
+}
+
+.ep-nav__arrow--complete {
+  background: var(--color-brand);
+  color: #ffffff;
+  border-color: var(--color-brand);
+}
+
+.ep-nav__arrow:disabled {
+  opacity: 0.32;
+  pointer-events: none;
+}
+
+.ep-nav__arrow:not(:disabled):not(.ep-nav__arrow--complete):hover {
+  background: var(--color-bg-elevated);
+  transform: scale(1.06);
+}
+
+.ep-nav__arrow--complete:hover {
+  opacity: 0.9;
+  transform: scale(1.04);
+}
+
+.ep-nav__progress {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  text-align: center;
+}
+
+.ep-nav__progress-count {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+
+.ep-nav__progress-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ep-nav__progress-dist {
+  font-size: 0.74rem;
+  color: var(--color-brand);
+  font-weight: 600;
+}
+
+/* ── Stop details (full state content) ── */
+
+.ep-nav__stop {
+  padding: 0 16px 20px;
+  display: grid;
+  gap: 16px;
+}
+
+.ep-nav__stop-img {
+  margin: 0 -16px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--color-bg-elevated);
+}
+
+.ep-nav__stop-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ep-nav__stop-header {
+  display: grid;
+  gap: 7px;
+}
+
+.ep-nav__stop-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ep-nav__stop-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.ep-nav__stop-stats {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.ep-nav__stop-rating {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-accent-ink);
+}
+
+.ep-nav__stop-time {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.ep-nav__stop-schedule {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-tertiary);
+}
+
+.ep-nav__stop-desc {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+}
+
+/* ── Audio guide ── */
+
+.ep-nav__audio {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-line);
+}
+
+.ep-nav__audio-heading {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+}
+
+.ep-nav__audio-preview {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  line-height: 1.6;
+}
+
+.ep-nav__audio-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ep-nav__audio-placeholder {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-tertiary);
+}
+
+/* ── Action button ── */
+
+.ep-nav__stop-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.ep-nav__stop-actions .button {
+  width: 100%;
+}
+
+/* ── Wide screens: narrow the drag handle island ── */
+
+@media (min-width: 768px) {
+  .ep-nav__sheet {
+    left: 20px;
+    right: 20px;
+    border-radius: 28px 28px 0 0;
+    background: linear-gradient(180deg, transparent 52px, #ffffff 52px);
+  }
+
+  .ep-nav__drag {
+    max-width: 400px;
+    margin: 0 auto;
+    background: #ffffff;
+    border-radius: 22px 22px 0 0;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PHASE 3 — COMPLETE SCREEN
+═══════════════════════════════════════════════════════════════════════════ */
+
+.ep-complete {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12px 0 40px;
+}
+
+.ep-complete__card {
+  width: 100%;
+  max-width: 500px;
   display: grid;
   gap: 20px;
-  align-content: start;
+  padding: 32px 28px;
+  border-radius: 28px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-line);
+  text-align: center;
 }
 
-@media (max-width: 1080px) {
-  .excursion-page__hero-meta {
+.ep-complete__badge {
+  font-size: 3.5rem;
+  line-height: 1;
+}
+
+.ep-complete__title {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 900;
+}
+
+.ep-complete__route {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-brand);
+}
+
+.ep-complete__summary {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  line-height: 1.65;
+}
+
+/* ── Review ── */
+
+.ep-complete__review {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 20px;
+  background: #ffffff;
+  border: 1px solid var(--color-line);
+  text-align: left;
+}
+
+.ep-complete__review-label {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: center;
+  color: var(--color-text-primary);
+}
+
+.ep-complete__stars {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.ep-complete__star {
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--color-line);
+  transition: color 0.12s, transform 0.1s;
+  cursor: pointer;
+}
+
+.ep-complete__star--active {
+  color: #ffdd2d;
+}
+
+.ep-complete__star:hover {
+  transform: scale(1.15);
+}
+
+.ep-complete__review-text {
+  width: 100%;
+  min-height: 80px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 14px;
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  font-size: 0.9rem;
+  font-family: inherit;
+  resize: none;
+  outline: none;
+  transition: border-color 0.16s;
+  box-sizing: border-box;
+}
+
+.ep-complete__review-text:focus {
+  border-color: var(--color-brand);
+}
+
+.ep-complete__review-sent {
+  margin: 0;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-brand);
+  padding: 8px 0;
+}
+
+/* ── Action buttons ── */
+
+.ep-complete__actions {
+  display: grid;
+  gap: 10px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 760px) {
+  .ep-info__stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .excursion-page__layout {
-    grid-template-columns: 1fr;
+  .ep-info__secondary-actions .button {
+    flex: 1 1 calc(50% - 5px);
+  }
+
+  .ep-info__title {
+    font-size: 1.5rem;
   }
 }
 
-@media (max-width: 760px) {
-  .excursion-page__hero {
-    padding: 24px;
-    gap: 18px;
+@media (max-width: 640px) {
+  /* Cover image: full width on mobile, no rounded corners */
+  .ep-info__cover {
+    border-radius: 0;
+    margin-left: -12px;
+    margin-right: -12px;
   }
 
-  .excursion-page__hero-main {
-    flex-direction: column;
+  .ep-info__title {
+    font-size: 1.35rem;
   }
 
-  .excursion-page__hero-meta {
-    grid-template-columns: 1fr;
+  .ep-info__stat {
+    padding: 12px;
+    gap: 4px;
   }
 
-  .excursion-page__hero-stat {
-    gap: 6px;
-    padding: 14px;
+  .ep-info__stat-value {
+    font-size: 0.95rem;
   }
 
-  .excursion-page__hero-value {
-    font-size: 1.02rem;
+  .ep-complete__card {
+    padding: 24px 18px;
+    border-radius: 22px;
   }
 
-  .excursion-page__hero-actions .button {
-    flex: 1 1 100%;
+  .ep-complete__title {
+    font-size: 1.5rem;
+  }
+
+  .ep-complete__star {
+    font-size: 1.75rem;
   }
 }
 
 @media (max-width: 520px) {
-  .excursion-page__hero {
-    padding: 18px;
+  .ep-info__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .excursion-page__hero-copy {
-    gap: 12px;
-  }
-
-  .excursion-page__hero-chips,
-  .excursion-page__hero-actions {
-    gap: 8px;
+  .ep-info__secondary-actions .button {
+    flex: 1 1 100%;
   }
 }
