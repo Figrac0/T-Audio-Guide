@@ -11,6 +11,7 @@ body,
 }
 
 html {
+  overflow-x: clip;
   overflow-y: scroll;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
@@ -189,6 +190,12 @@ img {
 
 .button--ghost {
   background: rgba(255, 255, 255, 0.72);
+}
+
+.button--danger {
+  border-color: rgba(194, 81, 75, 0.22);
+  background: rgba(255, 244, 242, 0.82);
+  color: var(--color-danger);
 }
 
 .button--wide {

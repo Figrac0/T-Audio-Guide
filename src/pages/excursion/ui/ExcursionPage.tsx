@@ -16,6 +16,7 @@ import { RouteMap } from '@/features/route-map/ui/RouteMap'
 import { useUserRoutes } from '@/features/user-routes/model/useUserRoutes'
 import { appRoutes } from '@/shared/config/routes'
 import { getStoredDiscoveryContext } from '@/shared/lib/discovery-context'
+import { buildRoutePlaceholderImage } from '@/shared/lib/placeholder-images'
 import {
   formatDifficulty,
   formatDistance,
@@ -25,6 +26,7 @@ import {
   formatStopCount,
   formatTheme,
 } from '@/shared/lib/format'
+import { ResilientImage } from '@/shared/ui/ResilientImage'
 import './ExcursionPage.css'
 
 // ── Sheet constants ──────────────────────────────────────────────────────────
@@ -137,34 +139,6 @@ export function ExcursionPage() {
   )
 }
 
-// ── Theme fallback ───────────────────────────────────────────────────────────
-
-function getThemeFallback(theme: Excursion['theme']): React.CSSProperties {
-  const map: Record<string, React.CSSProperties> = {
-    walk: {
-      background:
-        'radial-gradient(circle at 72% 22%, rgba(129,212,224,0.42) 0%, transparent 44%), radial-gradient(circle at 24% 72%, rgba(45,106,159,0.36) 0%, transparent 40%), linear-gradient(135deg, #1d3c5e 0%, #2d6a9f 45%, #4db8d0 80%, #81d4e0 100%)',
-    },
-    food: {
-      background:
-        'radial-gradient(circle at 74% 20%, rgba(240,200,130,0.46) 0%, transparent 42%), radial-gradient(circle at 22% 72%, rgba(160,79,30,0.36) 0%, transparent 38%), linear-gradient(135deg, #5c2a10 0%, #a04f1e 45%, #d48a50 80%, #f0c882 100%)',
-    },
-    nature: {
-      background:
-        'radial-gradient(circle at 66% 20%, rgba(122,191,128,0.42) 0%, transparent 44%), radial-gradient(circle at 24% 74%, rgba(26,102,64,0.36) 0%, transparent 40%), linear-gradient(135deg, #0d3320 0%, #1a6640 45%, #3a9962 80%, #7abf80 100%)',
-    },
-    fun: {
-      background:
-        'radial-gradient(circle at 72% 22%, rgba(212,143,232,0.46) 0%, transparent 42%), radial-gradient(circle at 26% 72%, rgba(110,31,168,0.36) 0%, transparent 38%), linear-gradient(135deg, #3a0d5e 0%, #6e1fa8 45%, #a84fd8 80%, #d48fe8 100%)',
-    },
-    mixed: {
-      background:
-        'radial-gradient(circle at 74% 20%, rgba(168,79,45,0.36) 0%, transparent 40%), radial-gradient(circle at 22% 70%, rgba(110,31,168,0.3) 0%, transparent 38%), radial-gradient(circle at 50% 50%, rgba(29,94,60,0.25) 0%, transparent 50%), linear-gradient(135deg, #1d3c5e 0%, #1d5e3c 30%, #8f4a2d 60%, #6e1fa8 100%)',
-    },
-  }
-  return map[theme] ?? { background: 'linear-gradient(135deg, #2a3a5a 0%, #3d5a7a 50%, #5a7a9a 100%)' }
-}
-
 // ── Stop category fallback ───────────────────────────────────────────────────
 
 function getStopFallbackStyle(category: PointCategory): React.CSSProperties {
@@ -205,6 +179,11 @@ interface InfoPhaseProps {
 }
 
 function InfoPhase({ excursion, geolocationError, isSaved, onSave, onShare, onStart }: InfoPhaseProps) {
+  const routePlaceholder = useMemo(
+    () => buildRoutePlaceholderImage(excursion.theme),
+    [excursion.theme],
+  )
+
   return (
     <div className="ep-info">
 
@@ -223,65 +202,48 @@ function InfoPhase({ excursion, geolocationError, isSaved, onSave, onShare, onSt
         <div className="ep-info__hero-body">
           <div className="ep-info__hero-top">
             <h1 className="ep-info__title">{excursion.title}</h1>
-            <span className="ep-info__difficulty">{formatDifficulty(excursion.difficulty)}</span>
+            <span className="ep-info__difficulty">Сложность: {formatDifficulty(excursion.difficulty)}</span>
           </div>
           <p className="ep-info__tagline">{excursion.tagline}</p>
         </div>
 
         {/* Cover image */}
         <div className="ep-info__cover-frame" data-theme={excursion.theme}>
-          {excursion.coverImageUrl ? (
-            <div className="ep-info__cover">
-              <img alt={excursion.title} referrerPolicy="no-referrer" src={excursion.coverImageUrl} />
-              <div className="ep-info__cover-theme">{formatTheme(excursion.theme)}</div>
-            </div>
-          ) : (
-            <div className="ep-info__cover ep-info__cover--empty" style={getThemeFallback(excursion.theme)}>
-              <div className="ep-info__cover-theme">{formatTheme(excursion.theme)}</div>
-            </div>
-          )}
-        </div>
-
-        <div className="ep-info__stats-meta">
-          <div className="ep-info__stats">
-            <div className="ep-info__stat">
-              <span className="ep-info__stat-icon" aria-hidden="true">⏱</span>
-              <span className="ep-info__stat-value">{formatDuration(excursion.durationMinutes)}</span>
-              <span className="ep-info__stat-label">Время</span>
-            </div>
-            <div className="ep-info__stat">
-              <span className="ep-info__stat-icon" aria-hidden="true">📍</span>
-              <span className="ep-info__stat-value">{formatStopCount(excursion.stops.length)}</span>
-              <span className="ep-info__stat-label">Точки</span>
-            </div>
-            <div className="ep-info__stat">
-              <span className="ep-info__stat-icon" aria-hidden="true">🚶</span>
-              <span className="ep-info__stat-value">{formatDistance(excursion.distanceKm)}</span>
-              <span className="ep-info__stat-label">Длина</span>
-            </div>
-            <div className="ep-info__stat">
-              <span className="ep-info__stat-icon" aria-hidden="true">👥</span>
-              <span className="ep-info__stat-value">{excursion.audienceLabel}</span>
-              <span className="ep-info__stat-label">Формат</span>
-            </div>
-          </div>
-
-          <div className="ep-info__route-meta" aria-label="Детали маршрута">
-            <span className="ep-info__route-meta-item">
-              <strong>Район</strong>
-              {excursion.district}
-            </span>
-            <span className="ep-info__route-meta-item">
-              <strong>Тема</strong>
-              {formatTheme(excursion.theme)}
-            </span>
-            <span className="ep-info__route-meta-item">
-              <strong>Сложность</strong>
-              {formatDifficulty(excursion.difficulty)}
-            </span>
+          <div className="ep-info__cover">
+            <ResilientImage
+              alt={excursion.title}
+              fallbackSrcs={[routePlaceholder]}
+              loading="lazy"
+              placeholderSrc={routePlaceholder}
+              referrerPolicy="no-referrer"
+              src={excursion.coverImageUrl}
+            />
+            <div className="ep-info__cover-theme">{formatTheme(excursion.theme)}</div>
           </div>
         </div>
 
+        <div className="ep-info__stats" aria-label="Ключевые параметры маршрута">
+          <div className="ep-info__stat">
+            <span className="ep-info__stat-icon" aria-hidden="true">⏱</span>
+            <span className="ep-info__stat-value">{formatDuration(excursion.durationMinutes)}</span>
+            <span className="ep-info__stat-label">Время</span>
+          </div>
+          <div className="ep-info__stat">
+            <span className="ep-info__stat-icon" aria-hidden="true">📍</span>
+            <span className="ep-info__stat-value">{formatStopCount(excursion.stops.length)}</span>
+            <span className="ep-info__stat-label">Точки</span>
+          </div>
+          <div className="ep-info__stat">
+            <span className="ep-info__stat-icon" aria-hidden="true">🚶</span>
+            <span className="ep-info__stat-value">{formatDistance(excursion.distanceKm)}</span>
+            <span className="ep-info__stat-label">Длина</span>
+          </div>
+          <div className="ep-info__stat">
+            <span className="ep-info__stat-icon" aria-hidden="true">👥</span>
+            <span className="ep-info__stat-value">{excursion.audienceLabel}</span>
+            <span className="ep-info__stat-label">Формат</span>
+          </div>
+        </div>
         <p className="ep-info__desc">{excursion.description}</p>
 
         {geolocationError ? <p className="ep-info__geo-error">{geolocationError}</p> : null}
@@ -386,12 +348,14 @@ function StopCard({ stop, index }: { stop: RouteStop; index: number }) {
 
         <p className="ep-stop-card__desc">{stop.description || stop.shortDescription}</p>
 
-        {stop.audio.transcriptPreview ? (
-          <div className="ep-stop-card__audio">
-            <span aria-hidden="true" className="ep-stop-card__audio-icon">🎧</span>
-            <span className="ep-stop-card__audio-text">{stop.audio.transcriptPreview}</span>
-          </div>
-        ) : null}
+        <div className="ep-stop-card__audio">
+          <span aria-hidden="true" className="ep-stop-card__audio-icon">🎧</span>
+          <span className="ep-stop-card__audio-text">
+            {stop.audio.transcriptPreview || stop.audio.url
+              ? 'Аудиогид для этой точки доступен'
+              : 'Аудиогид для этой точки пока недоступен'}
+          </span>
+        </div>
       </div>
     </article>
   )
@@ -625,17 +589,17 @@ function NavigationPhase({
           role="button"
           tabIndex={0}
         >
-          <button
-            aria-label="Вернуться к описанию маршрута"
-            className="ep-nav__back"
-            onClick={onBack}
+          <Link
+            aria-label="Открыть профиль"
+            className="ep-nav__profile"
             onPointerDown={(e) => e.stopPropagation()}
-            type="button"
+            to={appRoutes.profile}
           >
             <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16">
-              <path d="M15 19l-7-7 7-7" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+              <circle cx="12" cy="8" r="3.2" stroke="currentColor" strokeWidth="2" />
+              <path d="M5.5 20c1.1-4 3.4-6 6.5-6s5.4 2 6.5 6" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
             </svg>
-          </button>
+          </Link>
           <div className="ep-nav__handle" />
           <button
             aria-label="Найти моё местоположение"
@@ -760,6 +724,9 @@ function NavigationPhase({
                   Следующая: {excursion.stops[currentStopIndex + 1]?.title}
                 </button>
               )}
+              <button className="button button--danger" onClick={onBack} type="button">
+                Вернуться
+              </button>
             </div>
           </div>
         </div>
