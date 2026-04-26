@@ -15,7 +15,11 @@
   position: relative;
   display: grid;
   gap: 28px;
-  padding-bottom: 32px;
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  /* clearance for the fixed sticky CTA button */
+  padding-bottom: 96px;
 }
 
 /* ── Back link ── */
@@ -38,7 +42,7 @@
   gap: 20px;
 }
 
-/* ── Cover frame wrapper (holds image + side decorations on desktop) ── */
+/* ── Cover frame wrapper ── */
 .ep-info__cover-frame {
   /* mobile: full-bleed */
   margin-left: -12px;
@@ -61,12 +65,7 @@
   object-fit: cover;
 }
 
-/* ── Theme-specific fallback covers ── */
-.ep-info__cover--empty {
-  /* gradient set via inline style from getThemeFallback() */
-}
-
-/* Subtle center shimmer for all fallbacks */
+/* Subtle center shimmer for fallback covers */
 .ep-info__cover--empty::before {
   content: '';
   position: absolute;
@@ -135,7 +134,7 @@
   line-height: 1.5;
 }
 
-/* ── Stats: 2×2 mobile → 4-col tablet+, colored individual cards ── */
+/* ── Stats: 2×2 mobile ── */
 .ep-info__stats {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -153,7 +152,6 @@
   border: 1px solid transparent;
 }
 
-/* Each stat gets a unique tinted card */
 .ep-info__stat:nth-child(1) {
   background: linear-gradient(145deg, rgba(255, 221, 45, 0.13) 0%, rgba(255, 221, 45, 0.05) 100%);
   border-color: rgba(255, 221, 45, 0.28);
@@ -194,11 +192,40 @@
   letter-spacing: 0.05em;
 }
 
+/* ── Stats + Meta wrapper ── */
+.ep-info__stats-meta {
+  display: grid;
+  gap: 12px;
+}
+
 /* ── Chips ── */
-.ep-info__chips {
+.ep-info__route-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
+}
+
+.ep-info__route-meta-item {
+  display: inline-grid;
+  gap: 2px;
+  min-height: 42px;
+  align-content: center;
+  padding: 8px 12px;
+  border: 1px solid rgba(216, 220, 229, 0.68);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.ep-info__route-meta-item strong {
+  color: var(--color-text-tertiary);
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 /* ── Description ── */
@@ -258,14 +285,8 @@
   gap: 14px;
 }
 
-/* ── Bottom section: save/share row + start inline ── */
+/* ── Bottom section: save / share ── */
 .ep-info__bottom {
-  display: grid;
-  gap: 12px;
-  justify-items: center;
-}
-
-.ep-info__bottom-row {
   display: flex;
   gap: 10px;
   justify-content: center;
@@ -281,30 +302,7 @@
   font-size: 0.88rem;
 }
 
-/* In-flow Start Route button (at the very bottom of the page) */
-.ep-info__start-inline {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 50px;
-  padding: 0 32px;
-  border: 1.5px solid rgba(31, 138, 112, 0.36);
-  border-radius: var(--radius-pill);
-  background: linear-gradient(180deg, var(--color-brand) 0%, var(--color-brand-strong) 100%);
-  color: #ffffff;
-  font-size: 1rem;
-  font-weight: 900;
-  box-shadow: 0 10px 28px rgba(31, 138, 112, 0.28);
-  transition: transform 0.14s ease, box-shadow 0.14s ease;
-}
-
-.ep-info__start-inline:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 14px 32px rgba(31, 138, 112, 0.34);
-}
-
-/* ── Floating fixed CTA (transparent bar, glass button) ── */
+/* ── Floating fixed CTA ── */
 .ep-info__cta {
   position: fixed;
   bottom: 0;
@@ -315,11 +313,9 @@
   justify-content: center;
   padding: 12px 20px;
   padding-bottom: max(20px, env(safe-area-inset-bottom, 20px));
-  /* No solid background — transparent */
   pointer-events: none;
 }
 
-/* Glass floating button */
 .ep-info__start-btn {
   display: inline-flex;
   align-items: center;
@@ -388,7 +384,6 @@
 .ep-stop-card__cover-placeholder {
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, #eef1f7 0%, #dde3ed 100%);
 }
 
 .ep-stop-card__num {
@@ -401,12 +396,12 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: linear-gradient(180deg, #2b5c83 0%, #1f2533 100%);
+  background: linear-gradient(135deg, #1a7060 0%, #1f8a70 55%, #8cc840 100%);
   border: 2px solid rgba(255, 255, 255, 0.9);
   color: #ffffff;
   font-size: 0.72rem;
   font-weight: 900;
-  box-shadow: 0 4px 10px rgba(31, 37, 51, 0.26);
+  box-shadow: 0 4px 12px rgba(31, 138, 112, 0.32);
 }
 
 .ep-stop-card__cat {
@@ -634,9 +629,12 @@ body.app-body--excursion-nav { overflow: hidden; }
   scrollbar-color: var(--color-brand) transparent;
 }
 
-.ep-nav__body::-webkit-scrollbar { width: 3px; }
+.ep-nav__body::-webkit-scrollbar { width: 4px; }
 .ep-nav__body::-webkit-scrollbar-track { background: transparent; }
-.ep-nav__body::-webkit-scrollbar-thumb { background: var(--color-brand); border-radius: 3px; }
+.ep-nav__body::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #ffdd2d 0%, #1f8a70 100%);
+  border-radius: 4px;
+}
 
 .ep-nav__nav-row {
   display: grid;
@@ -710,7 +708,17 @@ body.app-body--excursion-nav { overflow: hidden; }
   background: var(--color-bg-soft);
 }
 
-.ep-nav__stop-img img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ep-nav__stop-img img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ep-nav__stop-img-fallback {
+  width: 100%;
+  height: 100%;
+}
 
 .ep-nav__stop-cat {
   position: absolute;
@@ -935,19 +943,18 @@ body.app-body--excursion-nav { overflow: hidden; }
    Responsive
    ══════════════════════════════════════════════════════════════ */
 
-/* ≤380px — very small phones: tighten stats even more */
+/* ≤380px — very small phones: tighten stats */
 @media (max-width: 380px) {
   .ep-info__stat { padding: 12px 8px 10px; }
   .ep-info__stat-icon { font-size: 1.2rem; }
   .ep-info__title { font-size: 1.35rem; }
 }
 
-/* ≥480px — round the cover edges */
+/* ≥480px — round the cover, 4-col stats */
 @media (min-width: 480px) {
   .ep-info__cover-frame { margin: 0; }
   .ep-info__cover { border-radius: 20px; }
   .ep-info__title { font-size: 1.7rem; }
-  /* 4-col stats */
   .ep-info__stats { grid-template-columns: repeat(4, 1fr); }
 }
 
@@ -956,112 +963,62 @@ body.app-body--excursion-nav { overflow: hidden; }
   .ep-info__stops-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-/* ≥640px — 2-column hero layout, compact cover */
-@media (min-width: 640px) {
+/* ≥600px — 2-column hero: cover left, content right */
+@media (min-width: 600px) {
   .ep-info { gap: 32px; }
 
-  /* Side-by-side: cover on left, details on right */
   .ep-info__hero {
-    grid-template-columns: clamp(220px, 36%, 320px) 1fr;
-    column-gap: 28px;
-    row-gap: 14px;
-    align-items: start;
+    grid-template-columns: 220px 1fr;
+    grid-template-areas:
+      "cover body"
+      "cover stats-meta"
+      "desc  desc"
+      "geo   geo";
+    column-gap: 24px;
+    row-gap: 12px;
   }
 
-  /* Cover frame spans all rows in its column */
   .ep-info__cover-frame {
-    grid-column: 1;
-    grid-row: 1 / -1;
+    grid-area: cover;
     margin: 0;
-    position: relative;
     align-self: stretch;
   }
 
-  /* On desktop, cover drops 16:9 ratio and fills the frame height */
   .ep-info__cover {
     aspect-ratio: unset;
     height: 100%;
-    min-height: 200px;
+    min-height: 180px;
     border-radius: 18px;
   }
 
-  /* All hero children go to the right column */
-  .ep-info__hero-body,
-  .ep-info__stats,
-  .ep-info__chips,
-  .ep-info__desc,
-  .ep-info__geo-error { grid-column: 2; }
+  .ep-info__hero-body   { grid-area: body;       align-self: end; }
+  .ep-info__stats-meta  { grid-area: stats-meta; }
+  .ep-info__desc        { grid-area: desc; }
+  .ep-info__geo-error   { grid-area: geo; }
 
-  /* Tighter stats on desktop sidebar */
+  .ep-info__title { font-size: 1.75rem; }
+  .ep-info__hero-top { align-items: center; }
+  .ep-info__tagline { max-width: 48ch; }
+
+  /* 2×2 stats compact in the sidebar */
   .ep-info__stats {
     grid-template-columns: repeat(2, 1fr);
     gap: 8px;
+    max-width: 260px;
   }
 
-  .ep-info__stat { padding: 14px 10px 12px; }
-  .ep-info__stat-icon { font-size: 1.25rem; }
-
-  .ep-info__title { font-size: 1.75rem; }
-
-  .ep-info__cover { border-radius: 18px; }
-
-  /* Cover side decorations — geometric crystal stem */
-  .ep-info__cover-frame::before,
-  .ep-info__cover-frame::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    width: clamp(56px, 10vw, 100px);
-    height: 88%;
-    background-image: var(--decor-excursion-stem);
-    background-size: 100% 100%;
-    background-repeat: no-repeat;
-    pointer-events: none;
-    opacity: 0.52;
-    z-index: 0;
+  .ep-info__stat {
+    min-height: 72px;
+    justify-content: center;
+    padding: 10px 8px;
   }
 
-  /* Left decoration: stem mirrored */
-  .ep-info__cover-frame::before {
-    right: calc(100% + 10px);
-    transform: translateY(-50%) scaleX(-1);
-  }
-
-  /* Right decoration: stem normal */
-  .ep-info__cover-frame::after {
-    left: calc(100% + 10px);
-    transform: translateY(-50%);
-  }
-
-  /* Theme color variations for cover decorations */
-  .ep-info__cover-frame[data-theme="walk"]::before,
-  .ep-info__cover-frame[data-theme="walk"]::after {
-    filter: hue-rotate(0deg) saturate(1.1);
-  }
-
-  .ep-info__cover-frame[data-theme="food"]::before,
-  .ep-info__cover-frame[data-theme="food"]::after {
-    filter: hue-rotate(52deg) saturate(1.2) brightness(1.08);
-  }
-
-  .ep-info__cover-frame[data-theme="nature"]::before,
-  .ep-info__cover-frame[data-theme="nature"]::after {
-    filter: hue-rotate(118deg) saturate(1.1);
-  }
-
-  .ep-info__cover-frame[data-theme="fun"]::before,
-  .ep-info__cover-frame[data-theme="fun"]::after {
-    filter: hue-rotate(252deg) saturate(1.3);
-  }
-
-  .ep-info__cover-frame[data-theme="mixed"]::before,
-  .ep-info__cover-frame[data-theme="mixed"]::after {
-    filter: hue-rotate(172deg) saturate(0.95);
-  }
+  .ep-info__stat-icon  { font-size: 1.05rem; }
+  .ep-info__stat-value { font-size: 0.84rem; }
+  .ep-info__route-meta-item { min-height: 38px; padding: 7px 11px; }
 }
 
-/* ≥768px — nav sheet, more room for stats */
+/* ≥768px — nav sheet inset, complete actions 2-col */
 @media (min-width: 768px) {
   .ep-nav__sheet { left: 20px; right: 20px; border-radius: 28px 28px 0 0; }
   .ep-nav__back { left: calc(50% - 100px); }
@@ -1079,22 +1036,43 @@ body.app-body--excursion-nav { overflow: hidden; }
   .ep-complete__actions { grid-template-columns: 1fr 1fr; }
 }
 
-/* ≥860px — 3-col stop cards, wider cover side deco */
+/* ≥860px — wider cover column, stats+meta inline, desc in right column */
 @media (min-width: 860px) {
-  .ep-info__stops-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-
   .ep-info__hero {
-    grid-template-columns: clamp(260px, 38%, 360px) 1fr;
+    grid-template-columns: clamp(260px, 34%, 340px) 1fr;
+    grid-template-areas:
+      "cover body"
+      "cover stats-meta"
+      "cover desc"
+      "geo   geo";
     column-gap: 36px;
   }
 
-  /* 4-col stats back on wide desktop sidebar */
-  .ep-info__stats {
-    grid-template-columns: repeat(2, 1fr);
+  .ep-info__desc { grid-area: desc; }
+
+  .ep-info__stats-meta {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
   }
+
+  .ep-info__stats {
+    grid-template-columns: repeat(4, minmax(0, 80px));
+    gap: 6px;
+    flex-shrink: 0;
+    max-width: none;
+  }
+
+  .ep-info__stops-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
-/* ≥1100px — page background decoration (large screens only) */
+/* ≥1024px — nav sheet wider */
+@media (min-width: 1024px) {
+  .ep-nav__sheet { left: 28px; right: 28px; }
+}
+
+/* ≥1100px — decorative stems at the far page edges */
 @media (min-width: 1100px) {
   .ep-info::before,
   .ep-info::after {
@@ -1111,27 +1089,14 @@ body.app-body--excursion-nav { overflow: hidden; }
     z-index: 0;
   }
 
-  /* Left edge, outside the content container */
   .ep-info::before {
     right: calc(100% + 20px);
     transform: scaleX(-1);
   }
 
-  /* Right edge, outside the content container */
   .ep-info::after {
     left: calc(100% + 20px);
   }
-
-  .ep-info__cover-frame::before,
-  .ep-info__cover-frame::after {
-    width: clamp(70px, 10vw, 120px);
-    opacity: 0.58;
-  }
-}
-
-/* ≥1024px — nav sheet wider */
-@media (min-width: 1024px) {
-  .ep-nav__sheet { left: 28px; right: 28px; }
 }
 
 /* ≥1440px — ultra-wide nav sheet constraint */
@@ -1150,7 +1115,6 @@ body.app-body--excursion-nav { overflow: hidden; }
   .ep-nav__back,
   .ep-nav__locate,
   .ep-info__start-btn,
-  .ep-info__start-inline,
   .ep-complete__star {
     animation: none;
     transition: none;

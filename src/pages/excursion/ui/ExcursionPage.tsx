@@ -9,7 +9,7 @@ import {
 import { Link, useParams } from 'react-router-dom'
 
 import { useRouteBySlug } from '@/entities/excursion/model/useRouteBySlug'
-import type { Excursion, GeoPoint, RouteStop } from '@/entities/excursion/model/types'
+import type { Excursion, GeoPoint, PointCategory, RouteStop } from '@/entities/excursion/model/types'
 import { formatMeters, getDistanceMetersBetween } from '@/features/route-map/lib/route-geometry'
 import { useUserGeolocation } from '@/features/route-map/model/useUserGeolocation'
 import { RouteMap } from '@/features/route-map/ui/RouteMap'
@@ -133,7 +133,6 @@ export function ExcursionPage() {
       onSave={() => toggleSavedRoute(excursion)}
       onShare={() => void shareRoute(excursion)}
       onStart={() => { setCurrentStopIndex(0); setPhase('navigation') }}
-      userPosition={userPosition}
     />
   )
 }
@@ -166,6 +165,34 @@ function getThemeFallback(theme: Excursion['theme']): React.CSSProperties {
   return map[theme] ?? { background: 'linear-gradient(135deg, #2a3a5a 0%, #3d5a7a 50%, #5a7a9a 100%)' }
 }
 
+// ── Stop category fallback ───────────────────────────────────────────────────
+
+function getStopFallbackStyle(category: PointCategory): React.CSSProperties {
+  const map: Record<PointCategory, React.CSSProperties> = {
+    museum: {
+      background:
+        'radial-gradient(circle at 72% 28%, rgba(196,181,232,0.54) 0%, transparent 44%), radial-gradient(circle at 22% 70%, rgba(100,72,160,0.42) 0%, transparent 38%), linear-gradient(135deg, #2c1d54 0%, #5a3c96 45%, #9a78d4 80%, #c8b8f0 100%)',
+    },
+    food: {
+      background:
+        'radial-gradient(circle at 74% 22%, rgba(240,195,120,0.54) 0%, transparent 44%), radial-gradient(circle at 22% 72%, rgba(160,72,24,0.42) 0%, transparent 38%), linear-gradient(135deg, #5c2408 0%, #a03c14 45%, #d46c38 80%, #f0b870 100%)',
+    },
+    park: {
+      background:
+        'radial-gradient(circle at 66% 22%, rgba(108,184,112,0.54) 0%, transparent 44%), radial-gradient(circle at 22% 74%, rgba(20,88,52,0.42) 0%, transparent 40%), linear-gradient(135deg, #0b2e1c 0%, #165c38 45%, #2e9058 80%, #72bc7a 100%)',
+    },
+    entertainment: {
+      background:
+        'radial-gradient(circle at 72% 24%, rgba(228,130,220,0.54) 0%, transparent 42%), radial-gradient(circle at 24% 72%, rgba(120,28,168,0.42) 0%, transparent 38%), linear-gradient(135deg, #420960 0%, #8024b8 45%, #c050e0 80%, #e896d8 100%)',
+    },
+    landmark: {
+      background:
+        'radial-gradient(circle at 70% 22%, rgba(110,196,220,0.54) 0%, transparent 44%), radial-gradient(circle at 24% 72%, rgba(28,88,148,0.42) 0%, transparent 40%), linear-gradient(135deg, #112840 0%, #1e5480 45%, #3a8cb8 80%, #6ec4dc 100%)',
+    },
+  }
+  return map[category] ?? { background: 'linear-gradient(135deg, #2a3a5a 0%, #4a6a8a 100%)' }
+}
+
 // ── Phase 1 — Info screen ────────────────────────────────────────────────────
 
 interface InfoPhaseProps {
@@ -175,14 +202,9 @@ interface InfoPhaseProps {
   onSave: () => void
   onShare: () => void
   onStart: () => void
-  userPosition: GeoPoint | null | undefined
 }
 
-function InfoPhase({ excursion, geolocationError, isSaved, onSave, onShare, onStart, userPosition }: InfoPhaseProps) {
-  const distanceToStart = userPosition
-    ? getDistanceMetersBetween(userPosition, excursion.stops[0].coordinates)
-    : null
-
+function InfoPhase({ excursion, geolocationError, isSaved, onSave, onShare, onStart }: InfoPhaseProps) {
   return (
     <div className="ep-info">
 
@@ -196,6 +218,17 @@ function InfoPhase({ excursion, geolocationError, isSaved, onSave, onShare, onSt
 
       {/* ── Hero ── */}
       <div className="ep-info__hero">
+
+        {/* Title/tagline first in DOM → appears above image on mobile */}
+        <div className="ep-info__hero-body">
+          <div className="ep-info__hero-top">
+            <h1 className="ep-info__title">{excursion.title}</h1>
+            <span className="ep-info__difficulty">{formatDifficulty(excursion.difficulty)}</span>
+          </div>
+          <p className="ep-info__tagline">{excursion.tagline}</p>
+        </div>
+
+        {/* Cover image */}
         <div className="ep-info__cover-frame" data-theme={excursion.theme}>
           {excursion.coverImageUrl ? (
             <div className="ep-info__cover">
@@ -209,43 +242,44 @@ function InfoPhase({ excursion, geolocationError, isSaved, onSave, onShare, onSt
           )}
         </div>
 
-        <div className="ep-info__hero-body">
-          <div className="ep-info__hero-top">
-            <h1 className="ep-info__title">{excursion.title}</h1>
-            <span className="ep-info__difficulty">{formatDifficulty(excursion.difficulty)}</span>
+        <div className="ep-info__stats-meta">
+          <div className="ep-info__stats">
+            <div className="ep-info__stat">
+              <span className="ep-info__stat-icon" aria-hidden="true">⏱</span>
+              <span className="ep-info__stat-value">{formatDuration(excursion.durationMinutes)}</span>
+              <span className="ep-info__stat-label">Время</span>
+            </div>
+            <div className="ep-info__stat">
+              <span className="ep-info__stat-icon" aria-hidden="true">📍</span>
+              <span className="ep-info__stat-value">{formatStopCount(excursion.stops.length)}</span>
+              <span className="ep-info__stat-label">Точки</span>
+            </div>
+            <div className="ep-info__stat">
+              <span className="ep-info__stat-icon" aria-hidden="true">🚶</span>
+              <span className="ep-info__stat-value">{formatDistance(excursion.distanceKm)}</span>
+              <span className="ep-info__stat-label">Длина</span>
+            </div>
+            <div className="ep-info__stat">
+              <span className="ep-info__stat-icon" aria-hidden="true">👥</span>
+              <span className="ep-info__stat-value">{excursion.audienceLabel}</span>
+              <span className="ep-info__stat-label">Формат</span>
+            </div>
           </div>
-          <p className="ep-info__tagline">{excursion.tagline}</p>
-        </div>
 
-        <div className="ep-info__stats">
-          <div className="ep-info__stat">
-            <span className="ep-info__stat-icon" aria-hidden="true">⏱</span>
-            <span className="ep-info__stat-value">{formatDuration(excursion.durationMinutes)}</span>
-            <span className="ep-info__stat-label">Время</span>
+          <div className="ep-info__route-meta" aria-label="Детали маршрута">
+            <span className="ep-info__route-meta-item">
+              <strong>Район</strong>
+              {excursion.district}
+            </span>
+            <span className="ep-info__route-meta-item">
+              <strong>Тема</strong>
+              {formatTheme(excursion.theme)}
+            </span>
+            <span className="ep-info__route-meta-item">
+              <strong>Сложность</strong>
+              {formatDifficulty(excursion.difficulty)}
+            </span>
           </div>
-          <div className="ep-info__stat">
-            <span className="ep-info__stat-icon" aria-hidden="true">📍</span>
-            <span className="ep-info__stat-value">{formatStopCount(excursion.stops.length)}</span>
-            <span className="ep-info__stat-label">Точки</span>
-          </div>
-          <div className="ep-info__stat">
-            <span className="ep-info__stat-icon" aria-hidden="true">🚶</span>
-            <span className="ep-info__stat-value">{formatDistance(excursion.distanceKm)}</span>
-            <span className="ep-info__stat-label">Длина</span>
-          </div>
-          <div className="ep-info__stat">
-            <span className="ep-info__stat-icon" aria-hidden="true">👥</span>
-            <span className="ep-info__stat-value">{excursion.audienceLabel}</span>
-            <span className="ep-info__stat-label">Формат</span>
-          </div>
-        </div>
-
-        <div className="ep-info__chips">
-          <span className="chip chip--accent">▶ {excursion.startLabel}</span>
-          <span className="chip">⏹ {excursion.finishLabel}</span>
-          {distanceToStart !== null ? (
-            <span className="chip">~{formatMeters(distanceToStart)} до старта</span>
-          ) : null}
         </div>
 
         <p className="ep-info__desc">{excursion.description}</p>
@@ -266,50 +300,42 @@ function InfoPhase({ excursion, geolocationError, isSaved, onSave, onShare, onSt
         </div>
       </div>
 
-      {/* ── Bottom: save / share / start ── */}
+      {/* ── Bottom: save / share ── */}
       <div className="ep-info__bottom">
-        <div className="ep-info__bottom-row">
-          <button
-            aria-pressed={isSaved}
-            className={`button ${isSaved ? 'button--primary' : 'button--secondary'} ep-info__side-btn`}
-            onClick={onSave}
-            type="button"
-          >
-            {isSaved ? (
-              <>
-                <svg aria-hidden="true" fill="currentColor" height="15" viewBox="0 0 24 24" width="15">
-                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-                </svg>
-                Сохранено
-              </>
-            ) : (
-              <>
-                <svg aria-hidden="true" fill="none" height="15" viewBox="0 0 24 24" width="15">
-                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-                </svg>
-                Сохранить
-              </>
-            )}
-          </button>
-          <button className="button button--ghost ep-info__side-btn" onClick={onShare} type="button">
-            <svg aria-hidden="true" fill="none" height="15" viewBox="0 0 24 24" width="15">
-              <circle cx="18" cy="5" r="3" stroke="currentColor" strokeWidth="2" />
-              <circle cx="6" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
-              <circle cx="18" cy="19" r="3" stroke="currentColor" strokeWidth="2" />
-              <path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98" stroke="currentColor" strokeWidth="2" />
-            </svg>
-            Поделиться
-          </button>
-        </div>
-        <button className="ep-info__start-inline" onClick={onStart} type="button">
-          Начать маршрут
-          <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16">
-            <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+        <button
+          aria-pressed={isSaved}
+          className={`button ${isSaved ? 'button--primary' : 'button--secondary'} ep-info__side-btn`}
+          onClick={onSave}
+          type="button"
+        >
+          {isSaved ? (
+            <>
+              <svg aria-hidden="true" fill="currentColor" height="15" viewBox="0 0 24 24" width="15">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+              </svg>
+              Сохранено
+            </>
+          ) : (
+            <>
+              <svg aria-hidden="true" fill="none" height="15" viewBox="0 0 24 24" width="15">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+              </svg>
+              Сохранить
+            </>
+          )}
+        </button>
+        <button className="button button--ghost ep-info__side-btn" onClick={onShare} type="button">
+          <svg aria-hidden="true" fill="none" height="15" viewBox="0 0 24 24" width="15">
+            <circle cx="18" cy="5" r="3" stroke="currentColor" strokeWidth="2" />
+            <circle cx="6" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+            <circle cx="18" cy="19" r="3" stroke="currentColor" strokeWidth="2" />
+            <path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98" stroke="currentColor" strokeWidth="2" />
           </svg>
+          Поделиться
         </button>
       </div>
 
-      {/* ── Floating CTA (no background, glass button) ── */}
+      {/* ── Sticky CTA ── */}
       <div className="ep-info__cta">
         <button className="ep-info__start-btn" onClick={onStart} type="button">
           Начать маршрут
@@ -331,7 +357,11 @@ function StopCard({ stop, index }: { stop: RouteStop; index: number }) {
         {stop.imageUrl ? (
           <img alt={stop.title} loading="lazy" referrerPolicy="no-referrer" src={stop.imageUrl} />
         ) : (
-          <div className="ep-stop-card__cover-placeholder" aria-hidden="true" />
+          <div
+            aria-hidden="true"
+            className="ep-stop-card__cover-placeholder"
+            style={getStopFallbackStyle(stop.category)}
+          />
         )}
         <span aria-label={`Точка ${index + 1}`} className="ep-stop-card__num">{index + 1}</span>
         <span className="ep-stop-card__cat">{formatPointCategory(stop.category)}</span>
@@ -669,12 +699,18 @@ function NavigationPhase({
 
           {/* Stop details — visible in full */}
           <div className="ep-nav__stop">
-            {currentStop.imageUrl ? (
-              <div className="ep-nav__stop-img">
+            <div className="ep-nav__stop-img">
+              {currentStop.imageUrl ? (
                 <img alt={currentStop.title} loading="lazy" referrerPolicy="no-referrer" src={currentStop.imageUrl} />
-                <span className="ep-nav__stop-cat">{formatPointCategory(currentStop.category)}</span>
-              </div>
-            ) : null}
+              ) : (
+                <div
+                  aria-hidden="true"
+                  className="ep-nav__stop-img-fallback"
+                  style={getStopFallbackStyle(currentStop.category)}
+                />
+              )}
+              <span className="ep-nav__stop-cat">{formatPointCategory(currentStop.category)}</span>
+            </div>
 
             <div className="ep-nav__stop-header">
               <h2 className="ep-nav__stop-title">{currentStop.title}</h2>
@@ -775,7 +811,6 @@ function CompleteScreen({ excursion, isSaved, onReturnToInfo, onSave, onShare }:
           </div>
         </div>
 
-        {/* Review */}
         <div className="ep-complete__review">
           {reviewSent ? (
             <p className="ep-complete__review-sent">Спасибо за отзыв ✓</p>
