@@ -16,6 +16,9 @@ export interface GeoPoint {
 export interface AudioStory {
   id: string
   hasAudioGuide: boolean
+  audioGuideUrl: string | null
+  audioDuration: number
+  audioLanguage: SupportedLocale
   url: string | null
   durationSeconds: number
   language: SupportedLocale

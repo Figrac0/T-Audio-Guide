@@ -61,11 +61,13 @@
 .rbm-leaflet-popup .leaflet-popup-content-wrapper {
   overflow: hidden;
   padding: 0;
-  border: 1px solid rgba(216, 220, 229, 0.6);
+  border: 1px solid rgba(31, 138, 112, 0.18);
   border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(249, 251, 250, 0.98));
   box-shadow:
     0 12px 36px rgba(15, 23, 42, 0.22),
-    0 2px 8px rgba(15, 23, 42, 0.1);
+    0 2px 8px rgba(15, 23, 42, 0.1),
+    inset 0 0 0 1px rgba(255, 221, 45, 0.14);
 }
 
 .rbm-leaflet-popup .leaflet-popup-content {
@@ -87,42 +89,65 @@
 }
 
 .rbm-leaflet-popup .leaflet-popup-close-button {
-  top: 8px;
-  right: 8px;
+  top: 10px !important;
+  right: 10px !important;
   z-index: 2;
   display: flex;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(216, 220, 229, 0.72);
+  padding: 0 !important;
+  overflow: hidden;
+  border: 1px solid rgba(31, 138, 112, 0.16);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.9);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(236, 249, 243, 0.96));
   backdrop-filter: blur(6px);
-  color: var(--color-text-secondary);
-  font-size: 1.1rem;
+  box-shadow: 0 4px 12px rgba(31, 138, 112, 0.14);
+  color: transparent;
+  font-size: 0;
+  line-height: 0;
+}
+
+.rbm-leaflet-popup .leaflet-popup-close-button::before {
+  content: '×';
+  color: var(--color-brand-strong);
+  font-size: 15px;
+  font-weight: 900;
   line-height: 1;
 }
 
+.rbm-leaflet-popup .leaflet-popup-close-button:hover {
+  border-color: rgba(255, 221, 45, 0.42);
+  background: linear-gradient(180deg, rgba(255, 250, 232, 0.98), rgba(236, 249, 243, 0.98));
+}
+
+.rbm-leaflet-popup .leaflet-popup-close-button:hover::before {
+  color: #19705e;
+}
+
 .rbm-popup {
-  width: 252px;
+  width: 264px;
 }
 
 .rbm-popup__cover {
   overflow: hidden;
   background: var(--color-bg-soft);
+  border-bottom: 1px solid rgba(31, 138, 112, 0.08);
 }
 
 .rbm-popup__cover img {
   display: block;
   width: 100%;
+  aspect-ratio: 16 / 10;
   height: auto;
+  object-fit: cover;
 }
 
 .rbm-popup__body {
   display: grid;
-  gap: 4px;
-  padding: 8px 11px 10px;
+  gap: 6px;
+  padding: 12px 12px 12px;
 }
 
 .rbm-popup__cat {

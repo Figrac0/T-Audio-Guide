@@ -345,6 +345,10 @@ function createRouteStopFromPoint(point: NearbyPoint, order: number): RouteStop 
 
 function createDraftAudio(point: NearbyPoint): AudioStory {
   return {
+    hasAudioGuide: false,
+    audioGuideUrl: null,
+    audioDuration: 90,
+    audioLanguage: 'ru',
     durationSeconds: 90,
     id: `${point.id}-draft-audio`,
     language: 'ru',

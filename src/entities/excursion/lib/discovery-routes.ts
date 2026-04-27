@@ -375,6 +375,10 @@ function createAudioStory(
 ): AudioStory {
     return {
         id: `${point.id}-audio`,
+        hasAudioGuide: false,
+        audioGuideUrl: null,
+        audioDuration: 95,
+        audioLanguage: locale,
         url: null,
         durationSeconds: 95,
         language: locale,

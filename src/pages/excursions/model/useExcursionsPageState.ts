@@ -301,6 +301,9 @@ export function useExcursionsPageState() {
       return
     }
     if (result.route) {
+      setExpandedStopId(null)
+      setSelectedPointId('')
+      setNotice(null)
       clearDraftRoute()
       navigate(appRoutes.excursion(result.route.slug))
     }
@@ -309,6 +312,7 @@ export function useExcursionsPageState() {
   const handleClearRoute = useCallback(() => {
     clearDraftRoute()
     setExpandedStopId(null)
+    setSelectedPointId('')
     setNotice(null)
   }, [clearDraftRoute])
 

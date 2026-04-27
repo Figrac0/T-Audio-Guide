@@ -8,6 +8,12 @@ import {
 } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
+import {
+  getAudioGuideDuration,
+  getAudioGuideLanguage,
+  getAudioGuideUrl,
+  hasAudioGuideAvailable,
+} from '@/entities/excursion/lib/audio-guide'
 import { useRouteBySlug } from '@/entities/excursion/model/useRouteBySlug'
 import type { Excursion, GeoPoint, PointCategory, RouteStop } from '@/entities/excursion/model/types'
 import { formatMeters, getDistanceMetersBetween } from '@/features/route-map/lib/route-geometry'
@@ -338,6 +344,8 @@ function InfoPhase({ excursion, geolocationError, isSaved, onSave, onShare, onSt
 // ── Stop card ─────────────────────────────────────────────────────────────────
 
 function StopCard({ stop, index }: { stop: RouteStop; index: number }) {
+  const hasAudio = hasAudioGuideAvailable(stop.audio)
+
   return (
     <article className="ep-stop-card">
       <div className="ep-stop-card__cover">
@@ -376,9 +384,9 @@ function StopCard({ stop, index }: { stop: RouteStop; index: number }) {
         <div className="ep-stop-card__audio">
           <span aria-hidden="true" className="ep-stop-card__audio-icon">🎧</span>
           <span className="ep-stop-card__audio-text">
-            {stop.audio.transcriptPreview || stop.audio.url
-              ? 'Аудиогид для этой точки доступен'
-              : 'Аудиогид для этой точки пока недоступен'}
+            {hasAudio
+              ? 'Для этой точки доступно аудиосопровождение'
+              : 'Сейчас для этой точки доступно только текстовое описание'}
           </span>
         </div>
       </div>
@@ -403,6 +411,9 @@ function NavigationPhase({
 }: NavigationPhaseProps) {
   const currentStop = excursion.stops[currentStopIndex] ?? excursion.stops[0]
   const isLastStop = currentStopIndex >= excursion.stops.length - 1
+  const currentAudio = currentStop.audio
+  const audioGuideUrl = getAudioGuideUrl(currentAudio)
+  const audioGuideAvailable = hasAudioGuideAvailable(currentAudio)
 
   const [sheetState, setSheetState] = useState<SheetState>('closed')
   const sheetStateRef = useRef<SheetState>('closed')
@@ -725,18 +736,18 @@ function NavigationPhase({
                 <h3 className="ep-nav__audio-title">Аудиогид</h3>
                 <div className="ep-nav__audio-chips">
                   <span className="ep-nav__audio-chip">
-                    {formatDuration(Math.ceil(currentStop.audio.durationSeconds / 60))}
+                    {formatDuration(Math.ceil(getAudioGuideDuration(currentAudio) / 60))}
                   </span>
                   <span className="ep-nav__audio-chip">
-                    {formatLocaleLabel(currentStop.audio.language)}
+                    {formatLocaleLabel(getAudioGuideLanguage(currentAudio))}
                   </span>
                 </div>
               </div>
-              <p className="ep-nav__audio-preview">{currentStop.audio.transcriptPreview}</p>
+              <p className="ep-nav__audio-preview">{currentAudio.transcriptPreview}</p>
               <div className="ep-nav__audio-actions">
                 <button
                   className="ep-nav__audio-play-btn"
-                  disabled={!currentStop.audio.hasAudioGuide || !currentStop.audio.url}
+                  disabled={!audioGuideAvailable}
                   type="button"
                 >
                   <svg aria-hidden="true" fill="currentColor" height="14" viewBox="0 0 24 24" width="14">
@@ -744,10 +755,10 @@ function NavigationPhase({
                   </svg>
                   Прослушать
                 </button>
-                {currentStop.audio.url ? (
-                  <audio controls preload="metadata" src={currentStop.audio.url} style={{ width: '100%' }} />
+                {audioGuideAvailable && audioGuideUrl ? (
+                  <audio controls preload="metadata" src={audioGuideUrl} style={{ width: '100%' }} />
                 ) : (
-                  <p className="ep-nav__audio-placeholder">Доступно текстовое описание точки.</p>
+                  <p className="ep-nav__audio-placeholder">Сейчас для этой точки доступно только текстовое описание.</p>
                 )}
               </div>
             </div>
@@ -790,7 +801,7 @@ function NavigationPhase({
                   </button>
                 )}
               </div>
-              <button className="button button--danger" onClick={onBack} type="button">
+              <button className="button button--danger ep-nav__back-btn" onClick={onBack} type="button">
                 Вернуться
               </button>
             </div>
