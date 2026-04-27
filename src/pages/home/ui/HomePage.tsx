@@ -22,7 +22,9 @@ import type { DiscoveryCategoryOption } from "@/features/route-map/ui/DiscoveryM
 import { DiscoveryMap } from "@/features/route-map/ui/DiscoveryMap";
 import { useAuth } from "@/app/providers/useAuth";
 import { useUserRoutes } from "@/features/user-routes/model/useUserRoutes";
+import { appMapConfig } from "@/shared/config/map";
 import { appRoutes } from "@/shared/config/routes";
+import { clampDiscoveryRadius } from "@/shared/lib/discovery-radius";
 import {
     detectSupportedLocale,
     getStoredDiscoveryContext,
@@ -125,7 +127,9 @@ export function HomePage() {
         PointCategory | "all"
     >(storedContext.activePointCategory ?? "all");
     const [radiusMeters, setRadiusMeters] = useState<number>(
-        storedContext.radiusMeters ?? 1000,
+        clampDiscoveryRadius(
+            storedContext.radiusMeters ?? appMapConfig.discoveryRadiusMeters,
+        ),
     );
     const [activeRouteTheme, setActiveRouteTheme] = useState<
         ExcursionTheme | "all"

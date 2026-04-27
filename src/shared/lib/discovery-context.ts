@@ -4,6 +4,7 @@
   SupportedLocale,
 } from '@/entities/excursion/model/types'
 import { appMapConfig } from '@/shared/config/map'
+import { clampDiscoveryRadius } from '@/shared/lib/discovery-radius'
 
 export interface DiscoveryContext {
   activePointCategory: PointCategory | 'all'
@@ -49,7 +50,7 @@ export function getDefaultDiscoveryContext(): DiscoveryContext {
     center: appMapConfig.defaultCenter,
     locale: detectSupportedLocale(browserLocale),
     browserLocale,
-    radiusMeters: 1000,
+    radiusMeters: appMapConfig.discoveryRadiusMeters,
     updatedAt: new Date().toISOString(),
   }
 }
@@ -79,7 +80,7 @@ export function getStoredDiscoveryContext(): DiscoveryContext {
       browserLocale: parsedValue.browserLocale ?? defaultContext.browserLocale,
       radiusMeters:
         typeof parsedValue.radiusMeters === 'number'
-          ? parsedValue.radiusMeters
+          ? clampDiscoveryRadius(parsedValue.radiusMeters)
           : defaultContext.radiusMeters,
       updatedAt: parsedValue.updatedAt ?? defaultContext.updatedAt,
     }

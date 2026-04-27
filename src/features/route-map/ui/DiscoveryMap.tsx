@@ -28,11 +28,14 @@ import {
   createUserIcon,
   getPointCategoryIcon,
 } from '@/features/route-map/lib/leaflet-map'
+import { routeMapPopupClassName } from '@/features/route-map/lib/popup-skin'
 import { appMapConfig } from '@/shared/config/map'
+import { getDiscoveryRadiusForZoom } from '@/shared/lib/discovery-radius'
 import { appRoutes } from '@/shared/config/routes'
 import { buildGoogleMapsUrl } from '@/shared/lib/maps'
 import './DiscoveryMap.css'
 import '@/features/route-map/ui/map-marker-skin.css'
+import '@/features/route-map/ui/leaflet-popup-close.css'
 
 export interface DiscoveryCategoryOption {
   id: PointCategory | 'all'
@@ -265,12 +268,7 @@ export function DiscoveryMap({
       map.on('zoomend', () => {
         if (zoomDebounceRef.current !== null) clearTimeout(zoomDebounceRef.current)
         zoomDebounceRef.current = setTimeout(() => {
-          const bounds = map.getBounds()
-          const center = bounds.getCenter()
-          const east = L.latLng(center.lat, bounds.getEast())
-          const halfWidthMeters = center.distanceTo(east)
-          const clamped = Math.round(Math.min(5000, Math.max(1000, halfWidthMeters)))
-          onChangeRadiusRef.current(clamped)
+          onChangeRadiusRef.current(getDiscoveryRadiusForZoom(map.getZoom()))
         }, 350)
       })
 
@@ -563,6 +561,7 @@ export function DiscoveryMap({
           }),
           {
             autoPan: true,
+            className: routeMapPopupClassName,
             keepInView: true,
           },
         )

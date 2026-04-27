@@ -61,13 +61,13 @@
 .rbm-leaflet-popup .leaflet-popup-content-wrapper {
   overflow: hidden;
   padding: 0;
-  border: 1px solid rgba(31, 138, 112, 0.18);
+  border: 1px solid rgba(108, 170, 78, 0.16);
   border-radius: 22px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(249, 251, 250, 0.98));
   box-shadow:
     0 12px 36px rgba(15, 23, 42, 0.22),
     0 2px 8px rgba(15, 23, 42, 0.1),
-    inset 0 0 0 1px rgba(255, 221, 45, 0.14);
+    inset 0 0 0 1px rgba(255, 221, 45, 0.1);
 }
 
 .rbm-leaflet-popup .leaflet-popup-content {
@@ -86,44 +86,6 @@
 .rbm-leaflet-popup .leaflet-popup-tip {
   background: #fff;
   box-shadow: none;
-}
-
-.rbm-leaflet-popup .leaflet-popup-close-button {
-  top: 10px !important;
-  right: 10px !important;
-  z-index: 2;
-  display: flex;
-  width: 24px;
-  height: 24px;
-  align-items: center;
-  justify-content: center;
-  padding: 0 !important;
-  overflow: hidden;
-  border: 1px solid rgba(31, 138, 112, 0.16);
-  border-radius: 50%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(236, 249, 243, 0.96));
-  backdrop-filter: blur(6px);
-  box-shadow: 0 4px 12px rgba(31, 138, 112, 0.14);
-  color: transparent;
-  font-size: 0;
-  line-height: 0;
-}
-
-.rbm-leaflet-popup .leaflet-popup-close-button::before {
-  content: '×';
-  color: var(--color-brand-strong);
-  font-size: 15px;
-  font-weight: 900;
-  line-height: 1;
-}
-
-.rbm-leaflet-popup .leaflet-popup-close-button:hover {
-  border-color: rgba(255, 221, 45, 0.42);
-  background: linear-gradient(180deg, rgba(255, 250, 232, 0.98), rgba(236, 249, 243, 0.98));
-}
-
-.rbm-leaflet-popup .leaflet-popup-close-button:hover::before {
-  color: #19705e;
 }
 
 .rbm-popup {

@@ -13,15 +13,18 @@ import {
   createSegmentedRoutePolyline,
   createUserIcon,
 } from '@/features/route-map/lib/leaflet-map'
+import { routeMapPopupClassName } from '@/features/route-map/lib/popup-skin'
 import {
   formatMeters,
   getBoundsFromPoints,
   toLngLat,
 } from '@/features/route-map/lib/route-geometry'
 import { appMapConfig } from '@/shared/config/map'
+import { getDiscoveryRadiusForZoom } from '@/shared/lib/discovery-radius'
 import { formatDuration, formatPointCategory } from '@/shared/lib/format'
 import { buildPlacePlaceholderImage } from '@/shared/lib/placeholder-images'
 import '@/features/route-map/ui/map-marker-skin.css'
+import '@/features/route-map/ui/leaflet-popup-close.css'
 import './RouteBuilderMap.css'
 
 export interface RouteBuilderMapHandle {
@@ -111,18 +114,15 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
     markersLayerRef.current = markersLayer
     userLayerRef.current = userLayer
 
-    map.on('zoomend', () => {
-      if (zoomDebounceRef.current !== null) {
-        clearTimeout(zoomDebounceRef.current)
-      }
+      map.on('zoomend', () => {
+        if (zoomDebounceRef.current !== null) {
+          clearTimeout(zoomDebounceRef.current)
+        }
 
-      zoomDebounceRef.current = setTimeout(() => {
-        const bounds = map.getBounds()
-        const center = bounds.getCenter()
-        const half = center.distanceTo(L.latLng(center.lat, bounds.getEast()))
-        onChangeRadiusRef.current(Math.round(Math.min(5000, Math.max(1000, half))))
-      }, 350)
-    })
+        zoomDebounceRef.current = setTimeout(() => {
+          onChangeRadiusRef.current(getDiscoveryRadiusForZoom(map.getZoom()))
+        }, 350)
+      })
 
     return () => {
       if (zoomDebounceRef.current !== null) {
@@ -243,7 +243,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
         )
 
         L.popup({
-          className: 'rbm-leaflet-popup',
+          className: `${routeMapPopupClassName} rbm-leaflet-popup`,
           closeButton: true,
           maxWidth: 320,
           minWidth: 252,

@@ -1,0 +1,61 @@
+.tg-leaflet-popup .leaflet-popup-close-button {
+  top: 10px !important;
+  right: 10px !important;
+  z-index: 2;
+  display: flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 !important;
+  overflow: visible;
+  border: none !important;
+  border-radius: 0;
+  background: transparent !important;
+  backdrop-filter: none;
+  box-shadow: none;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0;
+  text-decoration: none;
+  text-indent: 0;
+  transition:
+    transform 180ms ease,
+    filter 180ms ease,
+    opacity 180ms ease;
+}
+
+.tg-leaflet-popup .leaflet-popup-close-button > span {
+  display: none !important;
+}
+
+.tg-leaflet-popup .leaflet-popup-close-button::before {
+  content: '\00D7';
+  background: linear-gradient(135deg, rgba(255, 221, 45, 0.98), rgba(31, 138, 112, 0.98));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 1px 8px rgba(255, 221, 45, 0.14);
+}
+
+.tg-leaflet-popup .leaflet-popup-close-button:hover {
+  transform: scale(1.06);
+  filter: brightness(1.05);
+  background: transparent !important;
+}
+
+.tg-leaflet-popup .leaflet-popup-close-button:hover::before,
+.tg-leaflet-popup .leaflet-popup-close-button:active::before {
+  background: linear-gradient(135deg, rgba(255, 221, 45, 1), rgba(24, 112, 92, 1));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.tg-leaflet-popup .leaflet-popup-close-button:active {
+  transform: scale(0.96);
+  opacity: 0.82;
+}

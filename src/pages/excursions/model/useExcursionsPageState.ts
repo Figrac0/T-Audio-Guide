@@ -15,7 +15,9 @@ import {
 } from '@/features/route-map/lib/route-geometry'
 import { useUserGeolocation } from '@/features/route-map/model/useUserGeolocation'
 import { useUserRoutes } from '@/features/user-routes/model/useUserRoutes'
+import { appMapConfig } from '@/shared/config/map'
 import { appRoutes } from '@/shared/config/routes'
+import { clampDiscoveryRadius } from '@/shared/lib/discovery-radius'
 import {
   detectSupportedLocale,
   getStoredDiscoveryContext,
@@ -61,7 +63,9 @@ export function useExcursionsPageState() {
   const [locale] = useState<SupportedLocale>(storedContext.locale ?? detectedLocale)
   const [activeTheme, setActiveTheme] = useState<ExcursionTheme | 'all'>('all')
   const [maxDuration, setMaxDuration] = useState<number | null>(null)
-  const [radiusMeters, setRadiusMeters] = useState(storedContext.radiusMeters ?? 1000)
+  const [radiusMeters, setRadiusMeters] = useState(
+    clampDiscoveryRadius(storedContext.radiusMeters ?? appMapConfig.discoveryRadiusMeters),
+  )
   const [selectedPointId, setSelectedPointId] = useState('')
   const [expandedStopId, setExpandedStopId] = useState<string | null>(null)
   const [recenterKey, setRecenterKey] = useState(0)
