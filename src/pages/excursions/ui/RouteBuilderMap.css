@@ -220,8 +220,25 @@
 }
 
 .rbm-popup__btn:disabled {
-  opacity: 0.72;
-  cursor: default;
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.rbm-popup__btn-group {
+  display: grid;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.rbm-popup__btn--audio {
+  border-color: rgba(31, 138, 112, 0.2);
+  background: var(--color-brand-soft);
+  color: var(--color-brand-strong);
+}
+
+.rbm-popup__btn--audio-disabled {
+  background: var(--color-bg-soft);
+  color: var(--color-text-tertiary);
 }
 
 .rbm-popup__btn--primary {

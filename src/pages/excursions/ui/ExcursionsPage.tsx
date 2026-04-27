@@ -52,6 +52,14 @@ function clampSheetTranslate(value: number, maxTranslate: number) {
   return Math.min(maxTranslate, Math.max(DRAG_MIN, value))
 }
 
+function getSheetTranslateY(el: HTMLElement): number {
+  const t = window.getComputedStyle(el).transform
+  if (!t || t === 'none') return 0
+  const m = t.match(/matrix\(([^)]+)\)/)
+  if (!m) return 0
+  return parseFloat(m[1].split(',')[5] ?? '0')
+}
+
 export function ExcursionsPage() {
   const state = useExcursionsPageState()
   const [showAll, setShowAll] = useState(false)
@@ -111,14 +119,22 @@ export function ExcursionsPage() {
     setSheetTranslate(safe)
   }, [])
 
-  const animateSheetPosition = useCallback((nextTranslate: number, duration = 0.32) => {
+  const animateSheetPosition = useCallback((nextTranslate: number, durationMs = 480) => {
     const sheet = sheetRef.current
     if (!sheet) return
     const safe = clampSheetTranslate(nextTranslate, closedTranslateRef.current)
-    sheet.style.transition = `transform ${duration}s cubic-bezier(0.4, 0, 0.2, 1)`
+    const fromY = getSheetTranslateY(sheet)
+    sheet.style.willChange = 'transform'
+    sheet.style.transition = 'none'
+    sheet.style.transform = `translateY(${fromY}px)`
+    void sheet.offsetHeight
+    sheet.style.transition = `transform ${durationMs}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`
     sheet.style.transform = `translateY(${safe}px)`
     sheetTranslateRef.current = safe
     setSheetTranslate(safe)
+    const clear = () => { sheet.style.willChange = '' }
+    sheet.addEventListener('transitionend', clear, { once: true })
+    setTimeout(clear, durationMs + 100)
   }, [])
 
   const snapToClosed = useCallback(() => {
@@ -256,15 +272,20 @@ export function ExcursionsPage() {
     if (!sheet) return
     mapHandleRef.current?.closePopup()
     event.currentTarget.setPointerCapture(event.pointerId)
+    // Catch actual visual position — sheetTranslateRef holds the animation target,
+    // not where the sheet is visually when drag begins mid-animation.
+    const currentT = getSheetTranslateY(sheet)
+    sheetTranslateRef.current = currentT
     dragRef.current = {
       active: true,
       startPointerY: event.clientY,
-      startTranslate: sheetTranslateRef.current,
+      startTranslate: currentT,
       lastPointerY: event.clientY,
       lastTime: Date.now(),
       velocity: 0,
     }
     sheet.style.transition = 'none'
+    sheet.style.transform = `translateY(${currentT}px)`
     sheet.style.willChange = 'transform'
     setIsDragging(true)
   }, [])
@@ -325,11 +346,13 @@ export function ExcursionsPage() {
     if (velocity > 5 && bestIdx < snaps.length - 1) bestIdx++
     else if (velocity < -5 && bestIdx > 0) bestIdx--
 
-    animateSheetPosition(snaps[bestIdx], 0.28)
+    const absV = Math.abs(velocity)
+    const durationMs = absV > 12 ? 300 : absV > 6 ? 400 : 480
+    animateSheetPosition(snaps[bestIdx], durationMs)
 
     const clear = () => { sheet.style.willChange = '' }
     sheet.addEventListener('transitionend', clear, { once: true })
-    setTimeout(clear, 450)
+    setTimeout(clear, 580)
   }, [animateSheetPosition])
 
   const hasMoreExcursions = state.excursions.length > catalogInitial

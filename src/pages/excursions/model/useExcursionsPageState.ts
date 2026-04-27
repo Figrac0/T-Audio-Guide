@@ -301,9 +301,10 @@ export function useExcursionsPageState() {
       return
     }
     if (result.route) {
+      clearDraftRoute()
       navigate(appRoutes.excursion(result.route.slug))
     }
-  }, [navigate, saveDraftRoute])
+  }, [clearDraftRoute, navigate, saveDraftRoute])
 
   const handleClearRoute = useCallback(() => {
     clearDraftRoute()

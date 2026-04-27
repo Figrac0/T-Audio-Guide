@@ -15,6 +15,7 @@ export interface GeoPoint {
 
 export interface AudioStory {
   id: string
+  hasAudioGuide: boolean
   url: string | null
   durationSeconds: number
   language: SupportedLocale
@@ -50,6 +51,7 @@ export interface NearbyPoint {
   distanceMeters: number
   addressLabel?: string
   googleMapsUrl?: string
+  audioGuideUrl: string | null
 }
 
 export interface Excursion {

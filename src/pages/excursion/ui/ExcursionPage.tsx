@@ -42,6 +42,31 @@ function getSnapTranslate(state: SheetState, sheetHeight: number, peekHeight: nu
   return Math.max(DRAG_MIN, sheetHeight - CLOSED_HEIGHT)
 }
 
+// Returns the sheet's current VISUAL translateY (works mid-animation via composited style).
+function getSheetTranslateY(el: HTMLElement): number {
+  const t = window.getComputedStyle(el).transform
+  if (!t || t === 'none') return 0
+  const m = t.match(/matrix\(([^)]+)\)/)
+  if (!m) return 0
+  return parseFloat(m[1].split(',')[5] ?? '0')
+}
+
+// Park sheet at its current visual position (stopping any in-progress animation),
+// force a reflow so the browser commits that state, then start a fresh animation.
+// This prevents jumps when a snap is triggered mid-animation or after a fling.
+function snapSheet(sheet: HTMLElement, toY: number, durationMs: number): void {
+  const fromY = getSheetTranslateY(sheet)
+  sheet.style.willChange = 'transform'
+  sheet.style.transition = 'none'
+  sheet.style.transform = `translateY(${fromY}px)`
+  void sheet.offsetHeight // commit park position before starting new animation
+  sheet.style.transition = `transform ${durationMs}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`
+  sheet.style.transform = `translateY(${toY}px)`
+  const clear = () => { sheet.style.willChange = '' }
+  sheet.addEventListener('transitionend', clear, { once: true })
+  setTimeout(clear, durationMs + 100)
+}
+
 type Phase = 'info' | 'navigation' | 'complete'
 
 // ── Root ─────────────────────────────────────────────────────────────────────
@@ -400,8 +425,7 @@ function NavigationPhase({
     if (!sheet) return
     skipSnapRef.current = true
     setSheetState('closed')
-    sheet.style.transition = 'transform 0.32s cubic-bezier(0.4,0,0.2,1)'
-    sheet.style.transform = `translateY(${sheet.offsetHeight - CLOSED_HEIGHT}px)`
+    snapSheet(sheet, sheet.offsetHeight - CLOSED_HEIGHT, 480)
   }, [])
 
   const snapToPeek = useCallback(() => {
@@ -411,8 +435,7 @@ function NavigationPhase({
     if (bodyRef.current) bodyRef.current.scrollTop = 0
     skipSnapRef.current = true
     setSheetState('peek')
-    sheet.style.transition = 'transform 0.32s cubic-bezier(0.4,0,0.2,1)'
-    sheet.style.transform = `translateY(${peekT}px)`
+    snapSheet(sheet, peekT, 480)
   }, [])
 
   useEffect(() => {
@@ -430,8 +453,7 @@ function NavigationPhase({
     if (!sheet || sheet.offsetHeight === 0) return
     const target = getSnapTranslate(sheetState, sheet.offsetHeight, peekHeightRef.current)
     if (sheetState === 'peek' && bodyRef.current) bodyRef.current.scrollTop = 0
-    sheet.style.transition = 'transform 0.36s cubic-bezier(0.4,0,0.2,1)'
-    sheet.style.transform = `translateY(${target}px)`
+    snapSheet(sheet, target, 480)
   }, [sheetState])
 
   useLayoutEffect(() => {
@@ -480,8 +502,7 @@ function NavigationPhase({
         if (!sheet) return
         skipSnapRef.current = true
         setSheetState('closed')
-        sheet.style.transition = 'transform 0.32s cubic-bezier(0.4,0,0.2,1)'
-        sheet.style.transform = `translateY(${sheet.offsetHeight - CLOSED_HEIGHT}px)`
+        snapSheet(sheet, sheet.offsetHeight - CLOSED_HEIGHT, 480)
       }
     }
     const onTouchEnd = () => { reachedTopAt = -1 }
@@ -499,10 +520,10 @@ function NavigationPhase({
     const sheet = sheetRef.current
     if (!sheet) return
     e.currentTarget.setPointerCapture(e.pointerId)
-    const match = sheet.style.transform.match(/translateY\((-?\d+(?:\.\d+)?)px\)/)
-    const current = match ? parseFloat(match[1]) : getSnapTranslate(sheetState, sheet.offsetHeight, peekHeightRef.current)
-    dragRef.current = { active: true, startPointerY: e.clientY, startTranslate: current, lastPointerY: e.clientY, lastTime: Date.now(), velocity: 0 }
+    const currentT = getSheetTranslateY(sheet)
+    dragRef.current = { active: true, startPointerY: e.clientY, startTranslate: currentT, lastPointerY: e.clientY, lastTime: Date.now(), velocity: 0 }
     sheet.style.transition = 'none'
+    sheet.style.transform = `translateY(${currentT}px)`
     sheet.style.willChange = 'transform'
   }
 
@@ -543,12 +564,17 @@ function NavigationPhase({
     const [nextState, targetT] = snaps[bestIdx]
     skipSnapRef.current = true
     setSheetState(nextState)
-    sheet.style.transition = 'transform 0.32s cubic-bezier(0.4,0,0.2,1)'
-    sheet.style.transform = `translateY(${targetT}px)`
     if (nextState === 'peek' && bodyRef.current) bodyRef.current.scrollTop = 0
+
+    const absV = Math.abs(velocity)
+    const durationMs = absV > 12 ? 300 : absV > 6 ? 400 : 480
+    void sheet.offsetHeight
+    sheet.style.transition = `transform ${durationMs}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`
+    sheet.style.transform = `translateY(${targetT}px)`
+
     const clear = () => { sheet.style.willChange = '' }
     sheet.addEventListener('transitionend', clear, { once: true })
-    setTimeout(clear, 450)
+    setTimeout(clear, 580)
   }
 
   const handlePrevStop = () => { onStopChange(Math.max(0, currentStopIndex - 1)); snapToPeek() }
@@ -707,23 +733,63 @@ function NavigationPhase({
                 </div>
               </div>
               <p className="ep-nav__audio-preview">{currentStop.audio.transcriptPreview}</p>
-              {currentStop.audio.url ? (
-                <audio controls preload="metadata" src={currentStop.audio.url} style={{ width: '100%' }} />
-              ) : (
-                <p className="ep-nav__audio-placeholder">Доступно текстовое описание точки.</p>
-              )}
+              <div className="ep-nav__audio-actions">
+                <button
+                  className="ep-nav__audio-play-btn"
+                  disabled={!currentStop.audio.hasAudioGuide || !currentStop.audio.url}
+                  type="button"
+                >
+                  <svg aria-hidden="true" fill="currentColor" height="14" viewBox="0 0 24 24" width="14">
+                    <polygon points="5,3 19,12 5,21" />
+                  </svg>
+                  Прослушать
+                </button>
+                {currentStop.audio.url ? (
+                  <audio controls preload="metadata" src={currentStop.audio.url} style={{ width: '100%' }} />
+                ) : (
+                  <p className="ep-nav__audio-placeholder">Доступно текстовое описание точки.</p>
+                )}
+              </div>
             </div>
 
             <div className="ep-nav__stop-actions">
-              {isLastStop ? (
-                <button className="button button--primary" onClick={onComplete} type="button">
-                  Завершить маршрут
-                </button>
-              ) : (
-                <button className="button button--primary" onClick={handleNextStop} type="button">
-                  Следующая: {excursion.stops[currentStopIndex + 1]?.title}
-                </button>
-              )}
+              <div className="ep-nav__stop-nav">
+                {currentStopIndex > 0 ? (
+                  <button
+                    className="ep-nav__stop-nav-btn ep-nav__stop-nav-btn--prev"
+                    onClick={handlePrevStop}
+                    type="button"
+                  >
+                    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                      <path d="M15 19l-7-7 7-7" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
+                    </svg>
+                    <span className="ep-nav__stop-nav-label">Предыдущая: {excursion.stops[currentStopIndex - 1]?.title}</span>
+                  </button>
+                ) : null}
+                {isLastStop ? (
+                  <button
+                    className="ep-nav__stop-nav-btn ep-nav__stop-nav-btn--complete"
+                    onClick={onComplete}
+                    type="button"
+                  >
+                    <span className="ep-nav__stop-nav-label">Завершить</span>
+                    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                      <path d="M5 12l5 5L20 7" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
+                    </svg>
+                  </button>
+                ) : (
+                  <button
+                    className="ep-nav__stop-nav-btn ep-nav__stop-nav-btn--next"
+                    onClick={handleNextStop}
+                    type="button"
+                  >
+                    <span className="ep-nav__stop-nav-label">Следующая: {excursion.stops[currentStopIndex + 1]?.title}</span>
+                    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                      <path d="M9 5l7 7-7 7" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
+                    </svg>
+                  </button>
+                )}
+              </div>
               <button className="button button--danger" onClick={onBack} type="button">
                 Вернуться
               </button>

@@ -355,7 +355,11 @@ export function DiscoveryMap({
     return () => {
       controller.abort()
     }
-  }, [guideSignature, guidedPoint, userPosition])
+  // guideSignature encodes guidedPoint.id + userPosition coords — no need to
+  // list guidedPoint/userPosition separately; doing so causes spurious rebuilds
+  // whenever nearbyPoints gets a new array reference after zoom → radius refetch.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guideSignature])
 
   useEffect(() => {
     const controller = new AbortController()

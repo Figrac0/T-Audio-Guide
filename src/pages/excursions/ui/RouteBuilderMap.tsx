@@ -408,7 +408,10 @@ function buildPopupEl(
     body.appendChild(info)
   }
 
-  // Action button
+  // Buttons
+  const btnGroup = document.createElement('div')
+  btnGroup.className = 'rbm-popup__btn-group'
+
   const button = document.createElement('button')
   button.type = 'button'
 
@@ -425,8 +428,21 @@ function buildPopupEl(
     button.textContent = 'Добавить в свой маршрут'
     button.addEventListener('click', onAdd)
   }
+  btnGroup.appendChild(button)
 
-  body.appendChild(button)
+  const audioBtn = document.createElement('button')
+  audioBtn.type = 'button'
+  audioBtn.className = `rbm-popup__btn rbm-popup__btn--audio${point.audioGuideUrl ? '' : ' rbm-popup__btn--audio-disabled'}`
+  audioBtn.disabled = !point.audioGuideUrl
+  audioBtn.textContent = '🎧 Прослушать аудиогид'
+  if (point.audioGuideUrl) {
+    audioBtn.addEventListener('click', () => {
+      // TODO: open audio player when backend provides audioGuideUrl
+    })
+  }
+  btnGroup.appendChild(audioBtn)
+
+  body.appendChild(btnGroup)
   root.appendChild(body)
 
   return root

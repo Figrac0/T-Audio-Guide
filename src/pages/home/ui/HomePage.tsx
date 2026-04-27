@@ -48,6 +48,27 @@ function getSnapTranslate(state: SheetState, sheetHeight: number, peekHeight: nu
     return Math.max(DRAG_MIN, sheetHeight - CLOSED_HEIGHT);
 }
 
+function getSheetTranslateY(el: HTMLElement): number {
+    const t = window.getComputedStyle(el).transform;
+    if (!t || t === "none") return 0;
+    const m = t.match(/matrix\(([^)]+)\)/);
+    if (!m) return 0;
+    return parseFloat(m[1].split(",")[5] ?? "0");
+}
+
+function snapSheet(sheet: HTMLElement, toY: number, durationMs: number): void {
+    const fromY = getSheetTranslateY(sheet);
+    sheet.style.willChange = "transform";
+    sheet.style.transition = "none";
+    sheet.style.transform = `translateY(${fromY}px)`;
+    void sheet.offsetHeight;
+    sheet.style.transition = `transform ${durationMs}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
+    sheet.style.transform = `translateY(${toY}px)`;
+    const clear = () => { sheet.style.willChange = ""; };
+    sheet.addEventListener("transitionend", clear, { once: true });
+    setTimeout(clear, durationMs + 100);
+}
+
 const nearbyCategoryOptions: DiscoveryCategoryOption[] = [
     { id: "all", label: "Все" },
     { id: "museum", label: "Музеи" },
@@ -386,8 +407,7 @@ export function HomePage() {
         if (bodyRef.current) bodyRef.current.scrollTop = 0;
         skipSnapRef.current = true;
         setSheetState("peek");
-        sheet.style.transition = "transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)";
-        sheet.style.transform = `translateY(${peekT}px)`;
+        snapSheet(sheet, peekT, 480);
     }, []);
 
     const snapToClosed = useCallback(() => {
@@ -396,8 +416,7 @@ export function HomePage() {
         const closedT = sheet.offsetHeight - CLOSED_HEIGHT;
         skipSnapRef.current = true;
         setSheetState("closed");
-        sheet.style.transition = "transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)";
-        sheet.style.transform = `translateY(${closedT}px)`;
+        snapSheet(sheet, closedT, 480);
     }, []);
 
     const handleGoToPlace = useCallback(
@@ -444,8 +463,7 @@ export function HomePage() {
         if (!sheet || sheet.offsetHeight === 0) return;
         const target = getSnapTranslate(sheetState, sheet.offsetHeight, peekHeightRef.current);
         if (sheetState === "peek" && bodyRef.current) bodyRef.current.scrollTop = 0;
-        sheet.style.transition = "transform 0.36s cubic-bezier(0.4, 0, 0.2, 1)";
-        sheet.style.transform = `translateY(${target}px)`;
+        snapSheet(sheet, target, 480);
     }, [sheetState]);
 
     useLayoutEffect(() => {
@@ -517,9 +535,7 @@ export function HomePage() {
                 const closedT = sheet.offsetHeight - CLOSED_HEIGHT;
                 skipSnapRef.current = true;
                 setSheetState("closed");
-                sheet.style.transition =
-                    "transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)";
-                sheet.style.transform = `translateY(${closedT}px)`;
+                snapSheet(sheet, closedT, 480);
             }
         };
         const onTouchEnd = () => { reachedTopAt = -1; };
@@ -538,21 +554,19 @@ export function HomePage() {
         const sheet = sheetRef.current;
         if (!sheet) return;
         e.currentTarget.setPointerCapture(e.pointerId);
-        const match = sheet.style.transform.match(
-            /translateY\((-?\d+(?:\.\d+)?)px\)/,
-        );
-        const current = match
-            ? parseFloat(match[1])
-            : getSnapTranslate(sheetState, sheet.offsetHeight, peekHeightRef.current);
+        // Read actual visual position so drag starts from where the sheet IS,
+        // not from the target of any in-progress animation.
+        const currentT = getSheetTranslateY(sheet);
         dragRef.current = {
             active: true,
             startPointerY: e.clientY,
-            startTranslate: current,
+            startTranslate: currentT,
             lastPointerY: e.clientY,
             lastTime: Date.now(),
             velocity: 0,
         };
         sheet.style.transition = "none";
+        sheet.style.transform = `translateY(${currentT}px)`;
         sheet.style.willChange = "transform";
     }
 
@@ -609,13 +623,18 @@ export function HomePage() {
         const [nextState, targetT] = snaps[bestIdx];
         skipSnapRef.current = true;
         setSheetState(nextState);
-        sheet.style.transition = "transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)";
-        sheet.style.transform = `translateY(${targetT}px)`;
         if (nextState === "peek" && bodyRef.current) bodyRef.current.scrollTop = 0;
+
+        // Velocity-proportional duration: fast flings snap quicker
+        const absV = Math.abs(velocity);
+        const durationMs = absV > 12 ? 300 : absV > 6 ? 400 : 480;
+        void sheet.offsetHeight;
+        sheet.style.transition = `transform ${durationMs}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
+        sheet.style.transform = `translateY(${targetT}px)`;
 
         const clearWillChange = () => { sheet.style.willChange = ""; };
         sheet.addEventListener("transitionend", clearWillChange, { once: true });
-        setTimeout(clearWillChange, 450);
+        setTimeout(clearWillChange, 580);
     }
 
     return (

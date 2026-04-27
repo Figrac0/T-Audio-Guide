@@ -673,6 +673,7 @@ function createNearbyPoint(
     rating: template.rating,
     scheduleLabel: localizeText(template.scheduleLabel, locale),
     distanceMeters,
+    audioGuideUrl: null,
   }
 }
 
@@ -760,6 +761,7 @@ function createAudioStory(
 ): AudioStory {
   return {
     id: `${point.id}-audio`,
+    hasAudioGuide: false,
     url: null,
     durationSeconds: 95,
     language: locale,
