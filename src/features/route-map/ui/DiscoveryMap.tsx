@@ -159,6 +159,8 @@ export function DiscoveryMap({
   const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const onChangeRadiusRef = useRef(onChangeRadius)
   const selectedPointIdRef = useRef(selectedPointId)
+  const popupPointIdRef = useRef<string | null>(null)
+  const suppressPopupCloseRef = useRef(false)
   const [mapLoadError, setMapLoadError] = useState<string | null>(null)
   const [openMenu, setOpenMenu] = useState<'category' | 'radius' | null>(null)
   const [guideRoute, setGuideRoute] = useState<{
@@ -263,6 +265,14 @@ export function DiscoveryMap({
       mapRef.current = map
       routeLayerRef.current = routeLayer
       overlayRef.current = overlay
+
+      map.on('popupclose', () => {
+        if (suppressPopupCloseRef.current) {
+          return
+        }
+
+        popupPointIdRef.current = null
+      })
 
       // Dynamic radius: debounced to prevent rapid-fire API calls on every scroll tick
       map.on('zoomend', () => {
@@ -515,8 +525,10 @@ export function DiscoveryMap({
   // Kept separate from the route layer so zoom/radius changes don't thrash polylines.
   useEffect(() => {
     const overlay = overlayRef.current
-    if (!overlay) return
+    const map = mapRef.current
+    if (!overlay || !map) return
 
+    suppressPopupCloseRef.current = true
     overlay.clearLayers()
     markerRefs.current.clear()
 
@@ -568,6 +580,7 @@ export function DiscoveryMap({
         .on('click', () => {
           preservePageScroll()
           selectionSourceRef.current = 'marker'
+          popupPointIdRef.current = point.id
           onSelectPoint(point.id)
           marker.openPopup()
         })
@@ -575,6 +588,26 @@ export function DiscoveryMap({
       marker.addTo(overlay)
       markerRefs.current.set(point.id, marker)
     })
+
+    suppressPopupCloseRef.current = false
+
+    const popupPointId = popupPointIdRef.current
+    if (!popupPointId || popupPointId !== selectedPointIdRef.current) {
+      return
+    }
+
+    const selectedMarker = markerRefs.current.get(popupPointId)
+    if (!selectedMarker) {
+      return
+    }
+
+    const reopenTimeout = window.setTimeout(() => {
+      selectedMarker.openPopup()
+    }, 0)
+
+    return () => {
+      window.clearTimeout(reopenTimeout)
+    }
   }, [draftStops.length, nearbyPoints, onAddPointToDraft, onBuildRoute, onClearDraftRoute, onSelectPoint, routeTargetId, showDirectRouteInPopup, showPopupRouteActions, userPosition, visibleDraftOrderMap, visibleDraftPointIds])
 
   // Animate radius circle smoothly when radiusMeters changes (no full redraw)
@@ -644,6 +677,7 @@ export function DiscoveryMap({
     selectionSourceRef.current = null
 
     if (source === 'marker') {
+      popupPointIdRef.current = point.id
       marker.openPopup()
       return
     }
@@ -655,7 +689,10 @@ export function DiscoveryMap({
       easing: 'ease-in-out',
     })
 
-    const popupTimeout = window.setTimeout(() => marker.openPopup(), 240)
+    const popupTimeout = window.setTimeout(() => {
+      popupPointIdRef.current = point.id
+      marker.openPopup()
+    }, 240)
     return () => window.clearTimeout(popupTimeout)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPointId])
