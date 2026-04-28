@@ -38,8 +38,10 @@ interface RouteBuilderMapProps {
   nearbyPoints: NearbyPoint[]
   onAddPoint: (point: NearbyPoint) => void
   onChangeRadius: (meters: number) => void
+  onPopupClose: () => void
   onRemovePoint: (pointId: string) => void
   onSelectPoint: (id: string) => void
+  onShowDetail: (pointId: string) => void
   radiusMeters: number
   recenterKey: number
   routeState: PlannerRouteState
@@ -56,8 +58,10 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
   nearbyPoints,
   onAddPoint,
   onChangeRadius,
+  onPopupClose,
   onRemovePoint,
   onSelectPoint,
+  onShowDetail,
   radiusMeters,
   recenterKey,
   routeState,
@@ -81,6 +85,8 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
   const onAddPointRef = useRef(onAddPoint)
   const onRemovePointRef = useRef(onRemovePoint)
   const onSelectPointRef = useRef(onSelectPoint)
+  const onPopupCloseRef = useRef(onPopupClose)
+  const onShowDetailRef = useRef(onShowDetail)
   const isDraftFullRef = useRef(isDraftFull)
   const onChangeRadiusRef = useRef(onChangeRadius)
   const radiusMetersRef = useRef(radiusMeters)
@@ -90,10 +96,12 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
     onAddPointRef.current = onAddPoint
     onRemovePointRef.current = onRemovePoint
     onSelectPointRef.current = onSelectPoint
+    onPopupCloseRef.current = onPopupClose
+    onShowDetailRef.current = onShowDetail
     isDraftFullRef.current = isDraftFull
     onChangeRadiusRef.current = onChangeRadius
     radiusMetersRef.current = radiusMeters
-  }, [isDraftFull, onAddPoint, onChangeRadius, onRemovePoint, onSelectPoint, radiusMeters])
+  }, [isDraftFull, onAddPoint, onChangeRadius, onPopupClose, onRemovePoint, onSelectPoint, onShowDetail, radiusMeters])
 
   useEffect(() => {
     selectedPointIdRef.current = selectedPointId
@@ -123,6 +131,8 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
           onChangeRadiusRef.current(getDiscoveryRadiusForZoom(map.getZoom()))
         }, 350)
       })
+
+      map.on('popupclose', () => onPopupCloseRef.current())
 
     return () => {
       if (zoomDebounceRef.current !== null) {
@@ -240,6 +250,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
           isDraftFullRef.current,
           () => { onAddPointRef.current(point); closePopup() },
           () => { onRemovePointRef.current(point.id); closePopup() },
+          () => { closePopup(); onShowDetailRef.current(point.id) },
         )
 
         L.popup({
@@ -317,6 +328,7 @@ function buildPopupEl(
   isDraftFull: boolean,
   onAdd: () => void,
   onRemove: () => void,
+  onShowDetail: () => void,
 ): HTMLElement {
   const placeholder = buildPlacePlaceholderImage(point.category)
 
@@ -429,6 +441,13 @@ function buildPopupEl(
     button.addEventListener('click', onAdd)
   }
   btnGroup.appendChild(button)
+
+  const detailBtn = document.createElement('button')
+  detailBtn.type = 'button'
+  detailBtn.className = 'rbm-popup__btn rbm-popup__btn--detail'
+  detailBtn.textContent = 'Подробнее'
+  detailBtn.addEventListener('click', onShowDetail)
+  btnGroup.appendChild(detailBtn)
 
   const audioBtn = document.createElement('button')
   audioBtn.type = 'button'

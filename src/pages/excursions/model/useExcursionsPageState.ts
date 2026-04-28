@@ -67,6 +67,7 @@ export function useExcursionsPageState() {
     clampDiscoveryRadius(storedContext.radiusMeters ?? appMapConfig.discoveryRadiusMeters),
   )
   const [selectedPointId, setSelectedPointId] = useState('')
+  const [detailPointId, setDetailPointId] = useState<string | null>(null)
   const [expandedStopId, setExpandedStopId] = useState<string | null>(null)
   const [recenterKey, setRecenterKey] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
@@ -261,7 +262,25 @@ export function useExcursionsPageState() {
 
   const handleSelectPoint = useCallback((pointId: string) => {
     setSelectedPointId(pointId)
+    setDetailPointId(null)
   }, [])
+
+  const handleShowDetail = useCallback((pointId: string) => {
+    setDetailPointId(pointId)
+  }, [])
+
+  const handleCloseDetail = useCallback(() => {
+    setDetailPointId(null)
+  }, [])
+
+  const handlePopupClose = useCallback(() => {
+    setDetailPointId(null)
+  }, [])
+
+  const detailPoint = useMemo(
+    () => (detailPointId !== null ? nearbyPoints.find((p) => p.id === detailPointId) ?? null : null),
+    [detailPointId, nearbyPoints],
+  )
 
   const handleAddPoint = useCallback(
     (point: NearbyPoint) => {
@@ -331,17 +350,21 @@ export function useExcursionsPageState() {
   return {
     activeTheme,
     canLoadNearbyPlaces,
+    detailPoint,
     draftStops,
     excursions: filteredExcursions,
     expandedStopId,
     geolocationError,
     handleAddPoint,
     handleClearRoute,
+    handleCloseDetail,
     handleLocateUser,
+    handlePopupClose,
     handleRemovePointFromDraft,
     handleRemoveStop,
     handleSaveRoute,
     handleSelectPoint,
+    handleShowDetail,
     isLoading,
     isPointInDraft,
     maxDuration,

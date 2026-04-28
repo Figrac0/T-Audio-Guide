@@ -152,7 +152,7 @@ body.app-body--home-page {
     overscroll-behavior: contain;
     transform: translateZ(0);
     -webkit-overflow-scrolling: touch;
-    padding-bottom: 80px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     scrollbar-width: thin;
     scrollbar-color: #1f8a70 transparent;
 }
@@ -517,7 +517,7 @@ body.app-body--home-page {
     display: flex;
     gap: 10px;
     overflow-x: auto;
-    padding: 3px 0px 3px;
+    padding: 3px 3px 3px;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
     cursor: grab;
@@ -1003,12 +1003,6 @@ body.app-body--home-page {
     margin-bottom: 16px;
 }
 
-@media (min-width: 380px) {
-    .home-sheet__footer-features {
-        grid-template-columns: 1fr 1fr;
-    }
-}
-
 .home-sheet__footer-feature {
     display: inline-flex;
     align-items: center;
@@ -1022,6 +1016,23 @@ body.app-body--home-page {
     font-size: 0.74rem;
     font-weight: 700;
     white-space: nowrap;
+}
+
+.home-sheet__footer-feature-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: rgba(229, 250, 244, 0.92);
+    box-shadow: inset 0 0 0 1px rgba(31, 138, 112, 0.12);
+    color: var(--color-brand);
+    line-height: 0;
+}
+
+.home-sheet__footer-feature-icon svg {
+    display: block;
 }
 
 .home-sheet__footer-copy {

@@ -249,6 +249,18 @@
   background: rgba(255, 232, 230, 0.98);
 }
 
+.rbm-popup__btn--detail {
+  border-color: rgba(31, 37, 51, 0.14);
+  background: rgba(247, 248, 252, 0.9);
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+}
+
+.rbm-popup__btn--detail:hover {
+  background: rgba(240, 242, 248, 0.98);
+  color: var(--color-text);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rbm__loader::before {
     animation: none;

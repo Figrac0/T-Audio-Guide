@@ -1,12 +1,13 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import type { Excursion, RouteStop } from '@/entities/excursion/model/types'
+import type { Excursion, NearbyPoint, RouteStop } from '@/entities/excursion/model/types'
 import {
   durationOptions,
   themeOptions,
   useExcursionsPageState,
 } from '@/pages/excursions/model/useExcursionsPageState'
+import { formatMeters } from '@/features/route-map/lib/route-geometry'
 import { appRoutes } from '@/shared/config/routes'
 import {
   formatDifficulty,
@@ -16,7 +17,8 @@ import {
   formatStopCount,
   formatTheme,
 } from '@/shared/lib/format'
-import { buildRoutePlaceholderImage } from '@/shared/lib/placeholder-images'
+import { buildPlacePlaceholderImage, buildRoutePlaceholderImage } from '@/shared/lib/placeholder-images'
+import { FooterFeatureIcon } from '@/shared/ui/FooterFeatureIcon'
 import { ResilientImage } from '@/shared/ui/ResilientImage'
 import { RouteBuilderMap, type RouteBuilderMapHandle } from './RouteBuilderMap'
 import './ExcursionsPage.css'
@@ -90,6 +92,8 @@ export function ExcursionsPage() {
   const hasDraftStopsRef = useRef(hasDraftStops)
   const prevHasDraftRef = useRef(false)
   const draftPreviewRef = useRef<HTMLDivElement>(null)
+  const isDetailModeRef = useRef(false)
+  const handleCloseDetailRef = useRef<() => void>(() => {})
   const dragRef = useRef({
     active: false,
     startPointerY: 0,
@@ -139,6 +143,12 @@ export function ExcursionsPage() {
 
   const snapToClosed = useCallback(() => {
     animateSheetPosition(closedTranslateRef.current)
+  }, [animateSheetPosition])
+
+  const closeDetailMode = useCallback(() => {
+    handleCloseDetailRef.current()
+    const hasDraft = hasDraftStopsRef.current
+    animateSheetPosition(hasDraft ? peekTranslateRef.current : closedTranslateRef.current)
   }, [animateSheetPosition])
 
   const updateSheetBounds = useCallback((hasDraft: boolean) => {
@@ -223,6 +233,20 @@ export function ExcursionsPage() {
     if (isFullyOpen) window.dispatchEvent(new CustomEvent('app-sheet-open'))
   }, [isFullyOpen])
 
+  useEffect(() => {
+    handleCloseDetailRef.current = state.handleCloseDetail
+  }, [state.handleCloseDetail])
+
+  useEffect(() => {
+    isDetailModeRef.current = Boolean(state.detailPoint)
+  }, [state.detailPoint])
+
+  useEffect(() => {
+    if (state.detailPoint && hasMeasuredRef.current) {
+      animateSheetPosition(DRAG_MIN)
+    }
+  }, [state.detailPoint, animateSheetPosition])
+
   // Scroll-to-close: fully open + deliberate overscroll past the top → close.
   // Uses reachedTopAt to distinguish "scrolled to top" from "swiping down to close".
   useEffect(() => {
@@ -241,6 +265,9 @@ export function ExcursionsPage() {
       if (currentY - reachedTopAt > 52) {
         reachedTopAt = Infinity
         animateSheetPosition(closedTranslateRef.current)
+        if (isDetailModeRef.current) {
+          setTimeout(() => { handleCloseDetailRef.current() }, 560)
+        }
       }
     }
     const onTouchEnd = () => { reachedTopAt = -1 }
@@ -257,6 +284,10 @@ export function ExcursionsPage() {
 
   const handleSheetToggle = useCallback(() => {
     if (isDragging) return
+    if (isDetailModeRef.current) {
+      closeDetailMode()
+      return
+    }
     if (sheetTranslateRef.current <= DRAG_MIN + 2) {
       // Fully open → collapse to closed
       animateSheetPosition(closedTranslateRef.current)
@@ -265,7 +296,7 @@ export function ExcursionsPage() {
       mapHandleRef.current?.closePopup()
       animateSheetPosition(DRAG_MIN)
     }
-  }, [isDragging, animateSheetPosition])
+  }, [isDragging, animateSheetPosition, closeDetailMode])
 
   const handleDragStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const sheet = sheetRef.current
@@ -301,7 +332,7 @@ export function ExcursionsPage() {
 
     // Animate preview bar height during drag so it tracks the sheet position.
     const preview = draftPreviewRef.current
-    if (preview && hasDraftStopsRef.current) {
+    if (preview && hasDraftStopsRef.current && !isDetailModeRef.current) {
       const range = peekTranslateRef.current - DRAG_MIN
       const progress = range > 0
         ? Math.max(0, Math.min(1, (nextY - DRAG_MIN) / range))
@@ -331,10 +362,34 @@ export function ExcursionsPage() {
     const current = sheetTranslateRef.current
     const velocity = dragRef.current.velocity
     const fullT = DRAG_MIN
-    const peekT = peekTranslateRef.current
     const closedT = closedTranslateRef.current
-    const hasDraft = hasDraftStopsRef.current
+    const absV = Math.abs(velocity)
+    const durationMs = absV > 12 ? 300 : absV > 6 ? 400 : 480
 
+    const clear = () => { sheet.style.willChange = '' }
+    sheet.addEventListener('transitionend', clear, { once: true })
+    setTimeout(clear, 580)
+
+    if (isDetailModeRef.current) {
+      const snaps = [fullT, closedT]
+      let bestIdx = 0
+      let bestDist = Infinity
+      for (let i = 0; i < snaps.length; i++) {
+        const d = Math.abs(current - snaps[i])
+        if (d < bestDist) { bestDist = d; bestIdx = i }
+      }
+      if (velocity > 5 && bestIdx < snaps.length - 1) bestIdx++
+      else if (velocity < -5 && bestIdx > 0) bestIdx--
+
+      animateSheetPosition(snaps[bestIdx], durationMs)
+      if (snaps[bestIdx] === closedT) {
+        setTimeout(() => { handleCloseDetailRef.current() }, durationMs + 80)
+      }
+      return
+    }
+
+    const peekT = peekTranslateRef.current
+    const hasDraft = hasDraftStopsRef.current
     const snaps = hasDraft ? [fullT, peekT, closedT] : [fullT, closedT]
 
     let bestIdx = 0
@@ -346,13 +401,7 @@ export function ExcursionsPage() {
     if (velocity > 5 && bestIdx < snaps.length - 1) bestIdx++
     else if (velocity < -5 && bestIdx > 0) bestIdx--
 
-    const absV = Math.abs(velocity)
-    const durationMs = absV > 12 ? 300 : absV > 6 ? 400 : 480
     animateSheetPosition(snaps[bestIdx], durationMs)
-
-    const clear = () => { sheet.style.willChange = '' }
-    sheet.addEventListener('transitionend', clear, { once: true })
-    setTimeout(clear, 580)
   }, [animateSheetPosition])
 
   const hasMoreExcursions = state.excursions.length > catalogInitial
@@ -368,8 +417,10 @@ export function ExcursionsPage() {
           nearbyPoints={state.nearbyPoints}
           onAddPoint={state.handleAddPoint}
           onChangeRadius={state.setRadiusMeters}
+          onPopupClose={state.handlePopupClose}
           onRemovePoint={state.handleRemovePointFromDraft}
           onSelectPoint={state.handleSelectPoint}
+          onShowDetail={state.handleShowDetail}
           radiusMeters={state.radiusMeters}
           recenterKey={state.recenterKey}
           routeState={state.routeState}
@@ -466,10 +517,14 @@ export function ExcursionsPage() {
 
         {/* ── Scrollable body ── */}
         <div
-          className="ep-sheet__body"
+          className={state.detailPoint ? 'ep-sheet__body ep-sheet__body--detail' : 'ep-sheet__body'}
           ref={bodyRef}
           style={{ overflowY: isFullyOpen ? undefined : 'hidden' }}
         >
+          {state.detailPoint ? (
+            <PointDetailPanel point={state.detailPoint} />
+          ) : (
+          <>
           {state.draftStops.length > 0 ? (
             <section className="ep-draft">
               <div className="ep-draft__head">
@@ -603,14 +658,16 @@ export function ExcursionsPage() {
             <p className="ep-footer__desc">
               Готовые маршруты с описаниями достопримечательностей, точки интереса рядом с вами и удобная навигация по улицам — всё в одном месте.
             </p>
-            <div className="ep-footer__features">
-              <span className="ep-footer__feature">Аудиоэкскурсии</span>
-              <span className="ep-footer__feature">Готовые маршруты</span>
-              <span className="ep-footer__feature">Места рядом</span>
-              <span className="ep-footer__feature">Пешие прогулки</span>
-            </div>
+          <div className="ep-footer__features">
+            <span className="ep-footer__feature"><span aria-hidden="true" className="ep-footer__feature-icon"><FooterFeatureIcon name="audio" /></span>Аудиоэкскурсии</span>
+            <span className="ep-footer__feature"><span aria-hidden="true" className="ep-footer__feature-icon"><FooterFeatureIcon name="routes" /></span>Готовые маршруты</span>
+            <span className="ep-footer__feature"><span aria-hidden="true" className="ep-footer__feature-icon"><FooterFeatureIcon name="nearby" /></span>Места рядом</span>
+            <span className="ep-footer__feature"><span aria-hidden="true" className="ep-footer__feature-icon"><FooterFeatureIcon name="walking" /></span>Пешие прогулки</span>
+          </div>
             <p className="ep-footer__copy">© T-Guide · Открывайте город пешком</p>
           </footer>
+          </>
+          )}
         </div>
       </div>
     </div>
@@ -720,6 +777,80 @@ const ExcursionCard = memo(function ExcursionCard({ excursion }: ExcursionCardPr
     </article>
   )
 })
+
+// ── PointDetailPanel ──────────────────────────────────────────────────────────
+
+interface PointDetailPanelProps {
+  point: NearbyPoint
+}
+
+function PointDetailPanel({ point }: PointDetailPanelProps) {
+  const walkMinutes = Math.max(1, Math.round((point.distanceMeters / 1000) * 12))
+  const placeholder = buildPlacePlaceholderImage(point.category)
+  const detailDescription = point.description || point.shortDescription
+
+  return (
+    <div className="ep-detail">
+      <div className="ep-detail__cover-shell">
+        <div className="ep-detail__cover">
+          <img
+            alt={point.title}
+            onError={(e) => { (e.target as HTMLImageElement).src = placeholder }}
+            src={point.imageUrl || placeholder}
+          />
+          <span className="ep-detail__cat">{formatPointCategory(point.category)}</span>
+        </div>
+      </div>
+
+      <div className="ep-detail__body">
+        <div className="ep-detail__metrics" role="list" aria-label="Краткие метрики точки">
+          <span className="ep-detail__metric-chip" role="listitem">{formatMeters(point.distanceMeters)}</span>
+          <span className="ep-detail__metric-chip" role="listitem">~{walkMinutes} мин</span>
+          {point.rating > 0 ? (
+            <span className="ep-detail__metric-chip ep-detail__metric-chip--accent" role="listitem">
+              ★ {point.rating.toFixed(1)}
+            </span>
+          ) : null}
+        </div>
+
+        <div className="ep-detail__heading">
+          <h2 className="ep-detail__title">{point.title}</h2>
+          {point.scheduleLabel && (
+            <span className="ep-detail__schedule">{point.scheduleLabel}</span>
+          )}
+        </div>
+
+        {detailDescription && (
+          <p className="ep-detail__full-desc">{detailDescription}</p>
+        )}
+
+        {point.addressLabel && (
+          <p className="ep-detail__address">
+            {point.addressLabel}
+          </p>
+        )}
+
+        <footer className="ep-footer ep-detail__footer">
+          <div className="ep-footer__brand">
+            <span className="ep-footer__logo">T-GUIDE</span>
+            <p className="ep-footer__tagline">Что дальше</p>
+          </div>
+          <p className="ep-footer__desc">
+            После знакомства с точкой можно вернуться к маршруту, перейти к следующей остановке
+            или открыть другие места поблизости в том же районе.
+          </p>
+          <div className="ep-footer__features">
+            <span className="ep-footer__feature"><span aria-hidden="true" className="ep-footer__feature-icon"><FooterFeatureIcon name="back" /></span>Вернуться к маршруту</span>
+            <span className="ep-footer__feature"><span aria-hidden="true" className="ep-footer__feature-icon"><FooterFeatureIcon name="routes" /></span>Изучить другие точки</span>
+            <span className="ep-footer__feature"><span aria-hidden="true" className="ep-footer__feature-icon"><FooterFeatureIcon name="time" /></span>Проверить время работы</span>
+            <span className="ep-footer__feature"><span aria-hidden="true" className="ep-footer__feature-icon"><FooterFeatureIcon name="walking" /></span>Продолжить прогулку</span>
+          </div>
+          <p className="ep-footer__copy">© T-Guide · Полезные подсказки по точке маршрута</p>
+        </footer>
+      </div>
+    </div>
+  )
+}
 
 // ── ExcursionsSkeleton ────────────────────────────────────────────────────────
 

@@ -36,6 +36,7 @@ import {
     formatTheme,
 } from "@/shared/lib/format";
 import { SmartPlaceImage } from "@/shared/ui/SmartPlaceImage";
+import { FooterFeatureIcon } from "@/shared/ui/FooterFeatureIcon";
 import { ExcursionCatalog } from "@/widgets/excursion-catalog/ui/ExcursionCatalog";
 import "./HomePage.css";
 
@@ -993,16 +994,20 @@ export function HomePage() {
                         </p>
                         <div className="home-sheet__footer-features">
                             <span className="home-sheet__footer-feature">
-                                🎧 Аудиоэкскурсии
+                                <span aria-hidden="true" className="home-sheet__footer-feature-icon"><FooterFeatureIcon name="audio" /></span>
+                                Аудиоэкскурсии
                             </span>
                             <span className="home-sheet__footer-feature">
-                                🗺 Готовые маршруты
+                                <span aria-hidden="true" className="home-sheet__footer-feature-icon"><FooterFeatureIcon name="routes" /></span>
+                                Готовые маршруты
                             </span>
                             <span className="home-sheet__footer-feature">
-                                📍 Места рядом
+                                <span aria-hidden="true" className="home-sheet__footer-feature-icon"><FooterFeatureIcon name="nearby" /></span>
+                                Места рядом
                             </span>
                             <span className="home-sheet__footer-feature">
-                                🚶 Пешие прогулки
+                                <span aria-hidden="true" className="home-sheet__footer-feature-icon"><FooterFeatureIcon name="walking" /></span>
+                                Пешие прогулки
                             </span>
                         </div>
                         <p className="home-sheet__footer-copy">
