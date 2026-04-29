@@ -640,7 +640,8 @@ body.app-body--home-page {
     align-items: center;
     justify-content: center;
     height: 44px;
-    min-width: 200px;
+    width: auto;
+    min-width: 0;
     padding: 0 28px;
     border: 1.5px solid rgba(31, 138, 112, 0.28);
     border-radius: var(--radius-pill);
@@ -658,11 +659,13 @@ body.app-body--home-page {
     background: linear-gradient(
         90deg,
         transparent 0%,
-        rgba(180, 248, 225, 0.9) 50%,
+        rgba(255, 247, 210, 0) 18%,
+        rgba(255, 235, 140, 0.18) 50%,
+        rgba(255, 247, 210, 0) 82%,
         transparent 100%
     );
     transform: translateX(-100%);
-    animation: view-all-shimmer 3s ease-in-out infinite;
+    animation: view-all-shimmer 10s ease-in-out infinite;
 }
 
 @keyframes view-all-shimmer {

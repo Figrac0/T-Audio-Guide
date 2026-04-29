@@ -829,25 +829,25 @@ function PointDetailPanel({ point }: PointDetailPanelProps) {
             {point.addressLabel}
           </p>
         )}
-
-        <footer className="ep-footer ep-detail__footer">
-          <div className="ep-footer__brand">
-            <span className="ep-footer__logo">T-GUIDE</span>
-            <p className="ep-footer__tagline">Что дальше</p>
-          </div>
-          <p className="ep-footer__desc">
-            После знакомства с точкой можно вернуться к маршруту, перейти к следующей остановке
-            или открыть другие места поблизости в том же районе.
-          </p>
-          <div className="ep-footer__features">
-            <span className="ep-footer__feature"><span aria-hidden="true" className="ep-footer__feature-icon"><FooterFeatureIcon name="back" /></span>Вернуться к маршруту</span>
-            <span className="ep-footer__feature"><span aria-hidden="true" className="ep-footer__feature-icon"><FooterFeatureIcon name="routes" /></span>Изучить другие точки</span>
-            <span className="ep-footer__feature"><span aria-hidden="true" className="ep-footer__feature-icon"><FooterFeatureIcon name="time" /></span>Проверить время работы</span>
-            <span className="ep-footer__feature"><span aria-hidden="true" className="ep-footer__feature-icon"><FooterFeatureIcon name="walking" /></span>Продолжить прогулку</span>
-          </div>
-          <p className="ep-footer__copy">© T-Guide · Полезные подсказки по точке маршрута</p>
-        </footer>
       </div>
+
+      <footer className="ep-footer ep-detail__footer">
+        <div className="ep-footer__brand">
+          <span className="ep-footer__logo">T-GUIDE</span>
+          <p className="ep-footer__tagline">Что дальше</p>
+        </div>
+        <p className="ep-footer__desc">
+          После знакомства с точкой можно вернуться к маршруту, перейти к следующей остановке
+          или открыть другие места поблизости в том же районе.
+        </p>
+        <div className="ep-footer__features">
+          <span className="ep-footer__feature"><span aria-hidden="true" className="ep-footer__feature-icon"><FooterFeatureIcon name="back" /></span>Вернуться к маршруту</span>
+          <span className="ep-footer__feature"><span aria-hidden="true" className="ep-footer__feature-icon"><FooterFeatureIcon name="routes" /></span>Изучить другие точки</span>
+          <span className="ep-footer__feature"><span aria-hidden="true" className="ep-footer__feature-icon"><FooterFeatureIcon name="time" /></span>Проверить время работы</span>
+          <span className="ep-footer__feature"><span aria-hidden="true" className="ep-footer__feature-icon"><FooterFeatureIcon name="walking" /></span>Продолжить прогулку</span>
+        </div>
+        <p className="ep-footer__copy">© T-Guide · Полезные подсказки по точке маршрута</p>
+      </footer>
     </div>
   )
 }
