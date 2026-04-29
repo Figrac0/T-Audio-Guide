@@ -12,6 +12,7 @@ import {
 } from '@/app/providers/auth-context'
 import { appApi } from '@/shared/api/client'
 import type {
+  ChangePasswordRequestDto,
   RequestPasswordResetRequestDto,
   RegisterRequestDto,
   SessionDto,
@@ -50,6 +51,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return nextSession
   }, [])
 
+  const changePassword = useCallback(async (payload: ChangePasswordRequestDto) => {
+    await appApi.changePassword(payload)
+  }, [])
+
   const requestPasswordReset = useCallback(async (payload: RequestPasswordResetRequestDto) => {
     await appApi.requestPasswordReset(payload)
   }, [])
@@ -76,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AuthContextValue>(
     () => ({
+      changePassword,
       isLoading,
       requestPasswordReset,
       register,
@@ -84,7 +90,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       updateProfile,
     }),
-    [isLoading, requestPasswordReset, register, session, signIn, signOut, updateProfile],
+    [
+      changePassword,
+      isLoading,
+      requestPasswordReset,
+      register,
+      session,
+      signIn,
+      signOut,
+      updateProfile,
+    ],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

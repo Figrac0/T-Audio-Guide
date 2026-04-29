@@ -18,6 +18,7 @@ import { formatPointCategory } from '@/shared/lib/format'
 
 interface MockUserRecord {
   id: string
+  username: string
   name: string
   email: string
   phone: string
@@ -32,6 +33,7 @@ const sessionStorageKey = 't-guide:auth:session'
 
 const defaultUser: MockUserRecord = {
   id: 'user-1',
+  username: 'anna',
   name: 'Анна',
   email: 'anna@example.com',
   phone: '+79990000000',
@@ -41,6 +43,42 @@ const defaultUser: MockUserRecord = {
 }
 
 export const mockApi: FrontendApi = {
+  async changePassword(request) {
+    await wait(responseDelayMs)
+
+    if (request.newPassword.length < 8) {
+      throw new Error('Новый пароль должен быть не короче 8 символов.')
+    }
+
+    const session = loadSession()
+
+    if (!session.profile) {
+      throw new Error('Профиль недоступен.')
+    }
+
+    const users = loadUsers()
+    const user = users.find((candidate) => candidate.id === session.profile?.id)
+
+    if (!user) {
+      throw new Error('Профиль недоступен.')
+    }
+
+    if (user.password !== request.oldPassword) {
+      throw new Error('Текущий пароль указан неверно.')
+    }
+
+    writeUsers(
+      users.map((candidate) =>
+        candidate.id === user.id
+          ? {
+              ...candidate,
+              password: request.newPassword,
+            }
+          : candidate,
+      ),
+    )
+  },
+
   async createPersonalRoute(request) {
     await wait(responseDelayMs)
     return request.route
@@ -188,6 +226,7 @@ export const mockApi: FrontendApi = {
 
     const createdUser: MockUserRecord = {
       id: `user-${Date.now()}`,
+      username: request.email.trim().split('@')[0] || `user-${Date.now()}`,
       name: request.name.trim(),
       email: request.email.trim(),
       phone: request.phone.trim(),
@@ -397,9 +436,11 @@ function createGuestSession(): SessionDto {
 function toProfile(user: MockUserRecord): UserProfileDto {
   return {
     id: user.id,
+    username: user.username,
     name: user.name,
     email: user.email,
     phone: user.phone,
+    lang: user.language,
     language: user.language,
     role: user.role,
   }

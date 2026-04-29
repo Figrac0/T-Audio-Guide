@@ -14,6 +14,11 @@ import {
   getAudioGuideUrl,
   hasAudioGuideAvailable,
 } from '@/entities/excursion/lib/audio-guide'
+import {
+  completeLastRoute,
+  startLastRoute,
+  updateLastRouteProgress,
+} from '@/entities/excursion/lib/last-routes'
 import { useRouteBySlug } from '@/entities/excursion/model/useRouteBySlug'
 import type { Excursion, GeoPoint, PointCategory, RouteStop } from '@/entities/excursion/model/types'
 import { formatMeters, getDistanceMetersBetween } from '@/features/route-map/lib/route-geometry'
@@ -165,7 +170,11 @@ export function ExcursionPage() {
       isSaved={isSaved}
       onSave={() => toggleSavedRoute(excursion)}
       onShare={() => void shareRoute(excursion)}
-      onStart={() => { setCurrentStopIndex(0); setPhase('navigation') }}
+      onStart={() => {
+        startLastRoute(excursion)
+        setCurrentStopIndex(0)
+        setPhase('navigation')
+      }}
     />
   )
 }
@@ -590,8 +599,15 @@ function NavigationPhase({
 
   const handlePrevStop = () => { onStopChange(Math.max(0, currentStopIndex - 1)); snapToPeek() }
   const handleNextStop = () => {
-    if (isLastStop) onComplete()
-    else { onStopChange(currentStopIndex + 1); snapToPeek() }
+    if (isLastStop) {
+      completeLastRoute(excursion)
+      onComplete()
+      return
+    }
+
+    updateLastRouteProgress(excursion, currentStopIndex + 1)
+    onStopChange(currentStopIndex + 1)
+    snapToPeek()
   }
 
   const distanceToStop = userPosition ? getDistanceMetersBetween(userPosition, currentStop.coordinates) : null
@@ -780,7 +796,7 @@ function NavigationPhase({
                 {isLastStop ? (
                   <button
                     className="ep-nav__stop-nav-btn ep-nav__stop-nav-btn--complete"
-                    onClick={onComplete}
+                    onClick={handleNextStop}
                     type="button"
                   >
                     <span className="ep-nav__stop-nav-label">Завершить</span>

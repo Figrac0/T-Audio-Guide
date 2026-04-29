@@ -8,13 +8,37 @@
 
 export type UserRole = 'guest' | 'user' | 'admin'
 
+export interface BackendUserDto {
+  id: string
+  username: string
+  email: string
+  name: string
+  lang: SupportedLocale
+  role: UserRole
+}
+
 export interface UserProfileDto {
   id: string
+  username?: string
   name: string
   email: string
   phone?: string
+  lang?: SupportedLocale
   language: SupportedLocale
   role: UserRole
+}
+
+export interface AuthTokensDto {
+  accessToken: string
+  refreshToken: string
+}
+
+export interface AuthResponseDto {
+  accessToken?: string
+  refreshToken?: string
+  tokens?: AuthTokensDto
+  user?: BackendUserDto
+  profile?: UserProfileDto
 }
 
 export interface SessionDto {
@@ -29,6 +53,11 @@ export interface SignInRequestDto {
 
 export interface RequestPasswordResetRequestDto {
   login: string
+}
+
+export interface ChangePasswordRequestDto {
+  oldPassword: string
+  newPassword: string
 }
 
 export interface RegisterRequestDto {
@@ -113,6 +142,7 @@ export interface RouteDetailsRequest {
 }
 
 export interface FrontendApi {
+  changePassword(request: ChangePasswordRequestDto): Promise<void>
   createPersonalRoute(request: CreatePersonalRouteRequestDto): Promise<Excursion>
   getDiscoveryFeed(request: DiscoveryFeedRequest): Promise<DiscoveryFeedDto>
   getProfileOverview(): Promise<ProfileOverviewDto>

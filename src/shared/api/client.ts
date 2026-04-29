@@ -1,28 +1,30 @@
-﻿import { request } from '@/shared/api/http'
+import { authService } from '@/shared/api/authService'
 import type {
+  ChangePasswordRequestDto,
+  CreatePersonalRouteRequestDto,
   DiscoveryFeedDto,
   DiscoveryFeedRequest,
   FrontendApi,
-  ProfileOverviewDto,
   RequestPasswordResetRequestDto,
   RegisterRequestDto,
   RemoveSavedRouteRequestDto,
   RouteCatalogRequest,
   RouteDetailsRequest,
   SaveRouteRequestDto,
-  SessionDto,
   ShareRouteDto,
   ShareRouteRequestDto,
   SignInRequestDto,
-  UpdateProfileRequestDto,
-  UserProfileDto,
-  CreatePersonalRouteRequestDto,
 } from '@/shared/api/contracts'
+import { request } from '@/shared/api/http'
 import { mockApi } from '@/shared/api/mock/mockApi'
+import { profileService } from '@/shared/api/profileService'
 
 const useMockApi = import.meta.env.VITE_USE_MOCK_API !== 'false' || !import.meta.env.VITE_API_URL
 
 const httpApi: FrontendApi = {
+  changePassword(payload: ChangePasswordRequestDto) {
+    return authService.changePassword(payload)
+  },
   createPersonalRoute(payload: CreatePersonalRouteRequestDto) {
     return request('/profile/routes/personal', {
       body: JSON.stringify(payload),
@@ -36,7 +38,12 @@ const httpApi: FrontendApi = {
     })
   },
   getProfileOverview() {
-    return request<ProfileOverviewDto>('/profile/overview')
+    return profileService.getProfile().then((profile) => ({
+      personalRoutes: [],
+      profile,
+      routeHistory: [],
+      savedRoutes: [],
+    }))
   },
   getRouteBySlug({ slug, ...payload }: RouteDetailsRequest) {
     return request(`/routes/${slug}`, {
@@ -51,7 +58,16 @@ const httpApi: FrontendApi = {
     })
   },
   getSession() {
-    return request<SessionDto>('/auth/session')
+    return profileService
+      .getProfile()
+      .then((profile) => ({
+        isAuthenticated: true,
+        profile,
+      }))
+      .catch(() => ({
+        isAuthenticated: false,
+        profile: null,
+      }))
   },
   requestPasswordReset(payload: RequestPasswordResetRequestDto) {
     return request<void>('/auth/reset-password', {
@@ -60,10 +76,7 @@ const httpApi: FrontendApi = {
     })
   },
   register(payload: RegisterRequestDto) {
-    return request<SessionDto>('/auth/register', {
-      body: JSON.stringify(payload),
-      method: 'POST',
-    })
+    return authService.register(payload)
   },
   removeSavedRoute(payload: RemoveSavedRouteRequestDto) {
     return request<void>(`/profile/routes/saved/${payload.slug}`, {
@@ -82,21 +95,13 @@ const httpApi: FrontendApi = {
     })
   },
   signIn(payload: SignInRequestDto) {
-    return request<SessionDto>('/auth/sign-in', {
-      body: JSON.stringify(payload),
-      method: 'POST',
-    })
+    return authService.login(payload)
   },
   signOut() {
-    return request<SessionDto>('/auth/sign-out', {
-      method: 'POST',
-    })
+    return authService.logout()
   },
-  updateProfile(payload: UpdateProfileRequestDto) {
-    return request<UserProfileDto>('/profile', {
-      body: JSON.stringify(payload),
-      method: 'PATCH',
-    })
+  updateProfile(payload) {
+    return profileService.updateProfile(payload)
   },
 }
 

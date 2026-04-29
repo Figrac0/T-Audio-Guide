@@ -1,6 +1,7 @@
 import { createContext } from 'react'
 
 import type {
+  ChangePasswordRequestDto,
   RequestPasswordResetRequestDto,
   RegisterRequestDto,
   SessionDto,
@@ -12,6 +13,7 @@ import type {
 export interface AuthContextValue {
   isLoading: boolean
   session: SessionDto | null
+  changePassword: (payload: ChangePasswordRequestDto) => Promise<void>
   requestPasswordReset: (payload: RequestPasswordResetRequestDto) => Promise<void>
   register: (payload: RegisterRequestDto) => Promise<SessionDto>
   signIn: (payload: SignInRequestDto) => Promise<SessionDto>
