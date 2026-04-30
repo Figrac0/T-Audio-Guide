@@ -60,6 +60,32 @@
   margin-top: -4px;
 }
 
+.auth-form .field__input {
+  border-color: var(--color-line);
+}
+
+.auth-form .field--valid .field__input {
+  border-color: rgba(31, 138, 112, 0.52);
+  box-shadow:
+    inset 0 0 0 1px rgba(31, 138, 112, 0.1),
+    0 0 0 4px rgba(31, 138, 112, 0.07);
+}
+
+.auth-form .field--invalid .field__input {
+  border-color: rgba(202, 75, 75, 0.56);
+  box-shadow:
+    inset 0 0 0 1px rgba(202, 75, 75, 0.08),
+    0 0 0 4px rgba(202, 75, 75, 0.08);
+}
+
+.auth-form .field--valid .field__label {
+  color: var(--color-brand-strong);
+}
+
+.auth-form .field--invalid .field__label {
+  color: var(--color-danger);
+}
+
 .auth-page__inline-action {
   border: 0;
   background: transparent;

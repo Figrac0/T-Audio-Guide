@@ -1,10 +1,5 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type FormEvent,
-} from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '@/app/providers/useAuth'
 import type { SupportedLocale } from '@/entities/excursion/model/types'
@@ -13,11 +8,47 @@ import { formatLocaleLabel } from '@/shared/lib/format'
 import './SignInPage.css'
 
 type AuthMode = 'sign-in' | 'register' | 'reset'
+type ValidatedField = 'email' | 'password' | 'phone'
+type TouchedFields = Partial<Record<ValidatedField, boolean>>
+
+interface RedirectState {
+  from?: unknown
+}
 
 const localeOptions: SupportedLocale[] = ['ru', 'en', 'de', 'fr', 'es']
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const phonePattern = /^\+7 \d{3}-\d{3}-\d{2}-\d{2}$/
+const authCopy = {
+  account: '\u0410\u043a\u043a\u0430\u0443\u043d\u0442 T Guide',
+  alreadyHasProfile: '\u041f\u0440\u043e\u0444\u0438\u043b\u044c \u0443\u0436\u0435 \u0441\u043e\u0437\u0434\u0430\u043d?',
+  checking: '\u041f\u0440\u043e\u0432\u0435\u0440\u044f\u0435\u043c \u0434\u0430\u043d\u043d\u044b\u0435',
+  createAccount: '\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0430\u043a\u043a\u0430\u0443\u043d\u0442',
+  createProfile: '\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u043f\u0440\u043e\u0444\u0438\u043b\u044c',
+  email: '\u041f\u043e\u0447\u0442\u0430',
+  forgotPassword: '\u0417\u0430\u0431\u044b\u043b\u0438 \u043f\u0430\u0440\u043e\u043b\u044c?',
+  home: '\u041d\u0430 \u0433\u043b\u0430\u0432\u043d\u0443\u044e',
+  invalidForm: '\u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u043f\u043e\u0434\u0441\u0432\u0435\u0447\u0435\u043d\u043d\u044b\u0435 \u043f\u043e\u043b\u044f \u0438 \u043f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0435 \u0440\u0430\u0437.',
+  language: '\u042f\u0437\u044b\u043a \u0430\u0443\u0434\u0438\u043e\u0433\u0438\u0434\u0430',
+  name: '\u0418\u043c\u044f',
+  namePlaceholder: '\u0410\u043d\u043d\u0430',
+  noProfile: '\u0415\u0449\u0435 \u043d\u0435\u0442 \u043f\u0440\u043e\u0444\u0438\u043b\u044f?',
+  password: '\u041f\u0430\u0440\u043e\u043b\u044c',
+  passwordPlaceholder: '\u041c\u0438\u043d\u0438\u043c\u0443\u043c 8 \u0441\u0438\u043c\u0432\u043e\u043b\u043e\u0432',
+  phone: '\u0422\u0435\u043b\u0435\u0444\u043e\u043d',
+  register: '\u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f',
+  resetSuccess: '\u0418\u043d\u0441\u0442\u0440\u0443\u043a\u0446\u0438\u0438 \u0434\u043b\u044f \u0432\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u044f \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u044b. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u043f\u043e\u0447\u0442\u0443.',
+  resetTitle: '\u0412\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435 \u0434\u043e\u0441\u0442\u0443\u043f\u0430',
+  returnToSignIn: '\u0412\u0435\u0440\u043d\u0443\u0442\u044c\u0441\u044f \u043a\u043e \u0432\u0445\u043e\u0434\u0443',
+  sendInstructions: '\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0438\u043d\u0441\u0442\u0440\u0443\u043a\u0446\u0438\u0438',
+  signIn: '\u0412\u043e\u0439\u0442\u0438',
+  signInTab: '\u0412\u0445\u043e\u0434',
+  signInTitle: '\u0412\u0445\u043e\u0434 \u0432 \u0430\u043a\u043a\u0430\u0443\u043d\u0442',
+  unknownError: '\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0432\u044b\u043f\u043e\u043b\u043d\u0438\u0442\u044c \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435.',
+}
 
 export function SignInPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { register, requestPasswordReset, signIn } = useAuth()
   const [mode, setMode] = useState<AuthMode>('sign-in')
   const [name, setName] = useState('')
@@ -25,25 +56,31 @@ export function SignInPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [language, setLanguage] = useState<SupportedLocale>('ru')
+  const [touchedFields, setTouchedFields] = useState<TouchedFields>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [isLocaleMenuOpen, setIsLocaleMenuOpen] = useState(false)
   const localeSelectRef = useRef<HTMLDivElement | null>(null)
 
+  const redirectPath = getRedirectPath(location.state)
+  const isEmailValid = isValidEmail(email)
+  const isPasswordValid = isValidPassword(password)
+  const isPhoneValid = isValidPhone(phone)
   const title =
     mode === 'sign-in'
-      ? 'Вход в аккаунт'
+      ? authCopy.signInTitle
       : mode === 'register'
-        ? 'Регистрация'
-        : 'Восстановление доступа'
+        ? authCopy.register
+        : authCopy.resetTitle
   const submitLabel =
     mode === 'sign-in'
-      ? 'Войти'
+      ? authCopy.signIn
       : mode === 'register'
-        ? 'Создать профиль'
-        : 'Отправить инструкции'
-  const modeActionLabel = mode === 'sign-in' ? 'Создать аккаунт' : 'У меня уже есть аккаунт'
+        ? authCopy.createProfile
+        : authCopy.sendInstructions
+  const modeActionLabel =
+    mode === 'sign-in' ? authCopy.createAccount : authCopy.alreadyHasProfile
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -61,45 +98,69 @@ export function SignInPage() {
 
   function switchMode(nextMode: AuthMode) {
     setMode(nextMode)
+    setTouchedFields({})
     setError(null)
     setSuccessMessage(null)
+  }
+
+  function markFieldTouched(field: ValidatedField) {
+    setTouchedFields((current) => ({
+      ...current,
+      [field]: true,
+    }))
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
     setSuccessMessage(null)
+
+    const isFormValid =
+      isEmailValid &&
+      (mode === 'reset' || isPasswordValid) &&
+      (mode !== 'register' || isPhoneValid)
+
+    if (!isFormValid) {
+      setTouchedFields({
+        email: true,
+        password: mode !== 'reset',
+        phone: mode === 'register',
+      })
+      setError(authCopy.invalidForm)
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
       if (mode === 'sign-in') {
         await signIn({
-          login: email,
+          login: email.trim(),
           password,
         })
-        navigate(appRoutes.profile)
+        navigate(redirectPath, { replace: true })
         return
       }
 
       if (mode === 'register') {
         await register({
-          email,
+          email: email.trim(),
           language,
-          name,
+          name: name.trim(),
           password,
           phone,
         })
-        navigate(appRoutes.profile)
+        navigate(redirectPath, { replace: true })
         return
       }
 
       await requestPasswordReset({
-        login: email,
+        login: email.trim(),
       })
-      setSuccessMessage('Инструкции для восстановления отправлены. Проверьте почту или телефон.')
+      setSuccessMessage(authCopy.resetSuccess)
       setMode('sign-in')
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : 'Не удалось выполнить действие.')
+      setError(nextError instanceof Error ? nextError.message : authCopy.unknownError)
     } finally {
       setIsSubmitting(false)
     }
@@ -108,7 +169,7 @@ export function SignInPage() {
   return (
     <section className="auth-page">
       <div className="auth-page__panel">
-        <p className="eyebrow">Аккаунт T Guide</p>
+        <p className="eyebrow">{authCopy.account}</p>
         <h1 className="auth-page__title">{title}</h1>
 
         <div className="auth-page__mode-switch" role="tablist">
@@ -117,37 +178,47 @@ export function SignInPage() {
             onClick={() => switchMode('sign-in')}
             type="button"
           >
-            Вход
+            {authCopy.signInTab}
           </button>
           <button
             className={`auth-page__mode-button${mode === 'register' ? ' auth-page__mode-button--active' : ''}`}
             onClick={() => switchMode('register')}
             type="button"
           >
-            Регистрация
+            {authCopy.register}
           </button>
         </div>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
+        <form className="auth-form" onSubmit={handleSubmit} noValidate>
           {mode === 'register' ? (
             <>
               <label className="field">
-                <span className="field__label">Имя</span>
+                <span className="field__label">{authCopy.name}</span>
                 <input
                   className="field__input"
                   onChange={(event) => setName(event.target.value)}
-                  placeholder="Анна"
+                  placeholder={authCopy.namePlaceholder}
                   required
                   type="text"
                   value={name}
                 />
               </label>
-              <label className="field">
-                <span className="field__label">Телефон</span>
+              <label
+                className={getFieldClassName({
+                  isTouched: Boolean(touchedFields.phone),
+                  isValid: isPhoneValid,
+                  value: phone,
+                })}
+              >
+                <span className="field__label">{authCopy.phone}</span>
                 <input
                   className="field__input"
-                  onChange={(event) => setPhone(event.target.value)}
-                  placeholder="+7 999 000-00-00"
+                  inputMode="numeric"
+                  onBlur={() => markFieldTouched('phone')}
+                  onChange={(event) =>
+                    setPhone(formatRussianPhone(event.target.value))
+                  }
+                  placeholder="+7 927-687-12-14"
                   required
                   type="tel"
                   value={phone}
@@ -156,27 +227,42 @@ export function SignInPage() {
             </>
           ) : null}
 
-          <label className="field">
-            <span className="field__label">{mode === 'sign-in' ? 'Почта или телефон' : 'Почта'}</span>
+          <label
+            className={getFieldClassName({
+              isTouched: Boolean(touchedFields.email),
+              isValid: isEmailValid,
+              value: email,
+            })}
+          >
+            <span className="field__label">{authCopy.email}</span>
             <input
               className="field__input"
+              inputMode="email"
+              onBlur={() => markFieldTouched('email')}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder={mode === 'sign-in' ? 'name@example.com или +7 999 000-00-00' : 'name@example.com'}
+              placeholder="name@example.com"
               required
-              type={mode === 'sign-in' ? 'text' : 'email'}
+              type="email"
               value={email}
             />
           </label>
 
           {mode !== 'reset' ? (
             <>
-              <label className="field">
-                <span className="field__label">Пароль</span>
+              <label
+                className={getFieldClassName({
+                  isTouched: Boolean(touchedFields.password),
+                  isValid: isPasswordValid,
+                  value: password,
+                })}
+              >
+                <span className="field__label">{authCopy.password}</span>
                 <input
                   className="field__input"
                   minLength={8}
+                  onBlur={() => markFieldTouched('password')}
                   onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Минимум 8 символов"
+                  placeholder={authCopy.passwordPlaceholder}
                   required
                   type="password"
                   value={password}
@@ -190,7 +276,7 @@ export function SignInPage() {
                     onClick={() => switchMode('reset')}
                     type="button"
                   >
-                    Забыли пароль?
+                    {authCopy.forgotPassword}
                   </button>
                 </div>
               ) : null}
@@ -199,7 +285,7 @@ export function SignInPage() {
 
           {mode === 'register' ? (
             <div className="field auth-select" ref={localeSelectRef}>
-              <span className="field__label">Язык аудиогида</span>
+              <span className="field__label">{authCopy.language}</span>
               <button
                 aria-expanded={isLocaleMenuOpen}
                 className="auth-select__trigger"
@@ -210,7 +296,10 @@ export function SignInPage() {
                 <span aria-hidden="true" className="auth-select__chevron" />
               </button>
 
-              <div className={`auth-select__menu${isLocaleMenuOpen ? ' auth-select__menu--open' : ''}`} role="listbox">
+              <div
+                className={`auth-select__menu${isLocaleMenuOpen ? ' auth-select__menu--open' : ''}`}
+                role="listbox"
+              >
                 {localeOptions.map((locale) => (
                   <button
                     aria-selected={locale === language}
@@ -231,10 +320,16 @@ export function SignInPage() {
           ) : null}
 
           {error ? <p className="auth-page__error">{error}</p> : null}
-          {successMessage ? <p className="auth-page__success">{successMessage}</p> : null}
+          {successMessage ? (
+            <p className="auth-page__success">{successMessage}</p>
+          ) : null}
 
-          <button className="button button--primary button--wide" disabled={isSubmitting} type="submit">
-            {isSubmitting ? 'Проверяем данные' : submitLabel}
+          <button
+            className="button button--primary button--wide"
+            disabled={isSubmitting}
+            type="submit"
+          >
+            {isSubmitting ? authCopy.checking : submitLabel}
           </button>
         </form>
 
@@ -245,15 +340,19 @@ export function SignInPage() {
               onClick={() => switchMode('sign-in')}
               type="button"
             >
-              Вернуться ко входу
+              {authCopy.returnToSignIn}
             </button>
           </div>
         ) : (
           <div className="auth-page__footer">
-            <span>{mode === 'sign-in' ? 'Еще нет профиля?' : 'Профиль уже создан?'}</span>
+            <span>
+              {mode === 'sign-in' ? authCopy.noProfile : authCopy.alreadyHasProfile}
+            </span>
             <button
               className="button button--secondary"
-              onClick={() => switchMode(mode === 'sign-in' ? 'register' : 'sign-in')}
+              onClick={() =>
+                switchMode(mode === 'sign-in' ? 'register' : 'sign-in')
+              }
               type="button"
             >
               {modeActionLabel}
@@ -262,9 +361,83 @@ export function SignInPage() {
         )}
 
         <Link className="inline-link" to={appRoutes.home}>
-          На главную
+          {authCopy.home}
         </Link>
       </div>
     </section>
   )
+}
+
+function getFieldClassName({
+  isTouched,
+  isValid,
+  value,
+}: {
+  isTouched: boolean
+  isValid: boolean
+  value: string
+}) {
+  if (!value) {
+    return 'field'
+  }
+
+  if (isValid) {
+    return 'field field--valid'
+  }
+
+  return isTouched ? 'field field--invalid' : 'field'
+}
+
+function getRedirectPath(state: unknown) {
+  const from = (state as RedirectState | null)?.from
+
+  return typeof from === 'string' && from !== appRoutes.signIn
+    ? from
+    : appRoutes.profile
+}
+
+function isValidEmail(value: string) {
+  return emailPattern.test(value.trim())
+}
+
+function isValidPassword(value: string) {
+  return value.length >= 8
+}
+
+function isValidPhone(value: string) {
+  return phonePattern.test(value)
+}
+
+function formatRussianPhone(value: string) {
+  const digits = value.replace(/\D/g, '')
+  const localDigits = digits.replace(/^[78]/, '').slice(0, 10)
+
+  if (!digits) {
+    return ''
+  }
+
+  if (!localDigits) {
+    return '+7 '
+  }
+
+  const city = localDigits.slice(0, 3)
+  const first = localDigits.slice(3, 6)
+  const second = localDigits.slice(6, 8)
+  const third = localDigits.slice(8, 10)
+
+  let formatted = `+7 ${city}`
+
+  if (first) {
+    formatted += `-${first}`
+  }
+
+  if (second) {
+    formatted += `-${second}`
+  }
+
+  if (third) {
+    formatted += `-${third}`
+  }
+
+  return formatted
 }

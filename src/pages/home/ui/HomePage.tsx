@@ -45,7 +45,11 @@ const DRAG_MIN = 10;
 
 type SheetState = "closed" | "peek" | "full";
 
-function getSnapTranslate(state: SheetState, sheetHeight: number, peekHeight: number): number {
+function getSnapTranslate(
+    state: SheetState,
+    sheetHeight: number,
+    peekHeight: number,
+): number {
     if (state === "full") return DRAG_MIN;
     if (state === "peek") return Math.max(DRAG_MIN, sheetHeight - peekHeight);
     return Math.max(DRAG_MIN, sheetHeight - CLOSED_HEIGHT);
@@ -67,7 +71,9 @@ function snapSheet(sheet: HTMLElement, toY: number, durationMs: number): void {
     void sheet.offsetHeight;
     sheet.style.transition = `transform ${durationMs}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
     sheet.style.transform = `translateY(${toY}px)`;
-    const clear = () => { sheet.style.willChange = ""; };
+    const clear = () => {
+        sheet.style.willChange = "";
+    };
     sheet.addEventListener("transitionend", clear, { once: true });
     setTimeout(clear, durationMs + 100);
 }
@@ -408,7 +414,11 @@ export function HomePage() {
     const snapToPeek = useCallback(() => {
         const sheet = sheetRef.current;
         if (!sheet) return;
-        const peekT = getSnapTranslate("peek", sheet.offsetHeight, peekHeightRef.current);
+        const peekT = getSnapTranslate(
+            "peek",
+            sheet.offsetHeight,
+            peekHeightRef.current,
+        );
         if (bodyRef.current) bodyRef.current.scrollTop = 0;
         skipSnapRef.current = true;
         setSheetState("peek");
@@ -466,8 +476,13 @@ export function HomePage() {
         }
         const sheet = sheetRef.current;
         if (!sheet || sheet.offsetHeight === 0) return;
-        const target = getSnapTranslate(sheetState, sheet.offsetHeight, peekHeightRef.current);
-        if (sheetState === "peek" && bodyRef.current) bodyRef.current.scrollTop = 0;
+        const target = getSnapTranslate(
+            sheetState,
+            sheet.offsetHeight,
+            peekHeightRef.current,
+        );
+        if (sheetState === "peek" && bodyRef.current)
+            bodyRef.current.scrollTop = 0;
         snapSheet(sheet, target, 480);
     }, [sheetState]);
 
@@ -543,7 +558,9 @@ export function HomePage() {
                 snapSheet(sheet, closedT, 480);
             }
         };
-        const onTouchEnd = () => { reachedTopAt = -1; };
+        const onTouchEnd = () => {
+            reachedTopAt = -1;
+        };
 
         bodyEl.addEventListener("touchstart", onTouchStart, { passive: true });
         bodyEl.addEventListener("touchmove", onTouchMove, { passive: true });
@@ -607,7 +624,11 @@ export function HomePage() {
         const sheetHeight = sheet.offsetHeight;
         const velocity = dragRef.current.velocity;
         const fullT = DRAG_MIN;
-        const peekT = getSnapTranslate("peek", sheetHeight, peekHeightRef.current);
+        const peekT = getSnapTranslate(
+            "peek",
+            sheetHeight,
+            peekHeightRef.current,
+        );
         const closedT = sheetHeight - CLOSED_HEIGHT;
 
         const snaps: [SheetState, number][] = [
@@ -620,7 +641,10 @@ export function HomePage() {
         let bestDist = Infinity;
         for (let i = 0; i < snaps.length; i++) {
             const d = Math.abs(currentTranslate - snaps[i][1]);
-            if (d < bestDist) { bestDist = d; bestIdx = i; }
+            if (d < bestDist) {
+                bestDist = d;
+                bestIdx = i;
+            }
         }
         if (velocity > 5 && bestIdx < snaps.length - 1) bestIdx++;
         else if (velocity < -5 && bestIdx > 0) bestIdx--;
@@ -628,7 +652,8 @@ export function HomePage() {
         const [nextState, targetT] = snaps[bestIdx];
         skipSnapRef.current = true;
         setSheetState(nextState);
-        if (nextState === "peek" && bodyRef.current) bodyRef.current.scrollTop = 0;
+        if (nextState === "peek" && bodyRef.current)
+            bodyRef.current.scrollTop = 0;
 
         // Velocity-proportional duration: fast flings snap quicker
         const absV = Math.abs(velocity);
@@ -637,8 +662,12 @@ export function HomePage() {
         sheet.style.transition = `transform ${durationMs}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
         sheet.style.transform = `translateY(${targetT}px)`;
 
-        const clearWillChange = () => { sheet.style.willChange = ""; };
-        sheet.addEventListener("transitionend", clearWillChange, { once: true });
+        const clearWillChange = () => {
+            sheet.style.willChange = "";
+        };
+        sheet.addEventListener("transitionend", clearWillChange, {
+            once: true,
+        });
         setTimeout(clearWillChange, 580);
     }
 
@@ -688,7 +717,11 @@ export function HomePage() {
                     onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                             setSheetState((s) =>
-                                s === "closed" ? "peek" : s === "peek" ? "full" : "closed",
+                                s === "closed"
+                                    ? "peek"
+                                    : s === "peek"
+                                      ? "full"
+                                      : "closed",
                             );
                         }
                     }}
@@ -710,7 +743,13 @@ export function HomePage() {
                             height="16"
                             viewBox="0 0 24 24"
                             width="16">
-                            <circle cx="12" cy="8" r="3.2" stroke="currentColor" strokeWidth="2" />
+                            <circle
+                                cx="12"
+                                cy="8"
+                                r="3.2"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                            />
                             <path
                                 d="M5.5 20c1.1-4 3.4-6 6.5-6s5.4 2 6.5 6"
                                 stroke="currentColor"
@@ -753,10 +792,13 @@ export function HomePage() {
                 <div
                     className="home-sheet__body"
                     ref={bodyRef}
-                    style={{ overflowY: sheetState === "full" ? undefined : "hidden" }}
-                >
+                    style={{
+                        overflowY: sheetState === "full" ? undefined : "hidden",
+                    }}>
                     {/* ── Categories ── */}
-                    <div className="home-sheet__filter-group" ref={filterGroupRef}>
+                    <div
+                        className="home-sheet__filter-group"
+                        ref={filterGroupRef}>
                         <p className="home-sheet__filter-label">Места рядом</p>
                         <div className="home-sheet__cats">
                             {nearbyCategoryOptions.map((opt) => (
@@ -782,78 +824,86 @@ export function HomePage() {
 
                     {/* ── Selected place card ── */}
                     {selectedPoint && (
-                        <div className="home-sheet__place-wrap" key={selectedPoint.id}>
-                        <div className="home-sheet__place">
-                            <div className="home-sheet__place-top">
-                                <div className="home-sheet__place-meta">
-                                    <span className="home-sheet__place-cat">
-                                        {formatPointCategory(
-                                            selectedPoint.category,
-                                        )}
-                                    </span>
-                                    <span className="home-sheet__place-dist">
-                                        {formatMeters(
-                                            selectedPoint.distanceMeters,
-                                        )}
-                                    </span>
+                        <div
+                            className="home-sheet__place-wrap"
+                            key={selectedPoint.id}>
+                            <div className="home-sheet__place">
+                                <div className="home-sheet__place-top">
+                                    <div className="home-sheet__place-meta">
+                                        <span className="home-sheet__place-cat">
+                                            {formatPointCategory(
+                                                selectedPoint.category,
+                                            )}
+                                        </span>
+                                        <span className="home-sheet__place-dist">
+                                            {formatMeters(
+                                                selectedPoint.distanceMeters,
+                                            )}
+                                        </span>
+                                    </div>
+                                    <button
+                                        aria-label="Построить маршрут к месту"
+                                        className="home-sheet__place-go"
+                                        onClick={() =>
+                                            handleGoToPlace(selectedPoint)
+                                        }
+                                        type="button">
+                                        {/* Walking person icon */}
+                                        <svg
+                                            fill="currentColor"
+                                            height="18"
+                                            viewBox="0 0 24 24"
+                                            width="18"
+                                            aria-hidden="true">
+                                            <circle cx="12" cy="4.5" r="1.75" />
+                                            <path d="M14.5 8.5c-.6-.8-1.4-1-2-.9l-3 1.2-1.5 3.5 1.8.7.9-2.2 1-.4-1.5 4.1-2.8 2.4 1.2 1.4 3-2.6 1.4 3.3H16l-1.6-4 .6-1.6 1 2h1.9L15.5 12l-.3-1.4 1.4.6.6-1.7-2.7-1z" />
+                                        </svg>
+                                    </button>
                                 </div>
-                                <button
-                                    aria-label="Построить маршрут к месту"
-                                    className="home-sheet__place-go"
-                                    onClick={() =>
-                                        handleGoToPlace(selectedPoint)
-                                    }
-                                    type="button">
-                                    {/* Walking person icon */}
-                                    <svg
-                                        fill="currentColor"
-                                        height="18"
-                                        viewBox="0 0 24 24"
-                                        width="18"
-                                        aria-hidden="true">
-                                        <circle cx="12" cy="4.5" r="1.75" />
-                                        <path d="M14.5 8.5c-.6-.8-1.4-1-2-.9l-3 1.2-1.5 3.5 1.8.7.9-2.2 1-.4-1.5 4.1-2.8 2.4 1.2 1.4 3-2.6 1.4 3.3H16l-1.6-4 .6-1.6 1 2h1.9L15.5 12l-.3-1.4 1.4.6.6-1.7-2.7-1z" />
-                                    </svg>
-                                </button>
+                                <h3 className="home-sheet__place-title">
+                                    {selectedPoint.title}
+                                </h3>
+                                {selectedPoint.addressLabel && (
+                                    <p className="home-sheet__place-address">
+                                        {selectedPoint.addressLabel}
+                                    </p>
+                                )}
+                                {selectedPoint.scheduleLabel && (
+                                    <p className="home-sheet__place-schedule">
+                                        {selectedPoint.scheduleLabel}
+                                    </p>
+                                )}
+                                {(selectedPoint.description ||
+                                    selectedPoint.shortDescription) && (
+                                    <p className="home-sheet__place-desc">
+                                        {selectedPoint.description ||
+                                            selectedPoint.shortDescription}
+                                    </p>
+                                )}
+                                {(selectedPoint.rating > 0 ||
+                                    selectedPoint.expectedVisitMinutes > 0) && (
+                                    <div className="home-sheet__place-stats">
+                                        {selectedPoint.rating > 0 && (
+                                            <span className="home-sheet__place-stat home-sheet__place-stat--rating">
+                                                ★{" "}
+                                                {selectedPoint.rating.toFixed(
+                                                    1,
+                                                )}
+                                            </span>
+                                        )}
+                                        {selectedPoint.expectedVisitMinutes >
+                                            0 && (
+                                            <span className="home-sheet__place-stat">
+                                                ~
+                                                {
+                                                    selectedPoint.expectedVisitMinutes
+                                                }{" "}
+                                                мин
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
                             </div>
-                            <h3 className="home-sheet__place-title">
-                                {selectedPoint.title}
-                            </h3>
-                            {selectedPoint.addressLabel && (
-                                <p className="home-sheet__place-address">
-                                    {selectedPoint.addressLabel}
-                                </p>
-                            )}
-                            {selectedPoint.scheduleLabel && (
-                                <p className="home-sheet__place-schedule">
-                                    {selectedPoint.scheduleLabel}
-                                </p>
-                            )}
-                            {(selectedPoint.description ||
-                                selectedPoint.shortDescription) && (
-                                <p className="home-sheet__place-desc">
-                                    {selectedPoint.description ||
-                                        selectedPoint.shortDescription}
-                                </p>
-                            )}
-                            {(selectedPoint.rating > 0 ||
-                                selectedPoint.expectedVisitMinutes > 0) && (
-                                <div className="home-sheet__place-stats">
-                                    {selectedPoint.rating > 0 && (
-                                        <span className="home-sheet__place-stat home-sheet__place-stat--rating">
-                                            ★ {selectedPoint.rating.toFixed(1)}
-                                        </span>
-                                    )}
-                                    {selectedPoint.expectedVisitMinutes > 0 && (
-                                        <span className="home-sheet__place-stat">
-                                            ~
-                                            {selectedPoint.expectedVisitMinutes}{" "}
-                                            мин
-                                        </span>
-                                    )}
-                                </div>
-                            )}
-                        </div>
                         </div>
                     )}
 
@@ -917,7 +967,7 @@ export function HomePage() {
                     {/* ── Excursions ── */}
                     <div className="home-sheet__section home-sheet__section--excursions">
                         <h3 className="home-sheet__section-title">
-                            Готовые экскурсии
+                            Готовые маршруты
                         </h3>
 
                         <div className="home-sheet__filter-group home-sheet__filter-group--inline">
@@ -994,19 +1044,35 @@ export function HomePage() {
                         </p>
                         <div className="home-sheet__footer-features">
                             <span className="home-sheet__footer-feature">
-                                <span aria-hidden="true" className="home-sheet__footer-feature-icon"><FooterFeatureIcon name="audio" /></span>
+                                <span
+                                    aria-hidden="true"
+                                    className="home-sheet__footer-feature-icon">
+                                    <FooterFeatureIcon name="audio" />
+                                </span>
                                 Аудиоэкскурсии
                             </span>
                             <span className="home-sheet__footer-feature">
-                                <span aria-hidden="true" className="home-sheet__footer-feature-icon"><FooterFeatureIcon name="routes" /></span>
+                                <span
+                                    aria-hidden="true"
+                                    className="home-sheet__footer-feature-icon">
+                                    <FooterFeatureIcon name="routes" />
+                                </span>
                                 Готовые маршруты
                             </span>
                             <span className="home-sheet__footer-feature">
-                                <span aria-hidden="true" className="home-sheet__footer-feature-icon"><FooterFeatureIcon name="nearby" /></span>
+                                <span
+                                    aria-hidden="true"
+                                    className="home-sheet__footer-feature-icon">
+                                    <FooterFeatureIcon name="nearby" />
+                                </span>
                                 Места рядом
                             </span>
                             <span className="home-sheet__footer-feature">
-                                <span aria-hidden="true" className="home-sheet__footer-feature-icon"><FooterFeatureIcon name="walking" /></span>
+                                <span
+                                    aria-hidden="true"
+                                    className="home-sheet__footer-feature-icon">
+                                    <FooterFeatureIcon name="walking" />
+                                </span>
                                 Пешие прогулки
                             </span>
                         </div>
