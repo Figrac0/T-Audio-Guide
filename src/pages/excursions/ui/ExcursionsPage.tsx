@@ -405,6 +405,7 @@ export function ExcursionsPage() {
   }, [animateSheetPosition])
 
   const hasMoreExcursions = state.excursions.length > catalogInitial
+  const detailPoint = state.detailPoint
 
   return (
     <div className="ep">
@@ -521,8 +522,14 @@ export function ExcursionsPage() {
           ref={bodyRef}
           style={{ overflowY: isFullyOpen ? undefined : 'hidden' }}
         >
-          {state.detailPoint ? (
-            <PointDetailPanel point={state.detailPoint} />
+          {detailPoint ? (
+            <PointDetailPanel
+              isDraftFull={state.draftStops.length >= 6}
+              isInDraft={state.isPointInDraft(detailPoint.id)}
+              onAddPoint={() => state.handleAddPoint(detailPoint)}
+              onClose={closeDetailMode}
+              point={detailPoint}
+            />
           ) : (
           <>
           {state.draftStops.length > 0 ? (
@@ -781,13 +788,28 @@ const ExcursionCard = memo(function ExcursionCard({ excursion }: ExcursionCardPr
 // ── PointDetailPanel ──────────────────────────────────────────────────────────
 
 interface PointDetailPanelProps {
+  isDraftFull: boolean
+  isInDraft: boolean
+  onAddPoint: () => void
+  onClose: () => void
   point: NearbyPoint
 }
 
-function PointDetailPanel({ point }: PointDetailPanelProps) {
+function PointDetailPanel({
+  isDraftFull,
+  isInDraft,
+  onAddPoint,
+  onClose,
+  point,
+}: PointDetailPanelProps) {
   const walkMinutes = Math.max(1, Math.round((point.distanceMeters / 1000) * 12))
   const placeholder = buildPlacePlaceholderImage(point.category)
   const detailDescription = point.description || point.shortDescription
+  const addButtonLabel = isInDraft
+    ? 'Уже в маршруте'
+    : isDraftFull
+      ? 'Маршрут заполнен'
+      : 'Добавить в свой маршрут'
 
   return (
     <div className="ep-detail">
@@ -823,6 +845,24 @@ function PointDetailPanel({ point }: PointDetailPanelProps) {
         {detailDescription && (
           <p className="ep-detail__full-desc">{detailDescription}</p>
         )}
+
+        <div className="ep-detail__actions" aria-label="Действия с точкой">
+          <button
+            className="rbm-popup__btn rbm-popup__btn--primary ep-detail__action-btn"
+            disabled={isInDraft || isDraftFull}
+            onClick={onAddPoint}
+            type="button"
+          >
+            {addButtonLabel}
+          </button>
+          <button
+            className="rbm-popup__btn rbm-popup__btn--danger ep-detail__action-btn ep-detail__action-btn--close"
+            onClick={onClose}
+            type="button"
+          >
+            Закрыть
+          </button>
+        </div>
 
         {point.addressLabel && (
           <p className="ep-detail__address">

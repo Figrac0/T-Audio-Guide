@@ -1666,6 +1666,26 @@ body.app-body--routes-page {
     justify-self: stretch;
 }
 
+.ep-detail__actions {
+    display: grid;
+    justify-items: center;
+    gap: 10px;
+    width: 100%;
+    margin-top: 2px;
+}
+
+.ep-detail__action-btn {
+    width: fit-content;
+    min-width: 0;
+    max-width: min(100%, 320px);
+    padding-inline: 18px;
+}
+
+.ep-detail__action-btn--close {
+    border-color: rgba(194, 81, 75, 0.22);
+    background: rgba(255, 244, 242, 0.92);
+}
+
 .ep-detail__address {
     margin: 0;
     color: var(--color-text-tertiary);

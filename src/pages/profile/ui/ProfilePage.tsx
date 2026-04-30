@@ -444,7 +444,8 @@ export function ProfilePage() {
                         </span>
                     </div>
 
-                    <div className="profile-routes profile-routes--saved">
+                    <div
+                        className={`profile-routes profile-routes--saved${savedRoutes.length ? " profile-routes--scrollable" : ""}`}>
                         {savedRoutes.length ? (
                             savedRoutes.map((route) => (
                                 <ProfileRouteCard
@@ -480,7 +481,8 @@ export function ProfilePage() {
                     </span>
                 </div>
 
-                <div className="profile-routes profile-routes--grid">
+                <div
+                    className={`profile-routes profile-routes--grid${personalRoutes.length ? "" : " profile-routes--empty"}`}>
                     {personalRoutes.length ? (
                         visiblePersonalRoutes.map((route) => (
                             <ProfileRouteCard
