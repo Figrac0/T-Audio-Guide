@@ -1,93 +1,115 @@
 import {
-  clearAuthTokens,
-  request,
-  writeAuthTokens,
-} from '@/shared/api/http'
+    clearAuthTokens,
+    readAuthTokens,
+    request,
+    writeAuthTokens,
+} from "@/shared/api/http";
 import type {
-  AuthResponseDto,
-  ChangePasswordRequestDto,
-  RegisterRequestDto,
-  SessionDto,
-  SignInRequestDto,
-  UserProfileDto,
-} from '@/shared/api/contracts'
+    AuthResponseDto,
+    ChangePasswordRequestDto,
+    RegisterRequestDto,
+    SessionDto,
+    SignInRequestDto,
+    UserProfileDto,
+    UserRole,
+} from "@/shared/api/contracts";
+import type { SupportedLocale } from "@/entities/excursion/model/types";
 
 export const authService = {
-  async changePassword(payload: ChangePasswordRequestDto) {
-    await request<void>('/auth/change-password', {
-      body: JSON.stringify(payload),
-      method: 'POST',
-    })
-  },
+    async changePassword(payload: ChangePasswordRequestDto) {
+        await request<void>("/profile/change-password", {
+            body: JSON.stringify(payload),
+            method: "POST",
+        });
+    },
 
-  async login(payload: SignInRequestDto) {
-    const response = await request<AuthResponseDto>('/auth/login', {
-      body: JSON.stringify(payload),
-      method: 'POST',
-    })
+    async login(payload: SignInRequestDto) {
+        const response = await request<AuthResponseDto>("/auth/login", {
+            body: JSON.stringify({
+                username: payload.login,
+                password: payload.password,
+            }),
+            method: "POST",
+        });
 
-    return createAuthenticatedSession(response)
-  },
+        return createAuthenticatedSession(response);
+    },
 
-  async logout() {
-    await request<void>('/auth/logout', {
-      method: 'POST',
-    }).catch(() => undefined)
-    clearAuthTokens()
-    return createGuestSession()
-  },
+    async logout() {
+        const tokens = readAuthTokens();
+        if (tokens?.refreshToken) {
+            await request<void>("/auth/logout", {
+                body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+                method: "POST",
+            }).catch(() => undefined);
+        }
+        clearAuthTokens();
+        return createGuestSession();
+    },
 
-  async register(payload: RegisterRequestDto) {
-    const response = await request<AuthResponseDto>('/auth/registration', {
-      body: JSON.stringify(payload),
-      method: 'POST',
-    })
+    async register(payload: RegisterRequestDto) {
+        const username =
+            payload.email.trim().split("@")[0] || `user-${Date.now()}`;
+        const response = await request<AuthResponseDto>("/auth/registration", {
+            body: JSON.stringify({
+                username,
+                email: payload.email,
+                name: payload.name,
+                password: payload.password,
+                lang: (payload.language ?? 'ru').toUpperCase(),
+            }),
+            method: "POST",
+        });
 
-    return createAuthenticatedSession(response)
-  },
-}
+        return createAuthenticatedSession(response);
+    },
+};
 
 function createAuthenticatedSession(response: AuthResponseDto): SessionDto {
-  const tokens = response.tokens ?? (
-    response.accessToken && response.refreshToken
-      ? {
-          accessToken: response.accessToken,
-          refreshToken: response.refreshToken,
-        }
-      : null
-  )
+    const tokens =
+        response.tokens ??
+        (response.accessToken && response.refreshToken
+            ? {
+                  accessToken: response.accessToken,
+                  refreshToken: response.refreshToken,
+              }
+            : null);
 
-  if (tokens) {
-    writeAuthTokens(tokens)
-  }
+    if (tokens) {
+        writeAuthTokens(tokens);
+    }
 
-  return {
-    isAuthenticated: true,
-    profile: normalizeProfile(response.profile ?? response.user),
-  }
+    return {
+        isAuthenticated: true,
+        profile: normalizeProfile(response.profile ?? response.user),
+    };
 }
 
 function createGuestSession(): SessionDto {
-  return {
-    isAuthenticated: false,
-    profile: null,
-  }
+    return {
+        isAuthenticated: false,
+        profile: null,
+    };
 }
 
-function normalizeProfile(profile: AuthResponseDto['profile'] | AuthResponseDto['user']): UserProfileDto {
-  if (!profile) {
-    throw new Error('Профиль не найден в ответе сервера.')
-  }
+function normalizeProfile(
+    profile: AuthResponseDto["profile"] | AuthResponseDto["user"],
+): UserProfileDto {
+    if (!profile) {
+        throw new Error("Профиль не найден в ответе сервера.");
+    }
 
-  const language = 'language' in profile ? profile.language : profile.lang
+    // Backend sends lang as "RU" (uppercase) and role as "USER" (uppercase)
+    const rawLang = "language" in profile ? profile.language : profile.lang;
+    const language = (rawLang?.toLowerCase() ?? "ru") as SupportedLocale;
 
-  return {
-    email: profile.email,
-    id: profile.id,
-    lang: language,
-    language,
-    name: profile.name,
-    role: profile.role,
-    username: 'username' in profile ? profile.username : undefined,
-  }
+    return {
+        email: profile.email,
+        id: String(profile.id), // backend sends int64 (number)
+        lang: language,
+        language,
+        name: profile.name,
+        role: (profile.role?.toLowerCase() ?? "user") as UserRole,
+        username: "username" in profile ? profile.username : undefined,
+    };
 }

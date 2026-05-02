@@ -1,8 +1,10 @@
+import type { SupportedLocale } from '@/entities/excursion/model/types'
 import { request } from '@/shared/api/http'
 import type {
   BackendUserDto,
   UpdateProfileRequestDto,
   UserProfileDto,
+  UserRole,
 } from '@/shared/api/contracts'
 
 export const profileService = {
@@ -15,7 +17,7 @@ export const profileService = {
     const response = await request<BackendUserDto | UserProfileDto>('/profile', {
       body: JSON.stringify({
         email: payload.email,
-        lang: payload.language,
+        lang: payload.language.toUpperCase(),
         name: payload.name,
       }),
       method: 'PATCH',
@@ -26,16 +28,18 @@ export const profileService = {
 }
 
 function normalizeProfile(profile: BackendUserDto | UserProfileDto): UserProfileDto {
-  const language = 'language' in profile ? profile.language : profile.lang
+  // Backend sends lang as "RU" (uppercase) and role as "USER" (uppercase)
+  const rawLang = 'language' in profile ? profile.language : profile.lang
+  const language = (rawLang?.toLowerCase() ?? 'ru') as SupportedLocale
 
   return {
     email: profile.email,
-    id: profile.id,
+    id: String(profile.id),  // backend sends int64 (number)
     lang: language,
     language,
     name: profile.name,
     phone: 'phone' in profile ? profile.phone : undefined,
-    role: profile.role,
+    role: (profile.role?.toLowerCase() ?? 'user') as UserRole,
     username: 'username' in profile ? profile.username : undefined,
   }
 }

@@ -1,5 +1,5 @@
 ﻿import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/app/providers/useAuth";
 import {
@@ -32,6 +32,7 @@ type ProfileToast = {
 };
 
 export function ProfilePage() {
+    const navigate = useNavigate();
     const { changePassword, session, signOut, updateProfile } = useAuth();
     const {
         personalRoutes,
@@ -44,6 +45,20 @@ export function ProfilePage() {
         session?.isAuthenticated && session.profile,
     );
     const { error, isLoading, overview } = useProfileOverview(isAuthenticated);
+
+    useEffect(() => {
+        if (!error) return;
+        const isAuthError =
+            error.includes('401') ||
+            error.toLowerCase().includes('authentication') ||
+            error.toLowerCase().includes('unauthorized') ||
+            error.toLowerCase().includes('access denied');
+        if (isAuthError) {
+            signOut().finally(() => {
+                navigate(appRoutes.signIn, { replace: true });
+            });
+        }
+    }, [error, navigate, signOut]);
     const profile = session?.profile ?? overview?.profile ?? null;
     const [name, setName] = useState(profile?.name ?? "");
     const [email, setEmail] = useState(profile?.email ?? "");

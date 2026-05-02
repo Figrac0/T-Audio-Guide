@@ -621,7 +621,9 @@ export function ExcursionsPage() {
               <ExcursionsSkeleton />
             ) : state.excursions.length === 0 ? (
               <p className="ep-catalog__empty">
-                Маршруты не найдены. Попробуйте другой фильтр или отдалите карту.
+                {state.discoveryError
+                  ? 'Не удалось загрузить маршруты. Попробуйте перезагрузить страницу.'
+                  : 'Маршруты не найдены. Попробуйте другой фильтр или отдалите карту.'}
               </p>
             ) : (
               <>

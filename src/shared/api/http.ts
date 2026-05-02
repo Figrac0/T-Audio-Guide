@@ -35,7 +35,15 @@ export function readAuthTokens(): AuthTokensDto | null {
       return null
     }
 
-    return parseAuthTokens(JSON.parse(rawValue))
+    const tokens = parseAuthTokens(JSON.parse(rawValue))
+
+    // Clear obviously fake/mock tokens (very short or clearly test values).
+    if (tokens && (tokens.accessToken.length < 16 || tokens.accessToken === 'mocked_access_token')) {
+      clearAuthTokens()
+      return null
+    }
+
+    return tokens
   } catch {
     clearAuthTokens()
     return null
@@ -63,13 +71,16 @@ export function clearAuthTokens() {
   window.localStorage.removeItem(authTokensStorageKey)
 }
 
+// These endpoints don't require authentication — sending a stale token would cause 500
+const unauthenticatedPaths = ['/auth/login', '/auth/registration', '/auth/refresh']
+
 async function fetchWithAuth(path: string, init?: RequestInit) {
   const tokens = readAuthTokens()
   const headers = new Headers(init?.headers)
 
   headers.set('Content-Type', 'application/json')
 
-  if (tokens?.accessToken) {
+  if (tokens?.accessToken && !unauthenticatedPaths.includes(path)) {
     headers.set('Authorization', `Bearer ${tokens.accessToken}`)
   }
 
@@ -113,6 +124,17 @@ async function refreshAccessToken() {
 
 async function parseResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
+    // Try to extract the error message from the backend JSON body
+    const text = await response.text().catch(() => '')
+    if (text) {
+      try {
+        const body = JSON.parse(text) as { message?: string; error?: string }
+        const message = body.message || body.error
+        if (message) throw new Error(message)
+      } catch (e) {
+        if (e instanceof SyntaxError === false) throw e
+      }
+    }
     throw new Error(`HTTP ${response.status}`)
   }
 

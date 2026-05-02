@@ -908,59 +908,72 @@ export function HomePage() {
                     )}
 
                     {/* ── Nearby cards ── */}
-                    {nearbyPoints.length > 0 && (
-                        <div className="home-sheet__section">
-                            <h3 className="home-sheet__section-title">
-                                Рядом с вами
-                            </h3>
-                            <div
-                                className="home-sheet__cards"
-                                ref={nearbyListRef}>
-                                {nearbyPoints.map((point) => (
-                                    <button
-                                        className={[
-                                            "home-card",
-                                            point.id ===
-                                            effectiveSelectedPointId
-                                                ? "home-card--active"
-                                                : "",
-                                        ]
-                                            .filter(Boolean)
-                                            .join(" ")}
-                                        data-point-id={point.id}
-                                        key={point.id}
-                                        onClick={() =>
-                                            handleNearbyCardClick(point.id)
-                                        }
-                                        type="button">
-                                        <div className="home-card__img">
-                                            <SmartPlaceImage
-                                                alt={point.title}
-                                                category={point.category}
-                                                loading="lazy"
-                                                referrerPolicy="no-referrer"
-                                                src={point.imageUrl}
-                                                title={point.title}
-                                            />
-                                            <span className="home-card__dist-badge">
-                                                {formatMeters(
-                                                    point.distanceMeters,
-                                                )}
-                                            </span>
-                                        </div>
-                                        <div className="home-card__body">
-                                            <span className="home-card__cat">
-                                                {formatPointCategory(
-                                                    point.category,
-                                                )}
-                                            </span>
-                                            <p className="home-card__title">
-                                                {point.title}
-                                            </p>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
+                    {canLoadNearbyPlaces && (
+                        <div
+                            className={`home-sheet__section${isLoading && nearbyPoints.length > 0 ? ' home-sheet__section--fading' : ''}`}
+                        >
+                            <h3 className="home-sheet__section-title">Рядом с вами</h3>
+                            {nearbyPoints.length > 0 ? (
+                                <div
+                                    className="home-sheet__cards"
+                                    ref={nearbyListRef}>
+                                    {nearbyPoints.map((point) => (
+                                        <button
+                                            className={[
+                                                "home-card",
+                                                point.id ===
+                                                effectiveSelectedPointId
+                                                    ? "home-card--active"
+                                                    : "",
+                                            ]
+                                                .filter(Boolean)
+                                                .join(" ")}
+                                            data-point-id={point.id}
+                                            key={point.id}
+                                            onClick={() =>
+                                                handleNearbyCardClick(point.id)
+                                            }
+                                            type="button">
+                                            <div className="home-card__img">
+                                                <SmartPlaceImage
+                                                    alt={point.title}
+                                                    category={point.category}
+                                                    loading="lazy"
+                                                    referrerPolicy="no-referrer"
+                                                    src={point.imageUrl}
+                                                    title={point.title}
+                                                />
+                                                <span className="home-card__dist-badge">
+                                                    {formatMeters(
+                                                        point.distanceMeters,
+                                                    )}
+                                                </span>
+                                            </div>
+                                            <div className="home-card__body">
+                                                <span className="home-card__cat">
+                                                    {formatPointCategory(
+                                                        point.category,
+                                                    )}
+                                                </span>
+                                                <p className="home-card__title">
+                                                    {point.title}
+                                                </p>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : !isLoading ? (
+                                <section className={`status-card${discoveryError ? ' status-card--error' : ''}`}>
+                                    <h3 className="status-card__title">
+                                        {discoveryError ? 'Ошибка загрузки' : 'Нет точек рядом'}
+                                    </h3>
+                                    <p className="status-card__text">
+                                        {discoveryError
+                                            ? 'Сервис временно недоступен. Попробуйте перезагрузить страницу.'
+                                            : 'В этом радиусе нет доступных мест. Попробуйте другой фильтр или отдалите карту.'}
+                                    </p>
+                                </section>
+                            ) : null}
                         </div>
                     )}
 
@@ -1014,6 +1027,7 @@ export function HomePage() {
                             emptyDescription="Попробуйте другой фильтр"
                             emptyTitle="Нет маршрутов"
                             excursions={visibleRoutes.slice(0, 4)}
+                            isError={Boolean(discoveryError)}
                         />
 
                         {visibleRoutes.length > 0 && (

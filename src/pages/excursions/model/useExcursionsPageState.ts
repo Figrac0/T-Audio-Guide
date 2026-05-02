@@ -87,7 +87,7 @@ export function useExcursionsPageState() {
   const canLoadNearbyPlaces =
     Boolean(userPosition) || geolocationStatus === 'blocked' || geolocationStatus === 'unsupported'
 
-  const { excursions, isLoading, nearbyPoints } = useDiscoveryRoutes({
+  const { error: discoveryError, excursions, isLoading, nearbyPoints } = useDiscoveryRoutes({
     activePointCategory: 'all',
     center,
     enabled: canLoadNearbyPlaces,
@@ -351,6 +351,7 @@ export function useExcursionsPageState() {
     activeTheme,
     canLoadNearbyPlaces,
     detailPoint,
+    discoveryError,
     draftStops,
     excursions: filteredExcursions,
     expandedStopId,
