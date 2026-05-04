@@ -967,13 +967,16 @@
         height: min(180px, 46%);
         right: 8px;
         bottom: 8px;
+        opacity: 0.5;
     }
 
     .profile-card--empty-art::after {
-        width: 260px;
-        height: 220px;
-        right: -36px;
-        bottom: -64px;
+        display: none;
+    }
+
+    .profile-card--saved.profile-card--empty-art .profile-routes--saved::after,
+    .profile-card--personal.profile-card--empty-art .profile-routes--empty::after {
+        display: none;
     }
 
     .profile-route,
@@ -1042,21 +1045,22 @@
     .profile-card--saved.profile-card--empty-art .profile-routes--saved::before,
     .profile-card--personal.profile-card--empty-art
         .profile-routes--empty::before {
-        inset: 34px -64px -12px;
-        background-size: 520px auto;
+        inset: 34px 0 0;
+        background-size: min(100%, 520px) auto;
         background-position: center bottom;
-        opacity: 0.82;
+        opacity: 0.5;
     }
 
     .profile-card--saved.profile-card--empty-art .profile-routes--saved::after,
     .profile-card--personal.profile-card--empty-art
         .profile-routes--empty::after {
-        inset: 20px -40px -18px;
+        inset: 20px 0 0;
     }
 
     .profile-card--empty-art::before {
         width: min(190px, 56%);
         height: min(140px, 40%);
+        opacity: 0.3;
     }
 
     .profile-card--empty-art::after {
@@ -1064,6 +1068,7 @@
         height: 180px;
         right: -26px;
         bottom: -52px;
+        opacity: 0.2;
     }
 }
 

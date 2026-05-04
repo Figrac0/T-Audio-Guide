@@ -26,7 +26,7 @@ export const authService = {
     async login(payload: SignInRequestDto) {
         const response = await request<AuthResponseDto>("/auth/login", {
             body: JSON.stringify({
-                username: payload.login,
+                username: payload.login.trim(),
                 password: payload.password,
             }),
             method: "POST",
@@ -48,13 +48,11 @@ export const authService = {
     },
 
     async register(payload: RegisterRequestDto) {
-        const username =
-            payload.email.trim().split("@")[0] || `user-${Date.now()}`;
         const response = await request<AuthResponseDto>("/auth/registration", {
             body: JSON.stringify({
-                username,
-                email: payload.email,
-                name: payload.name,
+                username: payload.name.trim(),
+                email: payload.email.trim(),
+                name: payload.name.trim(),
                 password: payload.password,
                 lang: (payload.language ?? 'ru').toUpperCase(),
             }),

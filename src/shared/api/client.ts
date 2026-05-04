@@ -48,7 +48,8 @@ const httpApi: FrontendApi = {
   },
 
   async getDiscoveryFeed(payload): Promise<DiscoveryFeedDto> {
-    const radiusKm = Math.min(5, payload.radiusMeters / 1000)
+    // swagger: radiusKilometers is integer [1, 15]
+    const radiusKm = Math.max(1, Math.min(15, Math.round(payload.radiusMeters / 1000)))
     const categorySlug = payload.category !== 'all' ? payload.category : undefined
 
     const location = { latitude: payload.center.lat, longitude: payload.center.lng }
@@ -64,7 +65,7 @@ const httpApi: FrontendApi = {
       excursionsService
         .searchExcursions({
           location,
-          radiusKilometers: Math.min(5, payload.radiusMeters / 1000),
+          radiusKilometers: radiusKm,
         })
         .catch(() => []),
     ])
@@ -121,7 +122,7 @@ const httpApi: FrontendApi = {
   },
 
   async getRoutesCatalog(payload: RouteCatalogRequest) {
-    const radiusKm = Math.min(5, payload.radiusMeters / 1000)
+    const radiusKm = Math.max(1, Math.min(15, Math.round(payload.radiusMeters / 1000)))
     const rawExcursions = await excursionsService.searchExcursions({
       location: { latitude: payload.center.lat, longitude: payload.center.lng },
       radiusKilometers: radiusKm,

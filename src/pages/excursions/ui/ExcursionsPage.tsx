@@ -620,11 +620,16 @@ export function ExcursionsPage() {
             {state.isLoading && state.excursions.length === 0 ? (
               <ExcursionsSkeleton />
             ) : state.excursions.length === 0 ? (
-              <p className="ep-catalog__empty">
-                {state.discoveryError
-                  ? 'Не удалось загрузить маршруты. Попробуйте перезагрузить страницу.'
-                  : 'Маршруты не найдены. Попробуйте другой фильтр или отдалите карту.'}
-              </p>
+              <section className={`status-card${state.discoveryError ? ' status-card--error' : ''}`}>
+                <h3 className="status-card__title">
+                  {state.discoveryError ? 'Ошибка загрузки' : 'Нет маршрутов'}
+                </h3>
+                <p className="status-card__text">
+                  {state.discoveryError
+                    ? 'Сервис временно недоступен. Попробуйте перезагрузить страницу.'
+                    : 'Попробуйте другой фильтр'}
+                </p>
+              </section>
             ) : (
               <>
                 <div className="ep-catalog__grid">

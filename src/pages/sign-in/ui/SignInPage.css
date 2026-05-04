@@ -209,6 +209,7 @@
   background: var(--color-danger-soft);
   color: var(--color-danger);
   font-weight: 700;
+  text-align: center;
 }
 
 .auth-page__success {
@@ -218,6 +219,7 @@
   background: var(--color-brand-soft);
   color: var(--color-brand-strong);
   font-weight: 700;
+  text-align: center;
 }
 
 .auth-page__footer--center {

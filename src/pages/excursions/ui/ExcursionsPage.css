@@ -770,6 +770,30 @@ body.app-body--routes-page {
     margin: 18px 16px 0;
 }
 
+/* status-card inside the ep-sheet: compact variant */
+.ep-sheet .status-card {
+    padding: 16px 18px 20px;
+    gap: 8px;
+    margin: 10px auto 6px;
+    border-radius: 18px;
+    animation: ep-status-enter 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.06s both;
+}
+
+.ep-sheet .status-card__title {
+    font-size: 1.35rem;
+    letter-spacing: -0.03em;
+}
+
+.ep-sheet .status-card__text {
+    font-size: 0.84rem;
+    line-height: 1.5;
+}
+
+@keyframes ep-status-enter {
+    from { opacity: 0; transform: translateY(5px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
 .ep-catalog__head {
     display: flex;
     align-items: center;
@@ -858,11 +882,12 @@ body.app-body--routes-page {
 
 .ep-filters__divider {
     height: 1px;
+    margin: 2px 0;
     background: linear-gradient(
         90deg,
         transparent,
-        rgba(31, 37, 51, 0.1) 18%,
-        rgba(31, 37, 51, 0.1) 82%,
+        rgba(31, 37, 51, 0.1) 20%,
+        rgba(31, 37, 51, 0.1) 80%,
         transparent
     );
 }
@@ -1062,9 +1087,11 @@ body.app-body--routes-page {
 
 .ep-card__tagline {
     -webkit-line-clamp: 2;
+    line-clamp: 2;
 }
 .ep-card__description {
     -webkit-line-clamp: 4;
+    line-clamp: 4;
 }
 
 /* Stats row: flex + center so cells are content-width, not stretched */

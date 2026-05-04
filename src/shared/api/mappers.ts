@@ -14,14 +14,15 @@ export interface ApiGeoPoint {
   longitude: number
 }
 
-/** GET /points/search → PointListResponse.points[] */
+/** GET /points/search → PointListResponse.points[] (PointShortItem) */
 export interface ApiPointShort {
   id: number
   title: string
+  shortDescription?: string | null
   categoryId: number
   categoryName: string
   coordinates: ApiGeoPoint
-  visitTime?: number
+  visitTime?: number | null
 }
 
 export interface ApiPointMedia {
@@ -34,13 +35,14 @@ export interface ApiPointMedia {
 export interface ApiPointDetail {
   id: number
   title: string
-  description?: string
+  description?: string | null
+  shortDescription?: string | null
   categoryId: number
   categoryName: string
-  address?: string
+  address?: string | null
   coordinates: ApiGeoPoint
-  visitTime?: number
-  workingHours?: string
+  visitTime?: number | null
+  workingHours?: string | null
   media?: ApiPointMedia[]
 }
 
@@ -161,8 +163,15 @@ export function haversineDistance(
 
 function getImageUrl(media?: ApiPointMedia[]): string {
   if (!media?.length) return ''
-  const img = media.find((m) => /^image|^photo/i.test(m.type ?? ''))
-  return img?.url ?? media[0]?.url ?? ''
+  const sorted = [...media].sort((a, b) => a.sortOrder - b.sortOrder)
+  const img = sorted.find((m) => /^image|^photo/i.test(m.type ?? ''))
+  return img?.url ?? ''
+}
+
+function getAudioUrl(media?: ApiPointMedia[]): string | null {
+  if (!media?.length) return null
+  const audio = media.find((m) => /^audio/i.test(m.type ?? ''))
+  return audio?.url ?? null
 }
 
 // ── Theme inference ──────────────────────────────────────────────────────────
@@ -187,7 +196,7 @@ export function mapNearbyPointFromShort(
     id: String(point.id),
     title: point.title,
     category: mapCategoryName(point.categoryName),
-    shortDescription: '',
+    shortDescription: point.shortDescription ?? '',
     description: '',
     coordinates: { lat: point.coordinates.latitude, lng: point.coordinates.longitude },
     imageUrl: '',
@@ -214,7 +223,7 @@ export function mapNearbyPointFromDetail(
     id: String(point.id),
     title: point.title,
     category: mapCategoryName(point.categoryName),
-    shortDescription: point.description ?? '',
+    shortDescription: point.shortDescription ?? point.description ?? '',
     description: point.description ?? '',
     coordinates: { lat: point.coordinates.latitude, lng: point.coordinates.longitude },
     imageUrl: getImageUrl(point.media),
@@ -227,8 +236,8 @@ export function mapNearbyPointFromDetail(
       point.coordinates.latitude,
       point.coordinates.longitude,
     ),
-    addressLabel: point.address,
-    audioGuideUrl: null,
+    addressLabel: point.address ?? undefined,
+    audioGuideUrl: getAudioUrl(point.media),
   }
 }
 
@@ -245,7 +254,7 @@ export function mapRouteStopFromApiPoint(
     order,
     title: point.title,
     category: mapCategoryName(point.categoryName),
-    shortDescription: '',
+    shortDescription: point.shortDescription ?? '',
     description: '',
     coordinates: { lat: point.coordinates.latitude, lng: point.coordinates.longitude },
     imageUrl: '',
