@@ -19,6 +19,7 @@ export interface UserRoutesContextValue {
   clearDraftRoute: () => void
   isPointInDraft: (pointId: string) => boolean
   isRouteSaved: (slug: string) => boolean
+  reorderDraftStops: (fromIndex: number, toIndex: number) => void
   removeDraftStop: (stopId: string) => void
   removePersonalRoute: (slug: string) => void
   removeSavedRoute: (slug: string) => void

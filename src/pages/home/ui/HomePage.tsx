@@ -1174,6 +1174,9 @@ export function HomePage() {
                         )}
                     </div>
 
+                    {/* ── Decorative art (fills empty space on larger screens) ── */}
+                    <div aria-hidden="true" className="home-sheet__art" />
+
                     {/* ── Footer ── */}
                     <footer className="home-sheet__footer">
                         <div className="home-sheet__footer-brand">

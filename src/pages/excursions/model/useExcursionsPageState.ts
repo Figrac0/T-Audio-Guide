@@ -48,6 +48,7 @@ export function useExcursionsPageState() {
     clearDraftRoute,
     draftStops,
     isPointInDraft,
+    reorderDraftStops,
     removeDraftStop,
     saveDraftRoute,
   } = useUserRoutes()
@@ -347,6 +348,13 @@ export function useExcursionsPageState() {
     setRecenterKey((n) => n + 1)
   }, [requestLocation, userPosition])
 
+  const handleReorderStop = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      reorderDraftStops(fromIndex, toIndex)
+    },
+    [reorderDraftStops],
+  )
+
   return {
     activeTheme,
     canLoadNearbyPlaces,
@@ -360,6 +368,7 @@ export function useExcursionsPageState() {
     handleClearRoute,
     handleCloseDetail,
     handleLocateUser,
+    handleReorderStop,
     handlePopupClose,
     handleRemovePointFromDraft,
     handleRemoveStop,

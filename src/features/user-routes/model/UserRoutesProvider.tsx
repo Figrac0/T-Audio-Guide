@@ -165,6 +165,27 @@ export function UserRoutesProvider({ children }: UserRoutesProviderProps) {
     })
   }, [location.pathname])
 
+  const reorderDraftStops = useCallback((fromIndex: number, toIndex: number) => {
+    setDraftState((currentState) => {
+      const currentStops =
+        currentState.pathname === location.pathname ? currentState.stops : []
+      if (
+        fromIndex === toIndex ||
+        fromIndex < 0 || toIndex < 0 ||
+        fromIndex >= currentStops.length || toIndex >= currentStops.length
+      ) {
+        return currentState
+      }
+      const reordered = [...currentStops]
+      const [moved] = reordered.splice(fromIndex, 1)
+      reordered.splice(toIndex, 0, moved)
+      return {
+        pathname: location.pathname,
+        stops: reordered.map((stop, index) => ({ ...stop, order: index + 1 })),
+      }
+    })
+  }, [location.pathname])
+
   const clearDraftRoute = useCallback(() => {
     setDraftState({
       pathname: location.pathname,
@@ -237,6 +258,7 @@ export function UserRoutesProvider({ children }: UserRoutesProviderProps) {
       isPointInDraft,
       isRouteSaved,
       personalRoutes,
+      reorderDraftStops,
       removeDraftStop,
       removePersonalRoute,
       removeSavedRoute,
@@ -252,6 +274,7 @@ export function UserRoutesProvider({ children }: UserRoutesProviderProps) {
       isPointInDraft,
       isRouteSaved,
       personalRoutes,
+      reorderDraftStops,
       removeDraftStop,
       removePersonalRoute,
       removeSavedRoute,

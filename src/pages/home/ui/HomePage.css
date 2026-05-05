@@ -1009,8 +1009,47 @@ body.app-body--home-page {
    SHEET FOOTER
 ───────────────────────────────────────────────────────────────────────────── */
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   DECORATIVE ART  (fills empty space between content and footer on large screens)
+───────────────────────────────────────────────────────────────────────────── */
+
+.home-sheet__art {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.home-sheet__art::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 300' fill='none'%3E%3Cpath d='M-10 210C90 155 210 112 380 148C550 184 650 72 840 108C895 120 945 152 1010 166' stroke='%23B9971B' stroke-opacity='.22' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M-10 258C120 210 275 198 430 234C585 268 690 172 872 196C918 204 962 232 1010 228' stroke='%231F8A70' stroke-opacity='.16' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M-10 284C82 268 192 258 352 272C500 284 608 222 768 236C864 244 938 268 1010 262' stroke='%23B9971B' stroke-opacity='.12' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='108' cy='228' r='22' fill='%23FFDD2D' fill-opacity='.24'/%3E%3Ccircle cx='292' cy='184' r='16' fill='%231F8A70' fill-opacity='.14'/%3E%3Ccircle cx='452' cy='138' r='28' fill='%23FFDD2D' fill-opacity='.18'/%3E%3Ccircle cx='656' cy='172' r='20' fill='%231F8A70' fill-opacity='.13'/%3E%3Ccircle cx='856' cy='104' r='26' fill='%23FFDD2D' fill-opacity='.22'/%3E%3Ccircle cx='768' cy='238' r='14' fill='%231F8A70' fill-opacity='.12'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center bottom;
+    background-size: cover;
+}
+
+.home-sheet__art::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        180deg,
+        #ffffff 0%,
+        rgba(255, 255, 255, 0.4) 28%,
+        transparent 55%,
+        transparent 100%
+    );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   FOOTER
+───────────────────────────────────────────────────────────────────────────── */
+
 .home-sheet__footer {
-    margin: auto 16px 0;
+    margin: 16px 16px 0;
     padding: 22px 20px 24px;
     border-radius: 22px;
     background: linear-gradient(
@@ -1112,7 +1151,7 @@ body.app-body--home-page {
 
 @media (min-width: 768px) {
     .home-sheet__footer {
-        margin: auto 0 0;
+        margin: 16px 0 0;
         border-radius: 0;
         display: flex;
         flex-direction: column;

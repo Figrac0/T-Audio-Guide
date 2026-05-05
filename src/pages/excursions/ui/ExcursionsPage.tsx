@@ -80,6 +80,74 @@ export function ExcursionsPage() {
   const hasDraftStops = state.draftStops.length > 0
   const lastDraftStop = hasDraftStops ? state.draftStops[state.draftStops.length - 1] : null
 
+  // ── Drag-to-reorder state ───────────────────────────────────────────────────
+  const [reorderState, setReorderState] = useState<{ stopId: string; overIdx: number } | null>(null)
+  const reorderStateRef = useRef<{ stopId: string; overIdx: number } | null>(null)
+  const draftStopsRef = useRef(state.draftStops)
+  const handleReorderStopRef = useRef(state.handleReorderStop)
+  const stopsContainerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => { draftStopsRef.current = state.draftStops }, [state.draftStops])
+  useEffect(() => { handleReorderStopRef.current = state.handleReorderStop }, [state.handleReorderStop])
+
+  const displayedStops = useMemo(() => {
+    if (!reorderState) return state.draftStops
+    const { stopId, overIdx } = reorderState
+    const srcIdx = state.draftStops.findIndex(s => s.id === stopId)
+    if (srcIdx === -1) return state.draftStops
+    const reordered = [...state.draftStops]
+    const [moved] = reordered.splice(srcIdx, 1)
+    reordered.splice(overIdx, 0, moved)
+    return reordered.map((s, i) => ({ ...s, order: i + 1 }))
+  }, [reorderState, state.draftStops])
+
+  const handleReorderStart = useCallback((stopIdx: number) => {
+    const stop = draftStopsRef.current[stopIdx]
+    if (!stop) return
+    const initial = { stopId: stop.id, overIdx: stopIdx }
+    reorderStateRef.current = initial
+    setReorderState(initial)
+
+    const onMove = (e: PointerEvent) => {
+      const container = stopsContainerRef.current
+      if (!container) return
+      const items = [...container.children] as HTMLElement[]
+      let bestIdx = 0, bestDist = Infinity
+      for (let i = 0; i < items.length; i++) {
+        const { top, height } = items[i].getBoundingClientRect()
+        const mid = top + height / 2
+        const d = Math.abs(e.clientY - mid)
+        if (d < bestDist) { bestDist = d; bestIdx = i }
+      }
+      setReorderState(prev => {
+        if (!prev || prev.overIdx === bestIdx) return prev
+        const next = { ...prev, overIdx: bestIdx }
+        reorderStateRef.current = next
+        return next
+      })
+    }
+
+    const onUp = () => {
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+      document.removeEventListener('pointercancel', onUp)
+      const cur = reorderStateRef.current
+      reorderStateRef.current = null
+      setReorderState(null)
+      if (cur) {
+        const fromIdx = draftStopsRef.current.findIndex(s => s.id === cur.stopId)
+        if (fromIdx !== -1 && fromIdx !== cur.overIdx) {
+          handleReorderStopRef.current(fromIdx, cur.overIdx)
+        }
+      }
+    }
+
+    document.addEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', onUp)
+    document.addEventListener('pointercancel', onUp)
+  }, [])
+
+  // ── Sheet state ─────────────────────────────────────────────────────────────
   const [sheetTranslate, setSheetTranslate] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const sheetRef = useRef<HTMLDivElement>(null)
@@ -532,7 +600,7 @@ export function ExcursionsPage() {
             />
           ) : (
           <>
-          {state.draftStops.length > 0 ? (
+          {hasDraftStops ? (
             <section className="ep-draft">
               <div className="ep-draft__head">
                 <h2 className="ep-draft__title">
@@ -541,11 +609,13 @@ export function ExcursionsPage() {
                 </h2>
               </div>
 
-              <div className="ep-draft__stops">
-                {state.draftStops.map((stop) => (
+              <div className="ep-draft__stops" ref={stopsContainerRef}>
+                {displayedStops.map((stop, idx) => (
                   <DraftStopCard
+                    isDragging={reorderState?.stopId === stop.id}
                     isExpanded={state.expandedStopId === stop.id}
                     key={stop.id}
+                    onDragStart={() => handleReorderStart(idx)}
                     onRemove={() => state.handleRemoveStop(stop.id)}
                     onToggle={() => state.setExpandedStopId((cur) => (cur === stop.id ? null : stop.id))}
                     stop={stop}
@@ -574,95 +644,130 @@ export function ExcursionsPage() {
             </div>
           )}
 
-          <section className="ep-catalog">
-            <div className="ep-catalog__head">
-              <h2 className="ep-catalog__title">Готовые маршруты</h2>
-              {state.excursions.length > 0 ? (
-                <span className="ep-catalog__count">{state.excursions.length}</span>
-              ) : null}
-            </div>
-
-            <div className="ep-filters">
-              <div className="ep-filters__group">
-                {themeOptions.map((theme) => (
-                  <button
-                    className={`ep-filters__pill${state.activeTheme === theme ? ' ep-filters__pill--active' : ''}`}
-                    key={theme}
-                    onClick={() => state.setActiveTheme(theme)}
-                    type="button"
-                  >
-                    {theme === 'all' ? 'Все темы' : formatTheme(theme)}
-                  </button>
-                ))}
+          {/* When building a route: show nearby points with +/– buttons.
+              Otherwise: show the ready-routes catalog. */}
+          {hasDraftStops ? (
+            <section className="ep-nearby">
+              <div className="ep-nearby__head">
+                <h2 className="ep-nearby__title">Точки рядом</h2>
+                {state.nearbyPoints.length > 0 && (
+                  <span className="ep-catalog__count">{state.nearbyPoints.length}</span>
+                )}
               </div>
-              <div className="ep-filters__divider" />
-              <div className="ep-filters__group">
-                <button
-                  className={`ep-filters__pill${state.maxDuration === null ? ' ep-filters__pill--active' : ''}`}
-                  onClick={() => state.setMaxDuration(null)}
-                  type="button"
-                >
-                  Любое время
-                </button>
-                {durationOptions.map((duration) => (
-                  <button
-                    className={`ep-filters__pill${state.maxDuration === duration ? ' ep-filters__pill--active' : ''}`}
-                    key={duration}
-                    onClick={() => state.setMaxDuration(duration)}
-                    type="button"
-                  >
-                    До {formatDuration(duration)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {state.isLoading && state.excursions.length === 0 ? (
-              <ExcursionsSkeleton />
-            ) : state.excursions.length === 0 ? (
-              <section className={`status-card${state.discoveryError ? ' status-card--error' : ''}`}>
-                <h3 className="status-card__title">
-                  {state.discoveryError ? 'Ошибка загрузки' : 'Нет маршрутов'}
-                </h3>
-                <p className="status-card__text">
+              {state.isLoading && state.nearbyPoints.length === 0 ? (
+                <NearbyPointsSkeleton />
+              ) : state.nearbyPoints.length === 0 ? (
+                <p className="ep-catalog__empty">
                   {state.discoveryError
-                    ? 'Сервис временно недоступен. Попробуйте перезагрузить страницу.'
-                    : 'Попробуйте другой фильтр'}
+                    ? 'Сервис временно недоступен.'
+                    : 'Нет доступных точек в этом радиусе.'}
                 </p>
-              </section>
-            ) : (
-              <>
-                <div className="ep-catalog__grid">
-                  {state.excursions.slice(0, catalogInitial).map((excursion) => (
-                    <ExcursionCard excursion={excursion} key={excursion.id} />
+              ) : (
+                <div className="ep-nearby__list">
+                  {state.nearbyPoints.map((point) => (
+                    <NearbyPointRow
+                      isDraftFull={state.draftStops.length >= 6}
+                      isInDraft={state.isPointInDraft(point.id)}
+                      key={point.id}
+                      onAdd={() => state.handleAddPoint(point)}
+                      onRemove={() => state.handleRemovePointFromDraft(point.id)}
+                      point={point}
+                    />
                   ))}
                 </div>
+              )}
+            </section>
+          ) : (
+            <section className="ep-catalog">
+              <div className="ep-catalog__head">
+                <h2 className="ep-catalog__title">Готовые маршруты</h2>
+                {state.excursions.length > 0 ? (
+                  <span className="ep-catalog__count">{state.excursions.length}</span>
+                ) : null}
+              </div>
 
-                {hasMoreExcursions ? (
-                  <>
-                    <div className={`ep-catalog__extra${showAll ? ' ep-catalog__extra--open' : ''}`}>
-                      <div className="ep-catalog__extra-inner">
-                        <div className="ep-catalog__grid">
-                          {state.excursions.slice(catalogInitial).map((excursion) => (
-                            <ExcursionCard excursion={excursion} key={excursion.id} />
-                          ))}
+              <div className="ep-filters">
+                <div className="ep-filters__group">
+                  {themeOptions.map((theme) => (
+                    <button
+                      className={`ep-filters__pill${state.activeTheme === theme ? ' ep-filters__pill--active' : ''}`}
+                      key={theme}
+                      onClick={() => state.setActiveTheme(theme)}
+                      type="button"
+                    >
+                      {theme === 'all' ? 'Все темы' : formatTheme(theme)}
+                    </button>
+                  ))}
+                </div>
+                <div className="ep-filters__divider" />
+                <div className="ep-filters__group">
+                  <button
+                    className={`ep-filters__pill${state.maxDuration === null ? ' ep-filters__pill--active' : ''}`}
+                    onClick={() => state.setMaxDuration(null)}
+                    type="button"
+                  >
+                    Любое время
+                  </button>
+                  {durationOptions.map((duration) => (
+                    <button
+                      className={`ep-filters__pill${state.maxDuration === duration ? ' ep-filters__pill--active' : ''}`}
+                      key={duration}
+                      onClick={() => state.setMaxDuration(duration)}
+                      type="button"
+                    >
+                      До {formatDuration(duration)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {state.isLoading && state.excursions.length === 0 ? (
+                <ExcursionsSkeleton />
+              ) : state.excursions.length === 0 ? (
+                <section className={`status-card${state.discoveryError ? ' status-card--error' : ''}`}>
+                  <h3 className="status-card__title">
+                    {state.discoveryError ? 'Ошибка загрузки' : 'Нет маршрутов'}
+                  </h3>
+                  <p className="status-card__text">
+                    {state.discoveryError
+                      ? 'Сервис временно недоступен. Попробуйте перезагрузить страницу.'
+                      : 'Попробуйте другой фильтр'}
+                  </p>
+                </section>
+              ) : (
+                <>
+                  <div className="ep-catalog__grid">
+                    {state.excursions.slice(0, catalogInitial).map((excursion) => (
+                      <ExcursionCard excursion={excursion} key={excursion.id} />
+                    ))}
+                  </div>
+
+                  {hasMoreExcursions ? (
+                    <>
+                      <div className={`ep-catalog__extra${showAll ? ' ep-catalog__extra--open' : ''}`}>
+                        <div className="ep-catalog__extra-inner">
+                          <div className="ep-catalog__grid">
+                            {state.excursions.slice(catalogInitial).map((excursion) => (
+                              <ExcursionCard excursion={excursion} key={excursion.id} />
+                            ))}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="ep-catalog__toggle-wrap">
-                      <button
-                        className={`ep-catalog__toggle${showAll ? ' ep-catalog__toggle--open' : ''}`}
-                        onClick={() => setShowAll((v) => !v)}
-                        type="button"
-                      >
-                        {showAll ? 'Скрыть' : `Показать все (${state.excursions.length})`}
-                      </button>
-                    </div>
-                  </>
-                ) : null}
-              </>
-            )}
-          </section>
+                      <div className="ep-catalog__toggle-wrap">
+                        <button
+                          className={`ep-catalog__toggle${showAll ? ' ep-catalog__toggle--open' : ''}`}
+                          onClick={() => setShowAll((v) => !v)}
+                          type="button"
+                        >
+                          {showAll ? 'Скрыть' : `Показать все (${state.excursions.length})`}
+                        </button>
+                      </div>
+                    </>
+                  ) : null}
+                </>
+              )}
+            </section>
+          )
 
           <footer className="ep-footer">
             <div className="ep-footer__brand">
@@ -691,13 +796,22 @@ export function ExcursionsPage() {
 // ── DraftStopCard ─────────────────────────────────────────────────────────────
 
 interface DraftStopCardProps {
+  isDragging: boolean
   isExpanded: boolean
+  onDragStart: () => void
   onRemove: () => void
   onToggle: () => void
   stop: RouteStop
 }
 
-const DraftStopCard = memo(function DraftStopCard({ isExpanded, onRemove, onToggle, stop }: DraftStopCardProps) {
+const DraftStopCard = memo(function DraftStopCard({
+  isDragging,
+  isExpanded,
+  onDragStart,
+  onRemove,
+  onToggle,
+  stop,
+}: DraftStopCardProps) {
   const text = stop.description || stop.shortDescription
   const preview = [
     stop.expectedVisitMinutes > 0 && formatDuration(stop.expectedVisitMinutes),
@@ -705,18 +819,36 @@ const DraftStopCard = memo(function DraftStopCard({ isExpanded, onRemove, onTogg
   ].filter(Boolean).join(' · ')
 
   return (
-    <div className={`ep-stop${isExpanded ? ' ep-stop--open' : ''}`}>
-      <button className="ep-stop__header" onClick={onToggle} type="button">
-        <span className="ep-stop__order">{stop.order}</span>
-        <div className="ep-stop__info">
-          <span className="ep-stop__cat">{formatPointCategory(stop.category)}</span>
-          <span className="ep-stop__name">{stop.title}</span>
-          {preview ? <span className="ep-stop__preview">{preview}</span> : null}
-        </div>
-        <span aria-hidden="true" className={`ep-stop__chevron${isExpanded ? ' ep-stop__chevron--open' : ''}`}>
-          +
-        </span>
-      </button>
+    <div className={`ep-stop${isExpanded ? ' ep-stop--open' : ''}${isDragging ? ' ep-stop--dragging' : ''}`}>
+      <div className="ep-stop__head">
+        <button
+          aria-label="Перетащить для изменения порядка"
+          className="ep-stop__drag-handle"
+          onPointerDown={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onDragStart()
+          }}
+          type="button"
+        >
+          <svg aria-hidden="true" fill="currentColor" height="12" viewBox="0 0 10 14" width="10">
+            <rect height="2" rx="1" width="10" y="0" />
+            <rect height="2" rx="1" width="10" y="5" />
+            <rect height="2" rx="1" width="10" y="10" />
+          </svg>
+        </button>
+        <button className="ep-stop__header" onClick={onToggle} type="button">
+          <span className="ep-stop__order">{stop.order}</span>
+          <div className="ep-stop__info">
+            <span className="ep-stop__cat">{formatPointCategory(stop.category)}</span>
+            <span className="ep-stop__name">{stop.title}</span>
+            {preview ? <span className="ep-stop__preview">{preview}</span> : null}
+          </div>
+          <span aria-hidden="true" className={`ep-stop__chevron${isExpanded ? ' ep-stop__chevron--open' : ''}`}>
+            +
+          </span>
+        </button>
+      </div>
 
       <div className={`ep-stop__body${isExpanded ? ' ep-stop__body--open' : ''}`}>
         <div className="ep-stop__body-inner">
@@ -895,6 +1027,63 @@ function PointDetailPanel({
         </div>
         <p className="ep-footer__copy">© T-Guide · Полезные подсказки по точке маршрута</p>
       </footer>
+    </div>
+  )
+}
+
+// ── NearbyPointRow ────────────────────────────────────────────────────────────
+
+interface NearbyPointRowProps {
+  isDraftFull: boolean
+  isInDraft: boolean
+  onAdd: () => void
+  onRemove: () => void
+  point: NearbyPoint
+}
+
+function NearbyPointRow({ isDraftFull, isInDraft, onAdd, onRemove, point }: NearbyPointRowProps) {
+  const placeholder = buildPlacePlaceholderImage(point.category)
+
+  return (
+    <div className="ep-nearby-row">
+      <div className="ep-nearby-row__img">
+        <img
+          alt={point.title}
+          loading="lazy"
+          onError={(e) => { (e.target as HTMLImageElement).src = placeholder }}
+          referrerPolicy="no-referrer"
+          src={point.imageUrl || placeholder}
+        />
+      </div>
+      <div className="ep-nearby-row__info">
+        <span className="ep-nearby-row__cat">{formatPointCategory(point.category)}</span>
+        <p className="ep-nearby-row__name">{point.title}</p>
+        <div className="ep-nearby-row__meta">
+          <span className="ep-nearby-row__dist">{formatMeters(point.distanceMeters)}</span>
+          {point.rating > 0 && (
+            <span className="ep-nearby-row__rating">★ {point.rating.toFixed(1)}</span>
+          )}
+        </div>
+      </div>
+      <button
+        aria-label={isInDraft ? 'Убрать из маршрута' : isDraftFull ? 'Маршрут заполнен' : 'Добавить в маршрут'}
+        className={`ep-nearby-row__btn${isInDraft ? ' ep-nearby-row__btn--remove' : ''}${!isInDraft && isDraftFull ? ' ep-nearby-row__btn--disabled' : ''}`}
+        disabled={!isInDraft && isDraftFull}
+        onClick={isInDraft ? onRemove : onAdd}
+        type="button"
+      >
+        {isInDraft ? '−' : '+'}
+      </button>
+    </div>
+  )
+}
+
+function NearbyPointsSkeleton() {
+  return (
+    <div className="ep-nearby__skeleton">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div className="ep-nearby-row ep-nearby-row--skeleton" key={i} />
+      ))}
     </div>
   )
 }
