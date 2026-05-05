@@ -20,12 +20,17 @@ import {
 import { buildPlacePlaceholderImage, buildRoutePlaceholderImage } from '@/shared/lib/placeholder-images'
 import { FooterFeatureIcon } from '@/shared/ui/FooterFeatureIcon'
 import { ResilientImage } from '@/shared/ui/ResilientImage'
+import { SmartPlaceImage } from '@/shared/ui/SmartPlaceImage'
 import { RouteBuilderMap, type RouteBuilderMapHandle } from './RouteBuilderMap'
 import './ExcursionsPage.css'
 
 const DRAG_MIN = 10
 const CLOSED_HEIGHT = 52        // drag handle bar only — always visible
 const INTERMEDIATE_PEEK_HEIGHT = 124 // 52px bar + 72px draft-preview bar
+const SHEET_SNAP_EASING = 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+const SHEET_SNAP_DURATION_MS = 480
+const SHEET_SNAP_FAST_DURATION_MS = 300
+const SHEET_SNAP_MEDIUM_DURATION_MS = 400
 
 function getCatalogInitial(): number {
   if (typeof window === 'undefined') return 6
@@ -83,9 +88,11 @@ export function ExcursionsPage() {
   // ── Drag-to-reorder state ───────────────────────────────────────────────────
   const [reorderState, setReorderState] = useState<{ stopId: string; overIdx: number } | null>(null)
   const reorderStateRef = useRef<{ stopId: string; overIdx: number } | null>(null)
+  const isReorderingRef = useRef(false)
   const draftStopsRef = useRef(state.draftStops)
   const handleReorderStopRef = useRef(state.handleReorderStop)
   const stopsContainerRef = useRef<HTMLDivElement>(null)
+  const nearbyListRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { draftStopsRef.current = state.draftStops }, [state.draftStops])
   useEffect(() => { handleReorderStopRef.current = state.handleReorderStop }, [state.handleReorderStop])
@@ -105,6 +112,7 @@ export function ExcursionsPage() {
     const stop = draftStopsRef.current[stopIdx]
     if (!stop) return
     const initial = { stopId: stop.id, overIdx: stopIdx }
+    isReorderingRef.current = true
     reorderStateRef.current = initial
     setReorderState(initial)
 
@@ -132,6 +140,7 @@ export function ExcursionsPage() {
       document.removeEventListener('pointerup', onUp)
       document.removeEventListener('pointercancel', onUp)
       const cur = reorderStateRef.current
+      isReorderingRef.current = false
       reorderStateRef.current = null
       setReorderState(null)
       if (cur) {
@@ -157,6 +166,8 @@ export function ExcursionsPage() {
   const peekTranslateRef = useRef(0)
   const closedTranslateRef = useRef(0)
   const sheetTranslateRef = useRef(0)
+  const animationCleanupRef = useRef<number | null>(null)
+  const animationVersionRef = useRef(0)
   const hasDraftStopsRef = useRef(hasDraftStops)
   const prevHasDraftRef = useRef(false)
   const draftPreviewRef = useRef<HTMLDivElement>(null)
@@ -173,10 +184,74 @@ export function ExcursionsPage() {
 
   useEffect(() => {
     document.body.classList.add('app-body--routes-page')
-    return () => document.body.classList.remove('app-body--routes-page')
+    return () => {
+      document.body.classList.remove('app-body--routes-page')
+      isReorderingRef.current = false
+      if (animationCleanupRef.current !== null) {
+        window.clearTimeout(animationCleanupRef.current)
+      }
+    }
   }, [])
 
   useEffect(() => { hasDraftStopsRef.current = hasDraftStops }, [hasDraftStops])
+
+  useEffect(() => {
+    if (!hasDraftStops || state.nearbyPoints.length === 0) return
+    // Arrow buttons handle scrolling on desktop; skip drag-scroll there
+    if (window.matchMedia('(min-width: 768px)').matches) return
+    const el = nearbyListRef.current
+    if (!el) return
+
+    let isDown = false
+    let startX = 0
+    let scrollLeft = 0
+    let hasDragged = false
+
+    const onMouseDown = (event: MouseEvent) => {
+      isDown = true
+      hasDragged = false
+      startX = event.pageX - el.offsetLeft
+      scrollLeft = el.scrollLeft
+      el.style.cursor = 'grabbing'
+    }
+
+    const stopDrag = () => {
+      isDown = false
+      el.style.cursor = ''
+    }
+
+    const onMouseMove = (event: MouseEvent) => {
+      if (!isDown) return
+      const x = event.pageX - el.offsetLeft
+      const walk = (x - startX) * 1.4
+      if (Math.abs(walk) > 4) {
+        hasDragged = true
+        event.preventDefault()
+      }
+      el.scrollLeft = scrollLeft - walk
+    }
+
+    const onClickCapture = (event: MouseEvent) => {
+      if (!hasDragged) return
+      event.stopPropagation()
+      event.preventDefault()
+      hasDragged = false
+    }
+
+    el.addEventListener('mousedown', onMouseDown)
+    el.addEventListener('mouseleave', stopDrag)
+    el.addEventListener('mouseup', stopDrag)
+    el.addEventListener('mousemove', onMouseMove)
+    el.addEventListener('click', onClickCapture, true)
+
+    return () => {
+      el.removeEventListener('mousedown', onMouseDown)
+      el.removeEventListener('mouseleave', stopDrag)
+      el.removeEventListener('mouseup', stopDrag)
+      el.removeEventListener('mousemove', onMouseMove)
+      el.removeEventListener('click', onClickCapture, true)
+    }
+  }, [hasDraftStops, state.nearbyPoints.length])
 
   // Derived display state — must be declared before any effect that reads it
   const isFullyOpen = !isDragging && sheetTranslate <= DRAG_MIN + 2
@@ -191,22 +266,35 @@ export function ExcursionsPage() {
     setSheetTranslate(safe)
   }, [])
 
-  const animateSheetPosition = useCallback((nextTranslate: number, durationMs = 480) => {
+  const animateSheetPosition = useCallback((nextTranslate: number, durationMs = SHEET_SNAP_DURATION_MS) => {
     const sheet = sheetRef.current
     if (!sheet) return
+    if (animationCleanupRef.current !== null) {
+      window.clearTimeout(animationCleanupRef.current)
+      animationCleanupRef.current = null
+    }
     const safe = clampSheetTranslate(nextTranslate, closedTranslateRef.current)
     const fromY = getSheetTranslateY(sheet)
     sheet.style.willChange = 'transform'
     sheet.style.transition = 'none'
     sheet.style.transform = `translateY(${fromY}px)`
     void sheet.offsetHeight
-    sheet.style.transition = `transform ${durationMs}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`
+    sheet.style.transition = `transform ${durationMs}ms ${SHEET_SNAP_EASING}`
     sheet.style.transform = `translateY(${safe}px)`
     sheetTranslateRef.current = safe
     setSheetTranslate(safe)
-    const clear = () => { sheet.style.willChange = '' }
+    const animationVersion = animationVersionRef.current + 1
+    animationVersionRef.current = animationVersion
+    const clear = () => {
+      if (animationVersionRef.current !== animationVersion) return
+      sheet.style.willChange = ''
+      if (animationCleanupRef.current !== null) {
+        window.clearTimeout(animationCleanupRef.current)
+        animationCleanupRef.current = null
+      }
+    }
     sheet.addEventListener('transitionend', clear, { once: true })
-    setTimeout(clear, durationMs + 100)
+    animationCleanupRef.current = window.setTimeout(clear, durationMs + 100)
   }, [])
 
   const snapToClosed = useCallback(() => {
@@ -311,7 +399,7 @@ export function ExcursionsPage() {
 
   useEffect(() => {
     if (state.detailPoint && hasMeasuredRef.current) {
-      animateSheetPosition(DRAG_MIN)
+      animateSheetPosition(DRAG_MIN, 600)
     }
   }, [state.detailPoint, animateSheetPosition])
 
@@ -326,6 +414,7 @@ export function ExcursionsPage() {
       reachedTopAt = body.scrollTop === 0 ? e.touches[0].clientY : -1
     }
     const onTouchMove = (e: TouchEvent) => {
+      if (isReorderingRef.current) return
       if (sheetTranslateRef.current > DRAG_MIN + 2) return // only when fully open
       const currentY = e.touches[0].clientY
       if (body.scrollTop === 0 && reachedTopAt < 0) reachedTopAt = currentY
@@ -351,7 +440,7 @@ export function ExcursionsPage() {
   }, [animateSheetPosition])
 
   const handleSheetToggle = useCallback(() => {
-    if (isDragging) return
+    if (isDragging || isReorderingRef.current) return
     if (isDetailModeRef.current) {
       closeDetailMode()
       return
@@ -360,13 +449,14 @@ export function ExcursionsPage() {
       // Fully open → collapse to closed
       animateSheetPosition(closedTranslateRef.current)
     } else {
-      // Closed or peeking → expand to full
+      // Closed or peeking → expand to full (slightly slower for a smoother feel)
       mapHandleRef.current?.closePopup()
-      animateSheetPosition(DRAG_MIN)
+      animateSheetPosition(DRAG_MIN, 600)
     }
   }, [isDragging, animateSheetPosition, closeDetailMode])
 
   const handleDragStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (isReorderingRef.current) return
     const sheet = sheetRef.current
     if (!sheet) return
     mapHandleRef.current?.closePopup()
@@ -432,11 +522,11 @@ export function ExcursionsPage() {
     const fullT = DRAG_MIN
     const closedT = closedTranslateRef.current
     const absV = Math.abs(velocity)
-    const durationMs = absV > 12 ? 300 : absV > 6 ? 400 : 480
-
-    const clear = () => { sheet.style.willChange = '' }
-    sheet.addEventListener('transitionend', clear, { once: true })
-    setTimeout(clear, 580)
+    const durationMs = absV > 12
+      ? SHEET_SNAP_FAST_DURATION_MS
+      : absV > 6
+        ? SHEET_SNAP_MEDIUM_DURATION_MS
+        : SHEET_SNAP_DURATION_MS
 
     if (isDetailModeRef.current) {
       const snaps = [fullT, closedT]
@@ -596,6 +686,7 @@ export function ExcursionsPage() {
               isInDraft={state.isPointInDraft(detailPoint.id)}
               onAddPoint={() => state.handleAddPoint(detailPoint)}
               onClose={closeDetailMode}
+              onRemovePoint={() => state.handleRemovePointFromDraft(detailPoint.id)}
               point={detailPoint}
             />
           ) : (
@@ -644,39 +735,92 @@ export function ExcursionsPage() {
             </div>
           )}
 
-          {/* When building a route: show nearby points with +/– buttons.
-              Otherwise: show the ready-routes catalog. */}
+          {/* When building a route: horizontal scrollable card strip (same as home "Рядом с вами").
+              Click card = add to route; click again = remove. */}
           {hasDraftStops ? (
-            <section className="ep-nearby">
-              <div className="ep-nearby__head">
-                <h2 className="ep-nearby__title">Точки рядом</h2>
+            <>
+              <div className={`ep-nearby-wrap${state.isLoading && state.nearbyPoints.length > 0 ? ' ep-nearby-wrap--fading' : ''}`}>
+                <h3 className="ep-nearby-wrap__title">Рядом с вами</h3>
+                {state.nearbyPoints.length > 0 ? (
+                  <div className="ep-nearby-strip" ref={nearbyListRef}>
+                    {state.nearbyPoints.map((point) => {
+                      const inDraft = state.isPointInDraft(point.id)
+                      return (
+                        <button
+                          className={`ep-nearby-card${inDraft ? ' ep-nearby-card--active' : ''}`}
+                          data-point-id={point.id}
+                          key={point.id}
+                          onClick={() => {
+                            if (inDraft) {
+                              state.handleRemovePointFromDraft(point.id)
+                            } else {
+                              state.handleAddPoint(point)
+                            }
+                          }}
+                          type="button"
+                        >
+                          <div className="ep-nearby-card__img">
+                            <SmartPlaceImage
+                              alt={point.title}
+                              category={point.category}
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                              src={point.imageUrl}
+                              title={point.title}
+                            />
+                            <span className="ep-nearby-card__dist">{formatMeters(point.distanceMeters)}</span>
+                          </div>
+                          <div className="ep-nearby-card__body">
+                            <span className="ep-nearby-card__cat">{formatPointCategory(point.category)}</span>
+                            <p className="ep-nearby-card__name">{point.title}</p>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : !state.isLoading ? (
+                  <section className={`status-card${state.discoveryError ? ' status-card--error' : ''}`}>
+                    <h3 className="status-card__title">
+                      {state.discoveryError ? 'Ошибка загрузки' : 'Нет точек рядом'}
+                    </h3>
+                    <p className="status-card__text">
+                      {state.discoveryError
+                        ? 'Сервис временно недоступен. Попробуйте перезагрузить страницу.'
+                        : 'В этом радиусе нет доступных мест. Попробуйте другой фильтр или отдалите карту.'}
+                    </p>
+                  </section>
+                ) : null}
+
+                {/* Arrow buttons — visible only on desktop (≥768px via CSS) */}
                 {state.nearbyPoints.length > 0 && (
-                  <span className="ep-catalog__count">{state.nearbyPoints.length}</span>
+                  <div className="ep-nearby-nav" aria-hidden="true">
+                    <button
+                      aria-label="Прокрутить влево"
+                      className="ep-nearby-nav__btn"
+                      onClick={() => nearbyListRef.current?.scrollBy({ left: -300, behavior: 'smooth' })}
+                      type="button"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                        <path d="M11 4L6 9L11 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                    <button
+                      aria-label="Прокрутить вправо"
+                      className="ep-nearby-nav__btn"
+                      onClick={() => nearbyListRef.current?.scrollBy({ left: 300, behavior: 'smooth' })}
+                      type="button"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                        <path d="M7 4L12 9L7 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                  </div>
                 )}
               </div>
-              {state.isLoading && state.nearbyPoints.length === 0 ? (
-                <NearbyPointsSkeleton />
-              ) : state.nearbyPoints.length === 0 ? (
-                <p className="ep-catalog__empty">
-                  {state.discoveryError
-                    ? 'Сервис временно недоступен.'
-                    : 'Нет доступных точек в этом радиусе.'}
-                </p>
-              ) : (
-                <div className="ep-nearby__list">
-                  {state.nearbyPoints.map((point) => (
-                    <NearbyPointRow
-                      isDraftFull={state.draftStops.length >= 6}
-                      isInDraft={state.isPointInDraft(point.id)}
-                      key={point.id}
-                      onAdd={() => state.handleAddPoint(point)}
-                      onRemove={() => state.handleRemovePointFromDraft(point.id)}
-                      point={point}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
+
+              {/* Decorative art — fills the gap between nearby section and footer */}
+              <div aria-hidden="true" className="ep-sheet__art" />
+            </>
           ) : (
             <section className="ep-catalog">
               <div className="ep-catalog__head">
@@ -767,7 +911,7 @@ export function ExcursionsPage() {
                 </>
               )}
             </section>
-          )
+          )}
 
           <footer className="ep-footer">
             <div className="ep-footer__brand">
@@ -931,6 +1075,7 @@ interface PointDetailPanelProps {
   isInDraft: boolean
   onAddPoint: () => void
   onClose: () => void
+  onRemovePoint: () => void
   point: NearbyPoint
 }
 
@@ -939,16 +1084,24 @@ function PointDetailPanel({
   isInDraft,
   onAddPoint,
   onClose,
+  onRemovePoint,
   point,
 }: PointDetailPanelProps) {
   const walkMinutes = Math.max(1, Math.round((point.distanceMeters / 1000) * 12))
   const placeholder = buildPlacePlaceholderImage(point.category)
   const detailDescription = point.description || point.shortDescription
-  const addButtonLabel = isInDraft
-    ? 'Уже в маршруте'
+  const routeActionDisabled = !isInDraft && isDraftFull
+  const routeActionLabel = isInDraft
+    ? '− Убрать из маршрута'
     : isDraftFull
       ? 'Маршрут заполнен'
-      : 'Добавить в свой маршрут'
+      : '+ Добавить в свой маршрут'
+  const routeActionClassName = [
+    'rbm-popup__btn',
+    isInDraft ? 'rbm-popup__btn--danger' : 'rbm-popup__btn--primary',
+    'ep-detail__action-btn',
+    'ep-detail__action-btn--route',
+  ].join(' ')
 
   return (
     <div className="ep-detail">
@@ -987,12 +1140,12 @@ function PointDetailPanel({
 
         <div className="ep-detail__actions" aria-label="Действия с точкой">
           <button
-            className="rbm-popup__btn rbm-popup__btn--primary ep-detail__action-btn"
-            disabled={isInDraft || isDraftFull}
-            onClick={onAddPoint}
+            className={routeActionClassName}
+            disabled={routeActionDisabled}
+            onClick={isInDraft ? onRemovePoint : onAddPoint}
             type="button"
           >
-            {addButtonLabel}
+            {routeActionLabel}
           </button>
           <button
             className="rbm-popup__btn rbm-popup__btn--danger ep-detail__action-btn ep-detail__action-btn--close"
@@ -1027,63 +1180,6 @@ function PointDetailPanel({
         </div>
         <p className="ep-footer__copy">© T-Guide · Полезные подсказки по точке маршрута</p>
       </footer>
-    </div>
-  )
-}
-
-// ── NearbyPointRow ────────────────────────────────────────────────────────────
-
-interface NearbyPointRowProps {
-  isDraftFull: boolean
-  isInDraft: boolean
-  onAdd: () => void
-  onRemove: () => void
-  point: NearbyPoint
-}
-
-function NearbyPointRow({ isDraftFull, isInDraft, onAdd, onRemove, point }: NearbyPointRowProps) {
-  const placeholder = buildPlacePlaceholderImage(point.category)
-
-  return (
-    <div className="ep-nearby-row">
-      <div className="ep-nearby-row__img">
-        <img
-          alt={point.title}
-          loading="lazy"
-          onError={(e) => { (e.target as HTMLImageElement).src = placeholder }}
-          referrerPolicy="no-referrer"
-          src={point.imageUrl || placeholder}
-        />
-      </div>
-      <div className="ep-nearby-row__info">
-        <span className="ep-nearby-row__cat">{formatPointCategory(point.category)}</span>
-        <p className="ep-nearby-row__name">{point.title}</p>
-        <div className="ep-nearby-row__meta">
-          <span className="ep-nearby-row__dist">{formatMeters(point.distanceMeters)}</span>
-          {point.rating > 0 && (
-            <span className="ep-nearby-row__rating">★ {point.rating.toFixed(1)}</span>
-          )}
-        </div>
-      </div>
-      <button
-        aria-label={isInDraft ? 'Убрать из маршрута' : isDraftFull ? 'Маршрут заполнен' : 'Добавить в маршрут'}
-        className={`ep-nearby-row__btn${isInDraft ? ' ep-nearby-row__btn--remove' : ''}${!isInDraft && isDraftFull ? ' ep-nearby-row__btn--disabled' : ''}`}
-        disabled={!isInDraft && isDraftFull}
-        onClick={isInDraft ? onRemove : onAdd}
-        type="button"
-      >
-        {isInDraft ? '−' : '+'}
-      </button>
-    </div>
-  )
-}
-
-function NearbyPointsSkeleton() {
-  return (
-    <div className="ep-nearby__skeleton">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div className="ep-nearby-row ep-nearby-row--skeleton" key={i} />
-      ))}
     </div>
   )
 }

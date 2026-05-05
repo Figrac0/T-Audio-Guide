@@ -65,13 +65,18 @@ function getSheetTranslateY(el: HTMLElement): number {
     return parseFloat(m[1].split(",")[5] ?? "0");
 }
 
-function snapSheet(sheet: HTMLElement, toY: number, durationMs: number): void {
+function snapSheet(
+    sheet: HTMLElement,
+    toY: number,
+    durationMs: number,
+    easing = "cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+): void {
     const fromY = getSheetTranslateY(sheet);
     sheet.style.willChange = "transform";
     sheet.style.transition = "none";
     sheet.style.transform = `translateY(${fromY}px)`;
     void sheet.offsetHeight;
-    sheet.style.transition = `transform ${durationMs}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
+    sheet.style.transition = `transform ${durationMs}ms ${easing}`;
     sheet.style.transform = `translateY(${toY}px)`;
     const clear = () => {
         sheet.style.willChange = "";
@@ -160,6 +165,11 @@ export function HomePage() {
     >("success");
     const [recenterTrigger, setRecenterTrigger] = useState(0);
 
+    // Tracks whether data has ever arrived; set during render so it's instant.
+    const hasHadDataRef = useRef(false);
+    // Fallback: show empty state after 3 s even if no data arrived yet.
+    const [emptyAllowedByTimeout, setEmptyAllowedByTimeout] = useState(false);
+
     const nearbyListRef = useRef<HTMLDivElement | null>(null);
     const shouldScrollNearbyListRef = useRef(false);
     const isAuthenticated = Boolean(
@@ -219,6 +229,24 @@ export function HomePage() {
         radiusMeters,
         storedContext.browserLocale,
     ]);
+
+    // Once data arrives, latch the ref so canShowEmpty flips true immediately.
+    // The ref is set during render (not in an effect) to avoid the
+    // react-hooks/set-state-in-effect lint rule.
+    if (!hasHadDataRef.current && (nearbyPoints.length > 0 || excursions.length > 0)) {
+        hasHadDataRef.current = true;
+    }
+    // canShowEmpty is true once we've ever seen data OR after the 3-s timeout.
+    const canShowEmpty = hasHadDataRef.current || emptyAllowedByTimeout;
+
+    // Start a 3-s timer on first render. If data arrives first, hasHadDataRef
+    // flips to true during render and canShowEmpty becomes true instantly.
+    useEffect(() => {
+        if (hasHadDataRef.current || emptyAllowedByTimeout) return;
+        const id = setTimeout(() => setEmptyAllowedByTimeout(true), 3000);
+        return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const effectiveSelectedPointId =
         nearbyPoints.find((p) => p.id === selectedPointId)?.id ?? "";
@@ -605,8 +633,9 @@ export function HomePage() {
         return () => cancelAnimationFrame(frameId);
     }, [selectedPointId, measurePreviewHeight]);
 
-    // Auto-open to preview on mount (cleanup+re-run in StrictMode is fine —
-    // the second scheduled timeout is the one that actually fires)
+    // Auto-open to preview on mount. Near-zero delay so the animation begins
+    // immediately after first paint; the fast-start easing (0.16,1,0.3,1) passes
+    // through the intermediate peek position without any perceptible pause.
     useEffect(() => {
         const timeoutId = setTimeout(() => {
             const sheet = sheetRef.current;
@@ -621,8 +650,8 @@ export function HomePage() {
             skipSnapRef.current = true;
             setSheetState("preview");
             sheetStateRef.current = "preview";
-            snapSheet(sheet, previewT, 700);
-        }, 300);
+            snapSheet(sheet, previewT, 550, "cubic-bezier(0.16, 1, 0.3, 1)");
+        }, 50);
         return () => clearTimeout(timeoutId);
     }, [measurePreviewHeight]);
 
@@ -1040,74 +1069,74 @@ export function HomePage() {
                     )}
 
                     {/* ── Nearby cards ── */}
-                    {canLoadNearbyPlaces && (
-                        <div
-                            className={`home-sheet__section${isLoading && nearbyPoints.length > 0 ? ' home-sheet__section--fading' : ''}`}
-                        >
-                            <h3 className="home-sheet__section-title">Рядом с вами</h3>
-                            {nearbyPoints.length > 0 ? (
-                                <div
-                                    className="home-sheet__cards"
-                                    ref={nearbyListRef}>
-                                    {nearbyPoints.map((point) => (
-                                        <button
-                                            className={[
-                                                "home-card",
-                                                point.id ===
-                                                effectiveSelectedPointId
-                                                    ? "home-card--active"
-                                                    : "",
-                                            ]
-                                                .filter(Boolean)
-                                                .join(" ")}
-                                            data-point-id={point.id}
-                                            key={point.id}
-                                            onClick={() =>
-                                                handleNearbyCardClick(point.id)
-                                            }
-                                            type="button">
-                                            <div className="home-card__img">
-                                                <SmartPlaceImage
-                                                    alt={point.title}
-                                                    category={point.category}
-                                                    loading="lazy"
-                                                    referrerPolicy="no-referrer"
-                                                    src={point.imageUrl}
-                                                    title={point.title}
-                                                />
-                                                <span className="home-card__dist-badge">
-                                                    {formatMeters(
-                                                        point.distanceMeters,
-                                                    )}
-                                                </span>
-                                            </div>
-                                            <div className="home-card__body">
-                                                <span className="home-card__cat">
-                                                    {formatPointCategory(
-                                                        point.category,
-                                                    )}
-                                                </span>
-                                                <p className="home-card__title">
-                                                    {point.title}
-                                                </p>
-                                            </div>
-                                        </button>
-                                    ))}
-                                </div>
-                            ) : !isLoading ? (
-                                <section className={`status-card${discoveryError ? ' status-card--error' : ''}`}>
-                                    <h3 className="status-card__title">
-                                        {discoveryError ? 'Ошибка загрузки' : 'Нет точек рядом'}
-                                    </h3>
-                                    <p className="status-card__text">
-                                        {discoveryError
-                                            ? 'Сервис временно недоступен. Попробуйте перезагрузить страницу.'
-                                            : 'В этом радиусе нет доступных мест. Попробуйте другой фильтр или отдалите карту.'}
-                                    </p>
-                                </section>
-                            ) : null}
-                        </div>
-                    )}
+                    <div
+                        className={`home-sheet__section${isLoading && nearbyPoints.length > 0 ? ' home-sheet__section--fading' : ''}`}
+                    >
+                        <h3 className="home-sheet__section-title">Рядом с вами</h3>
+                        {nearbyPoints.length > 0 ? (
+                            <div
+                                className="home-sheet__cards"
+                                ref={nearbyListRef}>
+                                {nearbyPoints.map((point) => (
+                                    <button
+                                        className={[
+                                            "home-card",
+                                            point.id ===
+                                            effectiveSelectedPointId
+                                                ? "home-card--active"
+                                                : "",
+                                        ]
+                                            .filter(Boolean)
+                                            .join(" ")}
+                                        data-point-id={point.id}
+                                        key={point.id}
+                                        onClick={() =>
+                                            handleNearbyCardClick(point.id)
+                                        }
+                                        type="button">
+                                        <div className="home-card__img">
+                                            <SmartPlaceImage
+                                                alt={point.title}
+                                                category={point.category}
+                                                loading="lazy"
+                                                referrerPolicy="no-referrer"
+                                                src={point.imageUrl}
+                                                title={point.title}
+                                            />
+                                            <span className="home-card__dist-badge">
+                                                {formatMeters(
+                                                    point.distanceMeters,
+                                                )}
+                                            </span>
+                                        </div>
+                                        <div className="home-card__body">
+                                            <span className="home-card__cat">
+                                                {formatPointCategory(
+                                                    point.category,
+                                                )}
+                                            </span>
+                                            <p className="home-card__title">
+                                                {point.title}
+                                            </p>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : canShowEmpty && !isLoading ? (
+                            <section className={`status-card${discoveryError ? ' status-card--error' : ''}`}>
+                                <h3 className="status-card__title">
+                                    {discoveryError ? 'Ошибка загрузки' : 'Нет точек рядом'}
+                                </h3>
+                                <p className="status-card__text">
+                                    {discoveryError
+                                        ? 'Сервис временно недоступен. Попробуйте перезагрузить страницу.'
+                                        : 'В этом радиусе нет доступных мест. Попробуйте другой фильтр или отдалите карту.'}
+                                </p>
+                            </section>
+                        ) : (
+                            <NearbyCardsSkeleton />
+                        )}
+                    </div>
 
                     {/* ── Excursions ── */}
                     <div className="home-sheet__section home-sheet__section--excursions">
@@ -1156,21 +1185,27 @@ export function HomePage() {
                             </div>
                         </div>
 
-                        <ExcursionCatalog
-                            emptyDescription="Попробуйте другой фильтр"
-                            emptyTitle="Нет маршрутов"
-                            excursions={visibleRoutes.slice(0, 4)}
-                            isError={Boolean(discoveryError)}
-                        />
+                        {!canShowEmpty && visibleRoutes.length === 0 ? (
+                            <CatalogSkeleton />
+                        ) : (
+                            <>
+                                <ExcursionCatalog
+                                    emptyDescription="Попробуйте другой фильтр"
+                                    emptyTitle="Нет маршрутов"
+                                    excursions={visibleRoutes.slice(0, 4)}
+                                    isError={Boolean(discoveryError)}
+                                />
 
-                        {visibleRoutes.length > 0 && (
-                            <div className="home-sheet__view-all-wrap">
-                                <Link
-                                    className="home-sheet__view-all"
-                                    to={appRoutes.excursions}>
-                                    Смотреть все маршруты
-                                </Link>
-                            </div>
+                                {visibleRoutes.length > 0 && (
+                                    <div className="home-sheet__view-all-wrap">
+                                        <Link
+                                            className="home-sheet__view-all"
+                                            to={appRoutes.excursions}>
+                                            Смотреть все маршруты
+                                        </Link>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
 
@@ -1232,6 +1267,39 @@ export function HomePage() {
                     </footer>
                 </div>
             </div>
+        </div>
+    );
+}
+
+function NearbyCardsSkeleton() {
+    return (
+        <div className="home-sheet__cards home-sheet__cards--skeleton" aria-hidden="true">
+            {[0, 1, 2, 3].map((i) => (
+                <div className="home-card-skeleton" key={i}>
+                    <div className="home-card-skeleton__img" />
+                    <div className="home-card-skeleton__body">
+                        <div className="home-skeleton-line home-skeleton-line--short" />
+                        <div className="home-skeleton-line" />
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function CatalogSkeleton() {
+    return (
+        <div className="home-catalog-skeleton" aria-hidden="true">
+            {[0, 1, 2, 3].map((i) => (
+                <div className="home-catalog-skeleton__card" key={i}>
+                    <div className="home-catalog-skeleton__cover" />
+                    <div className="home-catalog-skeleton__info">
+                        <div className="home-skeleton-line home-skeleton-line--short" />
+                        <div className="home-skeleton-line" />
+                        <div className="home-skeleton-line home-skeleton-line--mid" />
+                    </div>
+                </div>
+            ))}
         </div>
     );
 }
