@@ -43,14 +43,16 @@ import "./HomePage.css";
 const CLOSED_HEIGHT = 52; // drag handle bar only
 const DRAG_MIN = 10;
 
-type SheetState = "closed" | "peek" | "full";
+type SheetState = "closed" | "peek" | "preview" | "full";
 
 function getSnapTranslate(
     state: SheetState,
     sheetHeight: number,
     peekHeight: number,
+    previewHeight: number = 400,
 ): number {
     if (state === "full") return DRAG_MIN;
+    if (state === "preview") return Math.max(DRAG_MIN, sheetHeight - previewHeight);
     if (state === "peek") return Math.max(DRAG_MIN, sheetHeight - peekHeight);
     return Math.max(DRAG_MIN, sheetHeight - CLOSED_HEIGHT);
 }
@@ -375,8 +377,11 @@ export function HomePage() {
     }, [userPosition, requestLocation]);
 
     const handleNearbyCardClick = useCallback((pointId: string) => {
-        shouldScrollNearbyListRef.current = true;
-        setSelectedPointId(pointId);
+        setSelectedPointId((prev) => {
+            if (prev === pointId) return "";
+            shouldScrollNearbyListRef.current = true;
+            return pointId;
+        });
     }, []);
 
     const handleMapPointSelect = useCallback((pointId: string) => {
@@ -408,6 +413,10 @@ export function HomePage() {
     const filterGroupRef = useRef<HTMLDivElement>(null);
     const bodyRef = useRef<HTMLDivElement>(null);
     const peekHeightRef = useRef(170); // fallback; measured by ResizeObserver
+    const previewHeightRef = useRef(400); // fallback; measured via routesTitleRef
+    const routesTitleRef = useRef<HTMLHeadingElement | null>(null);
+    // Tracks selectedPointId for access inside stable useCallback (no dep change)
+    const selectedPointIdRef = useRef("");
     // Prevents the sheetState useEffect from overriding a manually set transform
     const skipSnapRef = useRef(false);
 
@@ -480,11 +489,40 @@ export function HomePage() {
             sheetState,
             sheet.offsetHeight,
             peekHeightRef.current,
+            previewHeightRef.current,
         );
-        if (sheetState === "peek" && bodyRef.current)
+        if (sheetState !== "full" && bodyRef.current)
             bodyRef.current.scrollTop = 0;
         snapSheet(sheet, target, 480);
     }, [sheetState]);
+
+    // Keep selectedPointIdRef in sync so measurePreviewHeight can read it
+    // without being recreated on every selectedPointId change.
+    useEffect(() => {
+        selectedPointIdRef.current = selectedPointId;
+    }, [selectedPointId]);
+
+    // Measure preview height: ends right at the bottom of "Готовые маршруты" h3.
+    // Skipped when a place card is open — the card pushes h3 far down, which
+    // would make previewT ≈ fullT and collapse all snap points together.
+    // scrollTop compensation: getBoundingClientRect is viewport-relative, so
+    // if the body is scrolled by S, all inner elements appear S px higher in
+    // the viewport — we add S back to get the true layout offset.
+    const measurePreviewHeight = useCallback(() => {
+        if (selectedPointIdRef.current) return;
+        const title = routesTitleRef.current;
+        const sheet = sheetRef.current;
+        if (!title || !sheet) return;
+        const scrollCompensation = bodyRef.current?.scrollTop ?? 0;
+        const measured =
+            title.getBoundingClientRect().bottom -
+            sheet.getBoundingClientRect().top +
+            scrollCompensation +
+            8;
+        if (measured > CLOSED_HEIGHT + 50) {
+            previewHeightRef.current = measured;
+        }
+    }, []);
 
     useLayoutEffect(() => {
         const sheet = sheetRef.current;
@@ -500,10 +538,24 @@ export function HomePage() {
 
         const onResize = () => {
             if (dragRef.current.active) return;
+            // Only re-measure when no card detail is open (same guard as measurePreviewHeight)
+            if (!selectedPointIdRef.current) {
+                const title = routesTitleRef.current;
+                if (title) {
+                    const scrollCompensation = bodyRef.current?.scrollTop ?? 0;
+                    const measured =
+                        title.getBoundingClientRect().bottom -
+                        sheet.getBoundingClientRect().top +
+                        scrollCompensation +
+                        8;
+                    if (measured > CLOSED_HEIGHT + 50) previewHeightRef.current = measured;
+                }
+            }
             const target = getSnapTranslate(
                 sheetStateRef.current,
                 sheet.offsetHeight,
                 peekHeightRef.current,
+                previewHeightRef.current,
             );
             sheet.style.transition = "none";
             sheet.style.transform = `translateY(${target}px)`;
@@ -525,37 +577,104 @@ export function HomePage() {
         return () => ro.disconnect();
     }, []);
 
-    // Scroll-to-close: when fully open and user overscrolls past the top edge.
-    // We only close after the user has *continued* swiping ≥52 px beyond the
-    // moment the content hit scrollTop=0 — so "scroll to top" alone never
-    // accidentally closes the sheet.
+    // Re-measure + re-snap when nearby content changes (cards load/unload).
+    useEffect(() => {
+        const frameId = requestAnimationFrame(() => {
+            measurePreviewHeight();
+            if (sheetStateRef.current !== "preview") return;
+            const sheet = sheetRef.current;
+            if (!sheet || sheet.offsetHeight === 0) return;
+            const target = getSnapTranslate(
+                "preview",
+                sheet.offsetHeight,
+                peekHeightRef.current,
+                previewHeightRef.current,
+            );
+            sheet.style.transition =
+                "transform 400ms cubic-bezier(0.25, 0.46, 0.45, 0.94)";
+            sheet.style.transform = `translateY(${target}px)`;
+        });
+        return () => cancelAnimationFrame(frameId);
+    }, [nearbyPoints, isLoading, canLoadNearbyPlaces, measurePreviewHeight]);
+
+    // When a place card is deselected, refresh previewHeight (base layout restored).
+    // On select we skip — measurePreviewHeight guards against it internally.
+    useEffect(() => {
+        if (selectedPointId !== "") return;
+        const frameId = requestAnimationFrame(measurePreviewHeight);
+        return () => cancelAnimationFrame(frameId);
+    }, [selectedPointId, measurePreviewHeight]);
+
+    // Auto-open to preview on mount (cleanup+re-run in StrictMode is fine —
+    // the second scheduled timeout is the one that actually fires)
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            const sheet = sheetRef.current;
+            if (!sheet || sheet.offsetHeight === 0) return;
+            measurePreviewHeight();
+            const previewT = getSnapTranslate(
+                "preview",
+                sheet.offsetHeight,
+                peekHeightRef.current,
+                previewHeightRef.current,
+            );
+            skipSnapRef.current = true;
+            setSheetState("preview");
+            sheetStateRef.current = "preview";
+            snapSheet(sheet, previewT, 700);
+        }, 300);
+        return () => clearTimeout(timeoutId);
+    }, [measurePreviewHeight]);
+
+    // Swipe-down-to-close: step-by-step.
+    // full → preview (first overscroll), preview → closed (second overscroll).
+    // Requires reaching scrollTop=0 first, then ≥52 px downward overscroll.
     useEffect(() => {
         const bodyEl = bodyRef.current;
         if (!bodyEl) return;
-        let reachedTopAt = -1; // clientY where scrollTop first became 0
+        let reachedTopAt = -1;
 
         const onTouchStart = (e: TouchEvent) => {
-            // If already at top, start counting overscroll immediately
-            reachedTopAt = bodyEl.scrollTop === 0 ? e.touches[0].clientY : -1;
+            const state = sheetStateRef.current;
+            if (state === "full" || state === "preview") {
+                reachedTopAt =
+                    bodyEl.scrollTop === 0 ? e.touches[0].clientY : -1;
+            } else {
+                reachedTopAt = -1;
+            }
         };
         const onTouchMove = (e: TouchEvent) => {
-            if (sheetStateRef.current !== "full") return;
+            const state = sheetStateRef.current;
+            if (state !== "full" && state !== "preview") return;
             const currentY = e.touches[0].clientY;
-            // Record the exact y when content reaches the top mid-gesture
             if (bodyEl.scrollTop === 0 && reachedTopAt < 0) {
                 reachedTopAt = currentY;
             }
-            // Bail if we haven't reached the top yet, or scrolled back down
             if (reachedTopAt < 0 || bodyEl.scrollTop > 0) return;
-            // Require an intentional 52 px overscroll beyond the top edge
             if (currentY - reachedTopAt > 52) {
-                reachedTopAt = Infinity; // prevent re-trigger
+                reachedTopAt = Infinity;
                 const sheet = sheetRef.current;
                 if (!sheet) return;
-                const closedT = sheet.offsetHeight - CLOSED_HEIGHT;
-                skipSnapRef.current = true;
-                setSheetState("closed");
-                snapSheet(sheet, closedT, 480);
+                bodyEl.scrollTop = 0;
+                // Step down one level: full → preview, preview → closed
+                if (state === "full") {
+                    const previewT = getSnapTranslate(
+                        "preview",
+                        sheet.offsetHeight,
+                        peekHeightRef.current,
+                        previewHeightRef.current,
+                    );
+                    skipSnapRef.current = true;
+                    setSheetState("preview");
+                    sheetStateRef.current = "preview";
+                    snapSheet(sheet, previewT, 480);
+                } else {
+                    const closedT = sheet.offsetHeight - CLOSED_HEIGHT;
+                    skipSnapRef.current = true;
+                    setSheetState("closed");
+                    sheetStateRef.current = "closed";
+                    snapSheet(sheet, closedT, 480);
+                }
             }
         };
         const onTouchEnd = () => {
@@ -624,15 +743,23 @@ export function HomePage() {
         const sheetHeight = sheet.offsetHeight;
         const velocity = dragRef.current.velocity;
         const fullT = DRAG_MIN;
+        const previewT = getSnapTranslate(
+            "preview",
+            sheetHeight,
+            peekHeightRef.current,
+            previewHeightRef.current,
+        );
         const peekT = getSnapTranslate(
             "peek",
             sheetHeight,
             peekHeightRef.current,
+            previewHeightRef.current,
         );
         const closedT = sheetHeight - CLOSED_HEIGHT;
 
         const snaps: [SheetState, number][] = [
             ["full", fullT],
+            ["preview", previewT],
             ["peek", peekT],
             ["closed", closedT],
         ];
@@ -652,7 +779,7 @@ export function HomePage() {
         const [nextState, targetT] = snaps[bestIdx];
         skipSnapRef.current = true;
         setSheetState(nextState);
-        if (nextState === "peek" && bodyRef.current)
+        if (nextState !== "full" && bodyRef.current)
             bodyRef.current.scrollTop = 0;
 
         // Velocity-proportional duration: fast flings snap quicker
@@ -720,8 +847,10 @@ export function HomePage() {
                                 s === "closed"
                                     ? "peek"
                                     : s === "peek"
-                                      ? "full"
-                                      : "closed",
+                                      ? "preview"
+                                      : s === "preview"
+                                        ? "full"
+                                        : "closed",
                             );
                         }
                     }}
@@ -793,7 +922,10 @@ export function HomePage() {
                     className="home-sheet__body"
                     ref={bodyRef}
                     style={{
-                        overflowY: sheetState === "full" ? undefined : "hidden",
+                        overflowY:
+                            sheetState === "full" || sheetState === "preview"
+                                ? undefined
+                                : "hidden",
                     }}>
                     {/* ── Categories ── */}
                     <div
@@ -979,10 +1111,11 @@ export function HomePage() {
 
                     {/* ── Excursions ── */}
                     <div className="home-sheet__section home-sheet__section--excursions">
-                        <h3 className="home-sheet__section-title">
+                        <h3
+                            className="home-sheet__section-title"
+                            ref={routesTitleRef}>
                             Готовые маршруты
                         </h3>
-
                         <div className="home-sheet__filter-group home-sheet__filter-group--inline">
                             <div className="home-sheet__cats">
                                 {routeThemeOptions.map((theme) => (

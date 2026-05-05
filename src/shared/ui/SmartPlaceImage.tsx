@@ -23,7 +23,7 @@ export function SmartPlaceImage({
   )
   const allFallbacks = useMemo(
     () =>
-      [...fallbackSrcs, '/illustrations/landmark-card.svg'].filter(
+      fallbackSrcs.filter(
         (value, index, source): value is string =>
           typeof value === 'string' && value.length > 0 && source.indexOf(value) === index,
       ),

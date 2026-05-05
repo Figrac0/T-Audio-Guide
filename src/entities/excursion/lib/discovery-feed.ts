@@ -55,7 +55,7 @@ const pointTemplates: PointTemplate[] = [
     category: 'museum',
     rating: 4.8,
     expectedVisitMinutes: 24,
-    imageUrl: '/illustrations/landmark-card.svg',
+    imageUrl: '',
     title: {
       ru: 'Городской музей',
       en: 'City Museum',
@@ -80,7 +80,7 @@ const pointTemplates: PointTemplate[] = [
     category: 'landmark',
     rating: 4.7,
     expectedVisitMinutes: 18,
-    imageUrl: '/illustrations/volga-route.svg',
+    imageUrl: '',
     title: {
       ru: 'Смотровая площадь',
       en: 'Viewpoint Plaza',
@@ -105,7 +105,7 @@ const pointTemplates: PointTemplate[] = [
     category: 'food',
     rating: 4.9,
     expectedVisitMinutes: 20,
-    imageUrl: '/illustrations/landmark-card.svg',
+    imageUrl: '',
     title: {
       ru: 'Маркет местной кухни',
       en: 'Local Food Market',
@@ -130,7 +130,7 @@ const pointTemplates: PointTemplate[] = [
     category: 'food',
     rating: 4.6,
     expectedVisitMinutes: 16,
-    imageUrl: '/illustrations/landmark-card.svg',
+    imageUrl: '',
     title: {
       ru: 'Уличное бистро',
       en: 'Street Bistro',
@@ -155,7 +155,7 @@ const pointTemplates: PointTemplate[] = [
     category: 'park',
     rating: 4.8,
     expectedVisitMinutes: 28,
-    imageUrl: '/illustrations/volga-route.svg',
+    imageUrl: '',
     title: {
       ru: 'Зеленый парк',
       en: 'Green Park',
@@ -180,7 +180,7 @@ const pointTemplates: PointTemplate[] = [
     category: 'park',
     rating: 4.7,
     expectedVisitMinutes: 22,
-    imageUrl: '/illustrations/volga-route.svg',
+    imageUrl: '',
     title: {
       ru: 'Ботанический двор',
       en: 'Botanical Courtyard',
@@ -205,7 +205,7 @@ const pointTemplates: PointTemplate[] = [
     category: 'entertainment',
     rating: 4.5,
     expectedVisitMinutes: 26,
-    imageUrl: '/illustrations/landmark-card.svg',
+    imageUrl: '',
     title: {
       ru: 'Арт-клуб района',
       en: 'Neighborhood Art Club',
@@ -230,7 +230,7 @@ const pointTemplates: PointTemplate[] = [
     category: 'entertainment',
     rating: 4.6,
     expectedVisitMinutes: 19,
-    imageUrl: '/illustrations/landmark-card.svg',
+    imageUrl: '',
     title: {
       ru: 'Галерея идей',
       en: 'Idea Gallery',
@@ -255,7 +255,7 @@ const pointTemplates: PointTemplate[] = [
     category: 'food',
     rating: 4.7,
     expectedVisitMinutes: 14,
-    imageUrl: '/illustrations/landmark-card.svg',
+    imageUrl: '',
     title: {
       ru: 'Десертная студия',
       en: 'Dessert Studio',
@@ -280,7 +280,7 @@ const pointTemplates: PointTemplate[] = [
     category: 'landmark',
     rating: 4.8,
     expectedVisitMinutes: 17,
-    imageUrl: '/illustrations/volga-route.svg',
+    imageUrl: '',
     title: {
       ru: 'Историческая площадь',
       en: 'Historic Square',
@@ -305,7 +305,7 @@ const pointTemplates: PointTemplate[] = [
     category: 'landmark',
     rating: 4.6,
     expectedVisitMinutes: 15,
-    imageUrl: '/illustrations/volga-route.svg',
+    imageUrl: '',
     title: {
       ru: 'Дом городского архива',
       en: 'City Archive House',
@@ -330,7 +330,7 @@ const pointTemplates: PointTemplate[] = [
     category: 'landmark',
     rating: 4.7,
     expectedVisitMinutes: 12,
-    imageUrl: '/illustrations/volga-route.svg',
+    imageUrl: '',
     title: {
       ru: 'Памятные ворота',
       en: 'Memorial Gate',
@@ -355,7 +355,7 @@ const pointTemplates: PointTemplate[] = [
     category: 'museum',
     rating: 4.5,
     expectedVisitMinutes: 21,
-    imageUrl: '/illustrations/landmark-card.svg',
+    imageUrl: '',
     title: {
       ru: 'Центр фотографии',
       en: 'Photo Center',
@@ -380,7 +380,7 @@ const pointTemplates: PointTemplate[] = [
     category: 'food',
     rating: 4.8,
     expectedVisitMinutes: 13,
-    imageUrl: '/illustrations/landmark-card.svg',
+    imageUrl: '',
     title: {
       ru: 'Кофейня ремесленников',
       en: 'Craft Coffee',
@@ -405,7 +405,7 @@ const pointTemplates: PointTemplate[] = [
     category: 'food',
     rating: 4.6,
     expectedVisitMinutes: 12,
-    imageUrl: '/illustrations/landmark-card.svg',
+    imageUrl: '',
     title: {
       ru: 'Городская пекарня',
       en: 'City Bakery',
@@ -430,7 +430,7 @@ const pointTemplates: PointTemplate[] = [
     category: 'park',
     rating: 4.9,
     expectedVisitMinutes: 25,
-    imageUrl: '/illustrations/volga-route.svg',
+    imageUrl: '',
     title: {
       ru: 'Сад у воды',
       en: 'Riverside Garden',
@@ -455,7 +455,7 @@ const pointTemplates: PointTemplate[] = [
     category: 'entertainment',
     rating: 4.5,
     expectedVisitMinutes: 20,
-    imageUrl: '/illustrations/landmark-card.svg',
+    imageUrl: '',
     title: {
       ru: 'Камерный театр',
       en: 'Pocket Theatre',
@@ -480,7 +480,7 @@ const pointTemplates: PointTemplate[] = [
     category: 'entertainment',
     rating: 4.4,
     expectedVisitMinutes: 16,
-    imageUrl: '/illustrations/landmark-card.svg',
+    imageUrl: '',
     title: {
       ru: 'Двор активностей',
       en: 'Activity Yard',
