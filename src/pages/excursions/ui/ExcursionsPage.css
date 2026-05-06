@@ -94,9 +94,10 @@ body.app-body--routes-page {
     transform: translateY(
         calc(100% - 52px)
     ); /* closed by default; JS overrides */
-    transition: transform 480ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    /* will-change is set via JS only during active drag to avoid
-     persistent compositor layers that cause white-flash on wide screens */
+    /* No CSS transition — all transitions are set by JS to avoid stale easing.
+       backface-visibility keeps the GPU layer stable and prevents white-flash. */
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
 }
 
 /* ── Drag handle ──────────────────────────────────────────────────────────── */
@@ -534,6 +535,42 @@ body.app-body--routes-page {
     color: var(--color-brand-strong);
     font-size: 0.74rem;
     font-weight: 900;
+    transition:
+        background-color 0.18s ease,
+        color 0.18s ease;
+}
+
+@keyframes ep-draft-badge-bump {
+    0%   { transform: scale(1); }
+    22%  { transform: scale(1.22); }
+    50%  { transform: scale(0.9); }
+    72%  { transform: scale(1.14); }
+    100% { transform: scale(1); }
+}
+
+.ep-draft__badge--bump {
+    animation: ep-draft-badge-bump 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+    background: rgba(220, 53, 53, 0.12);
+    color: #c0392b;
+}
+
+@keyframes ep-stop-limit-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(192, 57, 43, 0);
+    }
+    50% {
+        box-shadow:
+            0 0 0 2px rgba(192, 57, 43, 0.28),
+            0 4px 18px rgba(192, 57, 43, 0.14);
+    }
+}
+
+.ep-stop--at-limit {
+    animation: ep-stop-limit-pulse 1.8s ease-in-out infinite;
+}
+
+.ep-stop--at-limit .ep-stop__name {
+    color: #c0392b;
 }
 
 .ep-draft__stops {
@@ -623,6 +660,7 @@ body.app-body--routes-page {
 }
 
 .ep-stop__drag-handle {
+    padding-top: 15px;
     display: inline-flex;
     flex-shrink: 0;
     width: 36px;
@@ -630,7 +668,7 @@ body.app-body--routes-page {
     justify-content: center;
     border: none;
     background: transparent;
-    color: rgba(31, 37, 51, 0.28);
+    color: rgb(0, 0, 0);
     cursor: grab;
     touch-action: none;
     user-select: none;
@@ -654,7 +692,7 @@ body.app-body--routes-page {
     align-items: center;
     gap: 10px;
     /* Compact padding: reduced from 14px to save vertical space */
-    padding: 9px 12px 9px 0;
+    padding: 9px 12px 0px 0;
     border: none;
     outline: none;
     background: transparent;
@@ -766,8 +804,8 @@ body.app-body--routes-page {
     display: grid;
     gap: 8px;
     overflow: hidden;
-    /* Left padding aligns with stop name: drag-handle(36) + order(26) + gap(10) = 72 */
-    padding: 0 12px 12px 72px;
+    padding: 8px 12px 12px 12px;
+    border-top: 1px solid rgba(31, 37, 51, 0.07);
 }
 
 .ep-stop__desc {
@@ -775,6 +813,7 @@ body.app-body--routes-page {
     color: var(--color-text-secondary);
     font-size: 0.82rem;
     line-height: 1.55;
+    text-align: center;
 }
 
 .ep-stop__meta {
@@ -916,12 +955,18 @@ body.app-body--routes-page {
     display: flex;
     gap: 10px;
     overflow-x: auto;
-    margin-left: 5px;
-    padding: 4px 16px 12px 24px;
+    padding: 4px 16px 12px 20px;
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     cursor: grab;
+}
+
+/* Give the first card a small left margin so its active box-shadow ring
+   sits inside the scroll container's content area and is never clipped. */
+.ep-nearby-card:first-child {
+    margin-left: 4px;
+    scroll-margin-left: 4px;
 }
 
 .ep-nearby-strip::-webkit-scrollbar {
@@ -1035,8 +1080,8 @@ body.app-body--routes-page {
         0 4px 12px rgba(31, 138, 112, 0.22);
 }
 
-.ep-nearby-card--active .ep-nearby-card__img::before {
-    content: "✓";
+/* Order-number badge rendered in JSX (replaces the old CSS ::before checkmark) */
+.ep-nearby-card__badge {
     position: absolute;
     top: 5px;
     right: 5px;
@@ -1049,8 +1094,9 @@ body.app-body--routes-page {
     border-radius: 50%;
     background: var(--color-brand);
     color: #fff;
-    font-size: 0.62rem;
+    font-size: 0.6rem;
     font-weight: 900;
+    line-height: 1;
     pointer-events: none;
 }
 
@@ -2366,6 +2412,7 @@ body.app-body--routes-page {
 @media (prefers-reduced-motion: reduce) {
     .ep-card,
     .ep-stop,
+    .ep-stop--at-limit,
     .ep-stop__body,
     .ep-sheet,
     .ep-sheet__locate,
@@ -2376,5 +2423,9 @@ body.app-body--routes-page {
     .ep-skeleton-line {
         animation: none;
         transition: none;
+    }
+
+    .ep-draft__badge--bump {
+        animation: none;
     }
 }

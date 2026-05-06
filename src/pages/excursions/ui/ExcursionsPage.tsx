@@ -84,6 +84,7 @@ export function ExcursionsPage() {
 
   const hasDraftStops = state.draftStops.length > 0
   const lastDraftStop = hasDraftStops ? state.draftStops[state.draftStops.length - 1] : null
+  const isDraftAtLimit = state.draftStops.length >= 10
 
   // ── Drag-to-reorder state ───────────────────────────────────────────────────
   const [reorderState, setReorderState] = useState<{ stopId: string; overIdx: number } | null>(null)
@@ -93,9 +94,20 @@ export function ExcursionsPage() {
   const handleReorderStopRef = useRef(state.handleReorderStop)
   const stopsContainerRef = useRef<HTMLDivElement>(null)
   const nearbyListRef = useRef<HTMLDivElement>(null)
+  const badgeRef = useRef<HTMLSpanElement>(null)
 
   useEffect(() => { draftStopsRef.current = state.draftStops }, [state.draftStops])
   useEffect(() => { handleReorderStopRef.current = state.handleReorderStop }, [state.handleReorderStop])
+
+  // Bump badge when user tries to add beyond the 10-stop limit
+  useEffect(() => {
+    if (!state.draftFullBumpKey) return
+    const badge = badgeRef.current
+    if (!badge) return
+    badge.classList.remove('ep-draft__badge--bump')
+    void badge.offsetHeight
+    badge.classList.add('ep-draft__badge--bump')
+  }, [state.draftFullBumpKey])
 
   const displayedStops = useMemo(() => {
     if (!reorderState) return state.draftStops
@@ -350,12 +362,19 @@ export function ExcursionsPage() {
     doFirstMeasure()
     const frameId = window.requestAnimationFrame(doFirstMeasure)
 
+    let resizeRafId: number | null = null
     const onResize = () => {
-      if (!dragRef.current.active) updateSheetBounds(hasDraftStopsRef.current)
+      if (dragRef.current.active) return
+      if (resizeRafId !== null) window.cancelAnimationFrame(resizeRafId)
+      resizeRafId = window.requestAnimationFrame(() => {
+        resizeRafId = null
+        updateSheetBounds(hasDraftStopsRef.current)
+      })
     }
     window.addEventListener('resize', onResize)
     return () => {
       window.cancelAnimationFrame(frameId)
+      if (resizeRafId !== null) window.cancelAnimationFrame(resizeRafId)
       window.removeEventListener('resize', onResize)
     }
   }, [syncSheetPosition, updateSheetBounds])
@@ -571,7 +590,7 @@ export function ExcursionsPage() {
         <RouteBuilderMap
           ref={mapHandleRef}
           draftPointOrders={draftPointOrders}
-          isDraftFull={state.draftStops.length >= 6}
+          isDraftFull={isDraftAtLimit}
           isLoading={state.isLoading || !state.canLoadNearbyPlaces}
           nearbyPoints={state.nearbyPoints}
           onAddPoint={state.handleAddPoint}
@@ -682,7 +701,7 @@ export function ExcursionsPage() {
         >
           {detailPoint ? (
             <PointDetailPanel
-              isDraftFull={state.draftStops.length >= 6}
+              isDraftFull={isDraftAtLimit}
               isInDraft={state.isPointInDraft(detailPoint.id)}
               onAddPoint={() => state.handleAddPoint(detailPoint)}
               onClose={closeDetailMode}
@@ -696,7 +715,7 @@ export function ExcursionsPage() {
               <div className="ep-draft__head">
                 <h2 className="ep-draft__title">
                   Мой маршрут
-                  <span className="ep-draft__badge">{state.draftStops.length}/6</span>
+                  <span className="ep-draft__badge" ref={badgeRef}>{state.draftStops.length}/10</span>
                 </h2>
               </div>
 
@@ -705,6 +724,7 @@ export function ExcursionsPage() {
                   <DraftStopCard
                     isDragging={reorderState?.stopId === stop.id}
                     isExpanded={state.expandedStopId === stop.id}
+                    isLastAtLimit={isDraftAtLimit && idx === displayedStops.length - 1}
                     key={stop.id}
                     onDragStart={() => handleReorderStart(idx)}
                     onRemove={() => state.handleRemoveStop(stop.id)}
@@ -769,6 +789,11 @@ export function ExcursionsPage() {
                               title={point.title}
                             />
                             <span className="ep-nearby-card__dist">{formatMeters(point.distanceMeters)}</span>
+                            {inDraft && (
+                              <span className="ep-nearby-card__badge" aria-hidden="true">
+                                {draftPointOrders.get(point.id)}
+                              </span>
+                            )}
                           </div>
                           <div className="ep-nearby-card__body">
                             <span className="ep-nearby-card__cat">{formatPointCategory(point.category)}</span>
@@ -942,6 +967,7 @@ export function ExcursionsPage() {
 interface DraftStopCardProps {
   isDragging: boolean
   isExpanded: boolean
+  isLastAtLimit: boolean
   onDragStart: () => void
   onRemove: () => void
   onToggle: () => void
@@ -951,6 +977,7 @@ interface DraftStopCardProps {
 const DraftStopCard = memo(function DraftStopCard({
   isDragging,
   isExpanded,
+  isLastAtLimit,
   onDragStart,
   onRemove,
   onToggle,
@@ -963,7 +990,7 @@ const DraftStopCard = memo(function DraftStopCard({
   ].filter(Boolean).join(' · ')
 
   return (
-    <div className={`ep-stop${isExpanded ? ' ep-stop--open' : ''}${isDragging ? ' ep-stop--dragging' : ''}`}>
+    <div className={`ep-stop${isExpanded ? ' ep-stop--open' : ''}${isDragging ? ' ep-stop--dragging' : ''}${isLastAtLimit ? ' ep-stop--at-limit' : ''}`}>
       <div className="ep-stop__head">
         <button
           aria-label="Перетащить для изменения порядка"
@@ -989,7 +1016,9 @@ const DraftStopCard = memo(function DraftStopCard({
             {preview ? <span className="ep-stop__preview">{preview}</span> : null}
           </div>
           <span aria-hidden="true" className={`ep-stop__chevron${isExpanded ? ' ep-stop__chevron--open' : ''}`}>
-            +
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
           </span>
         </button>
       </div>

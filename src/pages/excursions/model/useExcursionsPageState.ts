@@ -72,6 +72,7 @@ export function useExcursionsPageState() {
   const [expandedStopId, setExpandedStopId] = useState<string | null>(null)
   const [recenterKey, setRecenterKey] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
+  const [draftFullBumpKey, setDraftFullBumpKey] = useState(0)
   const [routeSegmentsState, setRouteSegmentsState] = useState<{
     signature: string
     segments: LngLat[][]
@@ -289,8 +290,8 @@ export function useExcursionsPageState() {
         setNotice('Точка уже добавлена в маршрут.')
         return
       }
-      if (draftStops.length >= 6) {
-        setNotice('В маршрут можно добавить не больше 6 точек.')
+      if (draftStops.length >= 10) {
+        setDraftFullBumpKey((k) => k + 1)
         return
       }
       addPointToDraft(point)
@@ -360,6 +361,7 @@ export function useExcursionsPageState() {
     canLoadNearbyPlaces,
     detailPoint,
     discoveryError,
+    draftFullBumpKey,
     draftStops,
     excursions: filteredExcursions,
     expandedStopId,

@@ -18,7 +18,7 @@ import { getDistanceMetersBetween } from '@/features/route-map/lib/route-geometr
 import { UserRoutesContext } from '@/features/user-routes/model/user-routes-context'
 import { appApi } from '@/shared/api/client'
 
-const maxDraftStops = 6
+const maxDraftStops = 10
 const storageKeyPrefix = 't-guide:user-routes'
 
 interface StoredUserRoutes {

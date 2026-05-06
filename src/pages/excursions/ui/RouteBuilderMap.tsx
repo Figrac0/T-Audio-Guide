@@ -134,7 +134,18 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
 
       map.on('popupclose', () => onPopupCloseRef.current())
 
+    // When returning to the tab the map container may have an invalid size.
+    // invalidateSize() recalculates and stops the map from "trembling".
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        map.invalidateSize({ animate: false, pan: false })
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+
       if (zoomDebounceRef.current !== null) {
         clearTimeout(zoomDebounceRef.current)
       }
