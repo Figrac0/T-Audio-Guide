@@ -16,7 +16,6 @@ import {
 import { routeMapPopupClassName } from '@/features/route-map/lib/popup-skin'
 import {
   formatMeters,
-  getBoundsFromPoints,
   toLngLat,
 } from '@/features/route-map/lib/route-geometry'
 import { appMapConfig } from '@/shared/config/map'
@@ -49,8 +48,6 @@ interface RouteBuilderMapProps {
   userPosition: GeoPoint | null
 }
 
-const MAP_PADDING: [number, number, number, number] = [72, 24, 24, 24]
-
 export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMapProps>(function RouteBuilderMap({
   draftPointOrders,
   isDraftFull,
@@ -75,7 +72,6 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
   const userLayerRef = useRef<L.LayerGroup | null>(null)
   const radiusCircleRef = useRef<L.Circle | null>(null)
   const markerRefsMap = useRef(new Map<string, L.Marker>())
-  const hasAutoFittedRef = useRef(false)
   const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useImperativeHandle(ref, () => ({
@@ -297,32 +293,22 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
   }, [draftPointOrders, nearbyPoints, selectedPointId])
 
   useEffect(() => {
-    const map = mapRef.current
-    if (!map || hasAutoFittedRef.current) return
-
-    const allPoints = [
-      ...nearbyPoints.map((point) => point.coordinates),
-      ...(userPosition ? [userPosition] : []),
-    ]
-
-    if (allPoints.length === 0) return
-
-    hasAutoFittedRef.current = true
-    applyLeafletLocation(map, {
-      bounds: getBoundsFromPoints(allPoints),
-      duration: 800,
-      padding: MAP_PADDING,
-    })
-  }, [nearbyPoints, userPosition])
-
-  useEffect(() => {
     if (!recenterKey || !userPosition || !mapRef.current) return
+
+    const container = containerRef.current
+    if (container) container.style.pointerEvents = 'none'
 
     applyLeafletLocation(mapRef.current, {
       center: toLngLat(userPosition),
       duration: 700,
       zoom: 15.5,
     })
+
+    const timeoutId = setTimeout(() => {
+      if (container) container.style.pointerEvents = ''
+    }, 750)
+
+    return () => clearTimeout(timeoutId)
   }, [recenterKey, userPosition])
 
   return (

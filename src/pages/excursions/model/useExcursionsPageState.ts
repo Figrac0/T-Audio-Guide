@@ -74,6 +74,7 @@ export function useExcursionsPageState() {
   const [recenterKey, setRecenterKey] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
   const [draftFullBumpKey, setDraftFullBumpKey] = useState(0)
+  const [isSavingRoute, setIsSavingRoute] = useState(false)
   const [routeSegmentsState, setRouteSegmentsState] = useState<{
     signature: string
     segments: LngLat[][]
@@ -321,9 +322,11 @@ export function useExcursionsPageState() {
   )
 
   const handleSaveRoute = useCallback(() => {
+    setIsSavingRoute(true)
     const result = saveDraftRoute()
     if (result.status === 'invalid') {
       setNotice('Добавьте минимум две точки.')
+      setIsSavingRoute(false)
       return
     }
     if (result.route) {
@@ -331,7 +334,10 @@ export function useExcursionsPageState() {
       setSelectedPointId('')
       setNotice(null)
       clearDraftRoute()
-      navigate(appRoutes.excursion(result.route.slug))
+      setTimeout(() => {
+        setIsSavingRoute(false)
+        navigate(appRoutes.excursion(result.route.slug))
+      }, 400)
     }
   }, [clearDraftRoute, navigate, saveDraftRoute])
 
@@ -381,6 +387,7 @@ export function useExcursionsPageState() {
     handleShowDetail,
     isLoading,
     isPointInDraft,
+    isSavingRoute,
     maxDuration,
     nearbyPoints,
     notice,

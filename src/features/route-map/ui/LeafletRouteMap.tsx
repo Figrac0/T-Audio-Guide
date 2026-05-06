@@ -44,6 +44,7 @@ export function LeafletRouteMap({
   const overlayRef = useRef<L.LayerGroup | null>(null)
   const initialCenterRef = useRef(stops[0]?.coordinates ?? defaultCenter)
   const skipSelectionFocusRef = useRef(true)
+  const hasInitialFitRef = useRef(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const stopsSignature = useMemo(() => stops.map((stop) => stop.id).join('|'), [stops])
   const fallbackRouteGeometry = useMemo(() => createFallbackRouteGeometry(stops), [stops])
@@ -206,11 +207,12 @@ export function LeafletRouteMap({
   useEffect(() => {
     const map = mapRef.current
 
-    if (!map) {
+    if (!map || hasInitialFitRef.current) {
       return
     }
 
     skipSelectionFocusRef.current = true
+    hasInitialFitRef.current = true
 
     if (guideBounds && userPosition) {
       applyLeafletLocation(map, {

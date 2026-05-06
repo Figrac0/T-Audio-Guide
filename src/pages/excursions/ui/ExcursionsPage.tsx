@@ -280,6 +280,7 @@ export function ExcursionsPage() {
 
   const animateSheetPosition = useCallback((nextTranslate: number, durationMs = SHEET_SNAP_DURATION_MS) => {
     const sheet = sheetRef.current
+    const mapEl = document.querySelector('.ep__map') as HTMLElement | null
     if (!sheet) return
     if (animationCleanupRef.current !== null) {
       window.clearTimeout(animationCleanupRef.current)
@@ -287,6 +288,7 @@ export function ExcursionsPage() {
     }
     const safe = clampSheetTranslate(nextTranslate, closedTranslateRef.current)
     const fromY = getSheetTranslateY(sheet)
+    if (mapEl) mapEl.style.pointerEvents = 'none'
     sheet.style.willChange = 'transform'
     sheet.style.transition = 'none'
     sheet.style.transform = `translateY(${fromY}px)`
@@ -300,6 +302,7 @@ export function ExcursionsPage() {
     const clear = () => {
       if (animationVersionRef.current !== animationVersion) return
       sheet.style.willChange = ''
+      if (mapEl) mapEl.style.pointerEvents = ''
       if (animationCleanupRef.current !== null) {
         window.clearTimeout(animationCleanupRef.current)
         animationCleanupRef.current = null
@@ -477,11 +480,11 @@ export function ExcursionsPage() {
   const handleDragStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (isReorderingRef.current) return
     const sheet = sheetRef.current
+    const mapEl = document.querySelector('.ep__map') as HTMLElement | null
     if (!sheet) return
     mapHandleRef.current?.closePopup()
+    if (mapEl) mapEl.style.pointerEvents = 'none'
     event.currentTarget.setPointerCapture(event.pointerId)
-    // Catch actual visual position — sheetTranslateRef holds the animation target,
-    // not where the sheet is visually when drag begins mid-animation.
     const currentT = getSheetTranslateY(sheet)
     sheetTranslateRef.current = currentT
     dragRef.current = {
@@ -530,9 +533,10 @@ export function ExcursionsPage() {
     setIsDragging(false)
 
     const sheet = sheetRef.current
+    const mapEl = document.querySelector('.ep__map') as HTMLElement | null
     if (!sheet) return
 
-    // Clear drag-time inline styles — CSS transitions + isFullyOpen class take over
+    if (mapEl) mapEl.style.pointerEvents = ''
     const preview = draftPreviewRef.current
     if (preview) preview.style.maxHeight = ''
 
@@ -610,6 +614,12 @@ export function ExcursionsPage() {
       {state.notice ? (
         <div className="ep__notice" role="status">{state.notice}</div>
       ) : null}
+
+      {state.isSavingRoute && (
+        <div className="ep__saving-spinner" aria-label="Сохранение маршрута" role="status">
+          <div className="ep__spinner-ring" />
+        </div>
+      )}
 
       {state.geolocationError ? <p className="ep__geo-error">{state.geolocationError}</p> : null}
 
@@ -1171,7 +1181,14 @@ function PointDetailPanel({
           <button
             className={routeActionClassName}
             disabled={routeActionDisabled}
-            onClick={isInDraft ? onRemovePoint : onAddPoint}
+            onClick={() => {
+              if (isInDraft) {
+                onRemovePoint()
+              } else {
+                onAddPoint()
+                onClose()
+              }
+            }}
             type="button"
           >
             {routeActionLabel}

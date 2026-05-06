@@ -135,7 +135,7 @@ export function ProfilePage() {
         const timeoutId = window.setTimeout(() => setToast(null), 3000);
 
         return () => window.clearTimeout(timeoutId);
-    }, [toast, toastKey]);
+    }, [toast]);
 
     function showToast(nextToast: ProfileToast) {
         setToast(nextToast);

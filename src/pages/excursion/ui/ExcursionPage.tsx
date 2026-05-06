@@ -431,7 +431,7 @@ function NavigationPhase({
   const sheetRef = useRef<HTMLDivElement>(null)
   const navRowRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
-  const peekHeightRef = useRef(130)
+  const peekHeightRef = useRef(CLOSED_HEIGHT + 50)
   const skipSnapRef = useRef(false)
   const dragRef = useRef({ active: false, startPointerY: 0, startTranslate: 0, lastPointerY: 0, lastTime: 0, velocity: 0 })
 
@@ -452,12 +452,17 @@ function NavigationPhase({
 
   const snapToPeek = useCallback(() => {
     const sheet = sheetRef.current
+    const mapEl = document.querySelector('.ep-nav__map') as HTMLElement | null
     if (!sheet) return
+    if (mapEl) mapEl.style.pointerEvents = 'none'
     const peekT = getSnapTranslate('peek', sheet.offsetHeight, peekHeightRef.current)
     if (bodyRef.current) bodyRef.current.scrollTop = 0
     skipSnapRef.current = true
     setSheetState('peek')
     snapSheet(sheet, peekT, 480)
+    setTimeout(() => {
+      if (mapEl) mapEl.style.pointerEvents = ''
+    }, 520)
   }, [])
 
   useEffect(() => {
@@ -501,8 +506,14 @@ function NavigationPhase({
   useEffect(() => {
     const el = navRowRef.current
     if (!el) return
-    const update = () => { peekHeightRef.current = CLOSED_HEIGHT + el.offsetHeight }
-    update()
+    const update = () => {
+      const navHeight = el.offsetHeight || 52
+      peekHeightRef.current = CLOSED_HEIGHT + Math.max(navHeight, 40)
+    }
+    // Update after paint to ensure element is rendered
+    requestAnimationFrame(() => {
+      update()
+    })
     const ro = new ResizeObserver(update)
     ro.observe(el)
     return () => ro.disconnect()
@@ -541,6 +552,8 @@ function NavigationPhase({
   function handleDragStart(e: React.PointerEvent<HTMLDivElement>) {
     const sheet = sheetRef.current
     if (!sheet) return
+    const mapEl = document.querySelector('.ep-nav__map')
+    if (mapEl) (mapEl as HTMLElement).style.pointerEvents = 'none'
     e.currentTarget.setPointerCapture(e.pointerId)
     const currentT = getSheetTranslateY(sheet)
     dragRef.current = { active: true, startPointerY: e.clientY, startTranslate: currentT, lastPointerY: e.clientY, lastTime: Date.now(), velocity: 0 }
@@ -553,6 +566,7 @@ function NavigationPhase({
     if (!dragRef.current.active) return
     const sheet = sheetRef.current
     if (!sheet) return
+    e.preventDefault()
     const raw = dragRef.current.startTranslate + (e.clientY - dragRef.current.startPointerY)
     const newT = Math.min(sheet.offsetHeight - CLOSED_HEIGHT, Math.max(DRAG_MIN, raw))
     const now = Date.now()
@@ -567,13 +581,16 @@ function NavigationPhase({
     dragRef.current.active = false
     const sheet = sheetRef.current
     if (!sheet) return
+    const mapEl = document.querySelector('.ep-nav__map')
+    if (mapEl) (mapEl as HTMLElement).style.pointerEvents = ''
     const match = sheet.style.transform.match(/translateY\((-?\d+(?:\.\d+)?)px\)/)
     const currentT = match ? parseFloat(match[1]) : 0
     const sheetHeight = sheet.offsetHeight
     const velocity = dragRef.current.velocity
+    const peekT = getSnapTranslate('peek', sheetHeight, peekHeightRef.current)
     const snaps: [SheetState, number][] = [
       ['full', DRAG_MIN],
-      ['peek', getSnapTranslate('peek', sheetHeight, peekHeightRef.current)],
+      ['peek', peekT],
       ['closed', sheetHeight - CLOSED_HEIGHT],
     ]
     let bestIdx = 0, bestDist = Infinity
@@ -581,8 +598,18 @@ function NavigationPhase({
       const d = Math.abs(currentT - snaps[i][1])
       if (d < bestDist) { bestDist = d; bestIdx = i }
     }
-    if (velocity > 5 && bestIdx < snaps.length - 1) bestIdx++
-    else if (velocity < -5 && bestIdx > 0) bestIdx--
+    // Improve snap logic: when swiping from full, prefer peek if moving slowly
+    if (sheetStateRef.current === 'full') {
+      const peekDist = Math.abs(currentT - peekT)
+      const closedDist = Math.abs(currentT - snaps[2][1])
+      if (velocity < 8 && peekDist < closedDist * 0.6) bestIdx = 1
+      else if (velocity >= 8 && velocity < -5) bestIdx = 1
+      else if (velocity >= 8) bestIdx = 2
+    } else if (velocity > 5 && bestIdx < snaps.length - 1) {
+      bestIdx++
+    } else if (velocity < -5 && bestIdx > 0) {
+      bestIdx--
+    }
     const [nextState, targetT] = snaps[bestIdx]
     skipSnapRef.current = true
     setSheetState(nextState)
@@ -614,6 +641,19 @@ function NavigationPhase({
       const audio = audioRef.current
       if (audio) { audio.pause(); audioRef.current = null }
     }
+  }, [])
+
+  // Disable map pointer events when header menu opens (prevents jittering during layout shift)
+  useEffect(() => {
+    const handleMenuOpen = () => {
+      const mapEl = document.querySelector('.ep-nav__map') as HTMLElement | null
+      if (mapEl) mapEl.style.pointerEvents = 'none'
+      setTimeout(() => {
+        if (mapEl) mapEl.style.pointerEvents = ''
+      }, 350)
+    }
+    window.addEventListener('app-menu-open', handleMenuOpen)
+    return () => window.removeEventListener('app-menu-open', handleMenuOpen)
   }, [])
 
   const handleToggleAudio = useCallback(() => {

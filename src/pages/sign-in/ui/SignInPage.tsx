@@ -87,7 +87,7 @@ export function SignInPage() {
     const isNameValid = name.trim().length >= 3;
     const isPasswordValid = isValidPassword(password);
     const isPhoneValid = isValidPhone(phone);
-    const isLoginUsernameValid = loginUsername.trim().length > 0;
+    const isLoginEmailValid = isValidEmail(loginUsername);
     const title =
         mode === "sign-in"
             ? authCopy.signInTitle
@@ -142,15 +142,14 @@ export function SignInPage() {
         setSuccessMessage(null);
 
         const isFormValid =
-            (mode === "sign-in" ? isLoginUsernameValid : isEmailValid) &&
+            (mode === "sign-in" ? isLoginEmailValid : isEmailValid) &&
             (mode === "reset" || isPasswordValid) &&
             (mode !== "register" || isPhoneValid) &&
             (mode !== "register" || isNameValid);
 
         if (!isFormValid) {
             setTouchedFields({
-                username: mode === "sign-in",
-                email: mode !== "sign-in",
+                email: true,
                 password: mode !== "reset",
                 phone: mode === "register",
                 name: mode === "register",
@@ -276,26 +275,33 @@ export function SignInPage() {
                     {mode === "sign-in" ? (
                         <label
                             className={getFieldClassName({
-                                isTouched: Boolean(touchedFields.username),
-                                isValid: isLoginUsernameValid,
+                                isTouched: Boolean(touchedFields.email),
+                                isValid: isLoginEmailValid,
                                 value: loginUsername,
                             })}>
                             <span className="field__label">
-                                {authCopy.username}
+                                {authCopy.email}
                             </span>
                             <input
-                                autoComplete="username"
+                                autoComplete="email"
                                 className="field__input"
-                                onBlur={() => markFieldTouched("username")}
+                                inputMode="email"
+                                onBlur={() => markFieldTouched("email")}
                                 onChange={(event) =>
                                     setLoginUsername(event.target.value)
                                 }
-                                placeholder={authCopy.usernamePlaceholder}
+                                placeholder="test@example.com"
                                 required
-                                type="text"
+                                type="email"
                                 value={loginUsername}
                             />
                         </label>
+                    ) : mode === "reset" ? (
+                        <p className="auth-page__reset-help">
+                            Здравствуйте, если вы забыли или потеряли свои данные то напишите нам на почту{" "}
+                            <a href="mailto:TGuide@gmail.com">TGuide@gmail.com</a>{" "}
+                            и мы поможем вернуть вам ваши данные.
+                        </p>
                     ) : (
                         <label
                             className={getFieldClassName({
@@ -407,12 +413,14 @@ export function SignInPage() {
                         <p className="auth-page__success">{successMessage}</p>
                     ) : null}
 
-                    <button
-                        className="button button--primary button--wide"
-                        disabled={isSubmitting}
-                        type="submit">
-                        {isSubmitting ? authCopy.checking : submitLabel}
-                    </button>
+                    {mode !== "reset" ? (
+                        <button
+                            className="button button--primary button--wide"
+                            disabled={isSubmitting}
+                            type="submit">
+                            {isSubmitting ? authCopy.checking : submitLabel}
+                        </button>
+                    ) : null}
                 </form>
 
                 {mode === "reset" ? (

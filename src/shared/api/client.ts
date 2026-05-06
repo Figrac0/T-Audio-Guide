@@ -27,24 +27,20 @@ const httpApi: FrontendApi = {
 
   async createPersonalRoute(payload) {
     const { route } = payload
-    if (!route.stops.length) return route
+    if (!route.stops.length) throw new Error('Маршрут должен содержать хотя бы одну точку')
 
     const validPoints = route.stops
       .map((stop) => ({ pointId: parseInt(stop.id, 10), order: stop.order }))
       .filter((p) => !isNaN(p.pointId))
 
-    if (!validPoints.length) return route
+    if (!validPoints.length) throw new Error('Все точки маршрута должны быть корректны')
 
-    try {
-      const created = await excursionsService.createExcursion({
-        title: route.title,
-        description: route.description,
-        points: validPoints,
-      })
-      return mapExcursionFromDetail(created)
-    } catch {
-      return route
-    }
+    const created = await excursionsService.createExcursion({
+      title: route.title,
+      description: route.description,
+      points: validPoints,
+    })
+    return mapExcursionFromDetail(created)
   },
 
   async getDiscoveryFeed(payload): Promise<DiscoveryFeedDto> {

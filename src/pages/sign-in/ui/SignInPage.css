@@ -222,6 +222,28 @@
   text-align: center;
 }
 
+.auth-page__reset-help {
+  margin: 0;
+  padding: 20px;
+  border-radius: 16px;
+  background: var(--color-bg-muted);
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.auth-page__reset-help a {
+  color: var(--color-brand-strong);
+  text-decoration: none;
+  font-weight: 700;
+  transition: opacity 0.2s ease;
+}
+
+.auth-page__reset-help a:hover {
+  opacity: 0.8;
+}
+
 .auth-page__footer--center {
   justify-content: center;
 }
