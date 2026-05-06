@@ -330,13 +330,14 @@ export function useExcursionsPageState() {
       return
     }
     if (result.route) {
+      const route = result.route
       setExpandedStopId(null)
       setSelectedPointId('')
       setNotice(null)
       clearDraftRoute()
       setTimeout(() => {
         setIsSavingRoute(false)
-        navigate(appRoutes.excursion(result.route.slug))
+        navigate(appRoutes.excursion(route.slug))
       }, 400)
     }
   }, [clearDraftRoute, navigate, saveDraftRoute])
