@@ -35,6 +35,7 @@ export function ProfilePage() {
     const navigate = useNavigate();
     const { changePassword, session, signOut, updateProfile } = useAuth();
     const {
+        loadRouteForEditing,
         personalRoutes,
         removePersonalRoute,
         removeSavedRoute,
@@ -502,6 +503,10 @@ export function ProfilePage() {
                         visiblePersonalRoutes.map((route) => (
                             <ProfileRouteCard
                                 key={route.slug}
+                                onEdit={() => {
+                                    loadRouteForEditing(route)
+                                    navigate(appRoutes.excursions)
+                                }}
                                 onRemove={() => removePersonalRoute(route.slug)}
                                 onShare={() => void shareRoute(route)}
                                 route={route}
@@ -524,6 +529,10 @@ export function ProfilePage() {
                                         <ProfileRouteCard
                                             className="profile-collapsible__item"
                                             key={route.slug}
+                                            onEdit={() => {
+                                                loadRouteForEditing(route)
+                                                navigate(appRoutes.excursions)
+                                            }}
                                             onRemove={() =>
                                                 removePersonalRoute(route.slug)
                                             }
@@ -587,6 +596,7 @@ export function ProfilePage() {
 interface ProfileRouteCardProps {
     className?: string;
     route: Excursion;
+    onEdit?: () => void;
     onRemove: () => void;
     onShare: () => void;
 }
@@ -594,6 +604,7 @@ interface ProfileRouteCardProps {
 function ProfileRouteCard({
     className,
     route,
+    onEdit,
     onRemove,
     onShare,
 }: ProfileRouteCardProps) {
@@ -616,6 +627,14 @@ function ProfileRouteCard({
             </Link>
 
             <div className="profile-route__actions">
+                {onEdit ? (
+                    <button
+                        className="button button--secondary"
+                        onClick={onEdit}
+                        type="button">
+                        Изменить
+                    </button>
+                ) : null}
                 <button
                     className="button button--secondary"
                     onClick={onShare}

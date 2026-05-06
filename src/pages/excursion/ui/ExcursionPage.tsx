@@ -154,7 +154,6 @@ export function ExcursionPage() {
       <NavigationPhase
         currentStopIndex={currentStopIndex}
         excursion={excursion}
-        onBack={() => setPhase('info')}
         onComplete={() => setPhase('complete')}
         onStopChange={setCurrentStopIndex}
         requestLocation={requestLocation}
@@ -408,7 +407,6 @@ function StopCard({ stop, index }: { stop: RouteStop; index: number }) {
 interface NavigationPhaseProps {
   currentStopIndex: number
   excursion: Excursion
-  onBack: () => void
   onComplete: () => void
   onStopChange: (index: number) => void
   requestLocation: () => void
@@ -416,7 +414,7 @@ interface NavigationPhaseProps {
 }
 
 function NavigationPhase({
-  currentStopIndex, excursion, onBack, onComplete, onStopChange, requestLocation, userPosition,
+  currentStopIndex, excursion, onComplete, onStopChange, requestLocation, userPosition,
 }: NavigationPhaseProps) {
   const currentStop = excursion.stops[currentStopIndex] ?? excursion.stops[0]
   const isLastStop = currentStopIndex >= excursion.stops.length - 1
@@ -425,6 +423,10 @@ function NavigationPhase({
   const audioGuideAvailable = hasAudioGuideAvailable(currentAudio)
 
   const [sheetState, setSheetState] = useState<SheetState>('closed')
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  // null means stopped; the number is the stop index currently playing
+  const [playingStopIndex, setPlayingStopIndex] = useState<number | null>(null)
+  const isAudioPlaying = playingStopIndex === currentStopIndex
   const sheetStateRef = useRef<SheetState>('closed')
   const sheetRef = useRef<HTMLDivElement>(null)
   const navRowRef = useRef<HTMLDivElement>(null)
@@ -597,6 +599,41 @@ function NavigationPhase({
     setTimeout(clear, 580)
   }
 
+  // Pause and release audio when the active stop changes (cleanup runs before next effect)
+  useEffect(() => {
+    return () => {
+      const prev = audioRef.current
+      audioRef.current = null
+      if (prev) { prev.pause(); prev.src = '' }
+    }
+  }, [currentStopIndex])
+
+  // Release audio on unmount
+  useEffect(() => {
+    return () => {
+      const audio = audioRef.current
+      if (audio) { audio.pause(); audioRef.current = null }
+    }
+  }, [])
+
+  const handleToggleAudio = useCallback(() => {
+    if (!audioGuideAvailable || !audioGuideUrl) return
+    if (!audioRef.current) {
+      const audio = new Audio(audioGuideUrl)
+      audio.addEventListener('ended', () => setPlayingStopIndex(null))
+      audio.addEventListener('error', () => setPlayingStopIndex(null))
+      audioRef.current = audio
+    }
+    if (isAudioPlaying) {
+      audioRef.current.pause()
+      setPlayingStopIndex(null)
+    } else {
+      void audioRef.current.play()
+        .then(() => setPlayingStopIndex(currentStopIndex))
+        .catch(() => setPlayingStopIndex(null))
+    }
+  }, [audioGuideAvailable, audioGuideUrl, currentStopIndex, isAudioPlaying])
+
   const handlePrevStop = () => { onStopChange(Math.max(0, currentStopIndex - 1)); snapToPeek() }
   const handleNextStop = () => {
     if (isLastStop) {
@@ -625,7 +662,7 @@ function NavigationPhase({
         />
       </div>
 
-      <div className="ep-nav__sheet" ref={sheetRef}>
+      <div className="ep-nav__sheet" data-sheet-state={sheetState} ref={sheetRef}>
         {/* Drag handle — always visible */}
         <div
           aria-label="Потяните вверх чтобы открыть панель"
@@ -642,17 +679,26 @@ function NavigationPhase({
           role="button"
           tabIndex={0}
         >
-          <Link
-            aria-label="Открыть профиль"
-            className="ep-nav__profile"
+          <button
+            aria-label={isAudioPlaying ? 'Остановить аудиогид' : 'Запустить аудиогид'}
+            className={`ep-nav__audio-btn${isAudioPlaying ? ' ep-nav__audio-btn--playing' : ''}`}
+            disabled={!audioGuideAvailable}
+            onClick={handleToggleAudio}
             onPointerDown={(e) => e.stopPropagation()}
-            to={appRoutes.profile}
+            type="button"
           >
-            <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16">
-              <circle cx="12" cy="8" r="3.2" stroke="currentColor" strokeWidth="2" />
-              <path d="M5.5 20c1.1-4 3.4-6 6.5-6s5.4 2 6.5 6" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-            </svg>
-          </Link>
+            {isAudioPlaying ? (
+              <svg aria-hidden="true" fill="currentColor" height="16" viewBox="0 0 24 24" width="16">
+                <rect height="14" rx="1.5" width="4" x="6" y="5" />
+                <rect height="14" rx="1.5" width="4" x="14" y="5" />
+              </svg>
+            ) : (
+              <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16">
+                <path d="M11 5L6 9H2v6h4l5 4V5z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+              </svg>
+            )}
+          </button>
           <div className="ep-nav__handle" />
           <button
             aria-label="Найти моё местоположение"
@@ -674,44 +720,13 @@ function NavigationPhase({
           ref={bodyRef}
           style={{ overflowY: sheetState === 'full' ? undefined : 'hidden' }}
         >
-          {/* Nav row — visible in peek */}
+          {/* Nav row — compact one-line strip, hidden when sheet is fully open */}
           <div className="ep-nav__nav-row" ref={navRowRef}>
-            <button
-              aria-label="Предыдущая точка"
-              className="ep-nav__arrow"
-              disabled={currentStopIndex === 0}
-              onClick={handlePrevStop}
-              type="button"
-            >
-              <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18">
-                <path d="M15 19l-7-7 7-7" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
-              </svg>
-            </button>
-
-            <div className="ep-nav__progress">
-              <span className="ep-nav__progress-count">{currentStopIndex + 1} / {excursion.stops.length}</span>
-              <p className="ep-nav__progress-title">{currentStop.title}</p>
-              {distanceToStop !== null ? (
-                <span className="ep-nav__progress-dist">{formatMeters(distanceToStop)}</span>
-              ) : null}
-            </div>
-
-            <button
-              aria-label={isLastStop ? 'Завершить маршрут' : 'Следующая точка'}
-              className={`ep-nav__arrow${isLastStop ? ' ep-nav__arrow--complete' : ''}`}
-              onClick={handleNextStop}
-              type="button"
-            >
-              {isLastStop ? (
-                <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18">
-                  <path d="M5 12l5 5L20 7" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
-                </svg>
-              ) : (
-                <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18">
-                  <path d="M9 5l7 7-7 7" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
-                </svg>
-              )}
-            </button>
+            <span className="ep-nav__progress-count">{currentStopIndex + 1}/{excursion.stops.length}</span>
+            <p className="ep-nav__progress-title">{currentStop.title}</p>
+            {distanceToStop !== null ? (
+              <span className="ep-nav__progress-dist">{formatMeters(distanceToStop)}</span>
+            ) : null}
           </div>
 
           {/* Stop details — visible in full */}
@@ -764,18 +779,29 @@ function NavigationPhase({
                 <button
                   className="ep-nav__audio-play-btn"
                   disabled={!audioGuideAvailable}
+                  onClick={handleToggleAudio}
                   type="button"
                 >
-                  <svg aria-hidden="true" fill="currentColor" height="14" viewBox="0 0 24 24" width="14">
-                    <polygon points="5,3 19,12 5,21" />
-                  </svg>
-                  Прослушать
+                  {isAudioPlaying ? (
+                    <>
+                      <svg aria-hidden="true" fill="currentColor" height="14" viewBox="0 0 24 24" width="14">
+                        <rect height="12" rx="1.5" width="4" x="6" y="6" />
+                        <rect height="12" rx="1.5" width="4" x="14" y="6" />
+                      </svg>
+                      Пауза
+                    </>
+                  ) : (
+                    <>
+                      <svg aria-hidden="true" fill="currentColor" height="14" viewBox="0 0 24 24" width="14">
+                        <polygon points="5,3 19,12 5,21" />
+                      </svg>
+                      Прослушать
+                    </>
+                  )}
                 </button>
-                {audioGuideAvailable && audioGuideUrl ? (
-                  <audio controls preload="metadata" src={audioGuideUrl} style={{ width: '100%' }} />
-                ) : (
+                {!audioGuideAvailable ? (
                   <p className="ep-nav__audio-placeholder">Сейчас для этой точки доступно только текстовое описание.</p>
-                )}
+                ) : null}
               </div>
             </div>
 
@@ -817,9 +843,6 @@ function NavigationPhase({
                   </button>
                 )}
               </div>
-              <button className="button button--danger ep-nav__back-btn" onClick={onBack} type="button">
-                Вернуться
-              </button>
             </div>
           </div>
         </div>

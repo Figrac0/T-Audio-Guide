@@ -13,12 +13,14 @@ export interface SaveDraftRouteResult {
 
 export interface UserRoutesContextValue {
   draftStops: RouteStop[]
+  editingRouteSlug: string | null
   personalRoutes: Excursion[]
   savedRoutes: Excursion[]
   addPointToDraft: (point: NearbyPoint) => void
   clearDraftRoute: () => void
   isPointInDraft: (pointId: string) => boolean
   isRouteSaved: (slug: string) => boolean
+  loadRouteForEditing: (route: Excursion) => void
   reorderDraftStops: (fromIndex: number, toIndex: number) => void
   removeDraftStop: (stopId: string) => void
   removePersonalRoute: (slug: string) => void

@@ -714,7 +714,7 @@ export function ExcursionsPage() {
             <section className="ep-draft">
               <div className="ep-draft__head">
                 <h2 className="ep-draft__title">
-                  Мой маршрут
+                  {state.editingRouteSlug ? 'Редактирование' : 'Мой маршрут'}
                   <span className="ep-draft__badge" ref={badgeRef}>{state.draftStops.length}/10</span>
                 </h2>
               </div>
@@ -736,7 +736,7 @@ export function ExcursionsPage() {
 
               <div className="ep-draft__actions">
                 <button className="ep-draft__action-btn" onClick={state.handleClearRoute} type="button">
-                  Сбросить маршрут
+                  {state.editingRouteSlug ? 'Отменить редактирование' : 'Сбросить маршрут'}
                 </button>
                 {state.draftStops.length >= 2 && (
                   <button

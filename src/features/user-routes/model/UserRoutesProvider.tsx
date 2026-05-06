@@ -1,6 +1,7 @@
 import {
   useCallback,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -15,8 +16,10 @@ import type {
   RouteStop,
 } from '@/entities/excursion/model/types'
 import { getDistanceMetersBetween } from '@/features/route-map/lib/route-geometry'
+import { generatePersonalRouteName } from '@/features/user-routes/lib/personal-route-names'
 import { UserRoutesContext } from '@/features/user-routes/model/user-routes-context'
 import { appApi } from '@/shared/api/client'
+import { appRoutes } from '@/shared/config/routes'
 
 const maxDraftStops = 10
 const storageKeyPrefix = 't-guide:user-routes'
@@ -46,6 +49,9 @@ export function UserRoutesProvider({ children }: UserRoutesProviderProps) {
     pathname: location.pathname,
     stops: [],
   })
+  const [editingRouteSlug, setEditingRouteSlug] = useState<string | null>(null)
+  // Ref keeps the current value readable by callbacks without stale closures
+  const editingRouteSlugRef = useRef<string | null>(null)
   const isAuthenticated = Boolean(session?.isAuthenticated && session.profile)
   const storageScope = session?.profile?.id ?? 'guest'
   const draftStops = useMemo(
@@ -186,12 +192,30 @@ export function UserRoutesProvider({ children }: UserRoutesProviderProps) {
     })
   }, [location.pathname])
 
+  const loadRouteForEditing = useCallback((route: Excursion) => {
+    editingRouteSlugRef.current = route.slug
+    setEditingRouteSlug(route.slug)
+    setDraftState({
+      pathname: appRoutes.excursions,
+      stops: route.stops.map((stop, index) => ({ ...stop, order: index + 1 })),
+    })
+  }, [])
+
   const clearDraftRoute = useCallback(() => {
+    const slug = editingRouteSlugRef.current
+    if (slug) {
+      editingRouteSlugRef.current = null
+      setEditingRouteSlug(null)
+      persistRoutes({
+        personalRoutes: personalRoutes.filter((r) => r.slug !== slug),
+        savedRoutes,
+      })
+    }
     setDraftState({
       pathname: location.pathname,
       stops: [],
     })
-  }, [location.pathname])
+  }, [location.pathname, persistRoutes, personalRoutes, savedRoutes])
 
   const saveDraftRoute = useCallback(() => {
     if (draftStops.length < 2) {
@@ -201,7 +225,31 @@ export function UserRoutesProvider({ children }: UserRoutesProviderProps) {
       }
     }
 
+    const slug = editingRouteSlugRef.current
     const draftSignature = getRouteSignature(draftStops)
+
+    if (slug) {
+      // Edit mode: replace the original route
+      const originalRoute = personalRoutes.find((r) => r.slug === slug)
+      if (originalRoute && getRouteSignature(originalRoute.stops) === draftSignature) {
+        // No changes — just exit edit mode without saving a duplicate
+        editingRouteSlugRef.current = null
+        setEditingRouteSlug(null)
+        return { route: originalRoute, status: 'duplicate' as const }
+      }
+
+      const route = createPersonalRoute(draftStops)
+      const nextPersonalRoutes = dedupeRoutes([
+        route,
+        ...personalRoutes.filter((r) => r.slug !== slug),
+      ])
+      editingRouteSlugRef.current = null
+      setEditingRouteSlug(null)
+      persistRoutes({ personalRoutes: nextPersonalRoutes, savedRoutes })
+      void appApi.createPersonalRoute({ route })
+      return { route, status: 'saved' as const }
+    }
+
     const duplicateRoute = personalRoutes.find(
       (route) => getRouteSignature(route.stops) === draftSignature,
     )
@@ -255,8 +303,10 @@ export function UserRoutesProvider({ children }: UserRoutesProviderProps) {
       addPointToDraft,
       clearDraftRoute,
       draftStops,
+      editingRouteSlug,
       isPointInDraft,
       isRouteSaved,
+      loadRouteForEditing,
       personalRoutes,
       reorderDraftStops,
       removeDraftStop,
@@ -271,8 +321,10 @@ export function UserRoutesProvider({ children }: UserRoutesProviderProps) {
       addPointToDraft,
       clearDraftRoute,
       draftStops,
+      editingRouteSlug,
       isPointInDraft,
       isRouteSaved,
+      loadRouteForEditing,
       personalRoutes,
       reorderDraftStops,
       removeDraftStop,
@@ -385,6 +437,7 @@ function createPersonalRoute(stops: RouteStop[]): Excursion {
   const distanceKm = getRouteDistanceKm(stops.map((stop) => stop.coordinates))
   const visitMinutes = stops.reduce((total, stop) => total + stop.expectedVisitMinutes, 0)
   const transitMinutes = Math.max(8, Math.round(distanceKm * 12))
+  const { tagline, title } = generatePersonalRouteName(stops)
 
   return {
     audienceLabel: 'Личный маршрут',
@@ -405,9 +458,9 @@ function createPersonalRoute(stops: RouteStop[]): Excursion {
       id: `${stop.id}-${now}`,
       order: index + 1,
     })),
-    tagline: 'Собственная прогулка по выбранным точкам',
+    tagline,
     theme: 'mixed',
-    title: `Личный маршрут на ${stops.length} точки`,
+    title,
   }
 }
 
