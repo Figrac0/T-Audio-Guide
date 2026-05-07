@@ -1,7 +1,7 @@
 # T-Guide
 
 <div align="center">
-  <a href="https://t-audio-guide-v4.vercel.app/" target="_blank">
+  <a href="https://t-audio-guide-f-b.vercel.app/" target="_blank">
     <img
       src="https://github.com/Figrac0/Figrac0/blob/main/href.svg"
       alt="Quick Access - Visit Site"
@@ -1109,5 +1109,3 @@ HomePage монтируется
 | Аудиогид у остановок маршрута всегда null         | `PointShortItem` не имеет медиа, нужен отдельный `GET /points/{id}` |
 
 ---
-
-_Последнее обновление: 2026-05-04_
