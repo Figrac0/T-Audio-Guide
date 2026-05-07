@@ -134,7 +134,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
 
         zoomDebounceRef.current = setTimeout(() => {
           onChangeRadiusRef.current(getDiscoveryRadiusForZoom(map.getZoom()))
-        }, 350)
+        }, 400)
       })
 
       map.on('popupclose', () => onPopupCloseRef.current())

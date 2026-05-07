@@ -285,9 +285,12 @@ export function DiscoveryMap({
       // Dynamic radius: debounced to prevent rapid-fire API calls on every scroll tick
       map.on('zoomend', () => {
         if (zoomDebounceRef.current !== null) clearTimeout(zoomDebounceRef.current)
+        // Debounce radius changes to reduce API requests - increased from 350ms to 400ms
+        // This gives users better UX while still being responsive
         zoomDebounceRef.current = setTimeout(() => {
-          onChangeRadiusRef.current(getDiscoveryRadiusForZoom(map.getZoom()))
-        }, 350)
+          const newRadius = getDiscoveryRadiusForZoom(map.getZoom())
+          onChangeRadiusRef.current(newRadius)
+        }, 400)
       })
 
       map.on('click', (event: L.LeafletMouseEvent) => {
@@ -552,8 +555,7 @@ export function DiscoveryMap({
         title: 'Ваше местоположение',
       }).addTo(routeLayer)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftGeometry, guideGeometry, userPosition])
+  }, [draftGeometry, guideGeometry, radiusMeters, userPosition])
 
   // Markers layer: POI markers only — rebuilt when the point set or selection changes.
   // Kept separate from the route layer so zoom/radius changes don't thrash polylines.

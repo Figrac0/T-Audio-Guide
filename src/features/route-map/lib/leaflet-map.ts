@@ -17,6 +17,10 @@ export function createOpenStreetMapLayer() {
   return L.tileLayer(openStreetMapTileUrl, {
     attribution: openStreetMapAttribution,
     maxZoom: 19,
+    minZoom: 2,
+    keepBuffer: 2,
+    updateWhenZooming: false,
+    updateWhenIdle: true,
   })
 }
 
@@ -29,6 +33,10 @@ export function createLeafletMap(container: HTMLElement, center: GeoPoint, zoom:
     zoomAnimationThreshold: 4,
     preferCanvas: true,
     zoomControl: false,
+    easeLinearity: 0.5,
+    maxBoundsViscosity: 1.0,
+    wheelPxPerZoomLevel: 60,
+    touchZoom: true,
   }).setView(toLeafletLatLng(center), zoom)
 
   createOpenStreetMapLayer().addTo(map)
