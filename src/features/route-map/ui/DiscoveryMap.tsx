@@ -60,7 +60,9 @@ interface DiscoveryMapProps {
   emptyMessage: string
   fixedRouteStops?: RouteStop[]
   geolocationError: string | null
+  initialCenter?: GeoPoint
   isLoading: boolean
+  isMapLocked?: boolean
   loadError: string | null
   nearbyPoints: NearbyPoint[]
   onAddPointToDraft?: (point: NearbyPoint) => void
@@ -68,6 +70,7 @@ interface DiscoveryMapProps {
   onChangeRadius: (radiusMeters: number) => void
   onClearDraftRoute?: () => void
   onLocateUser: () => void
+  onMapClick?: (coords: GeoPoint) => void
   onSaveDraftRoute?: () => void
   onSearchQueryChange?: (value: string) => void
   onSelectCategory: (category: PointCategory | 'all') => void
@@ -117,7 +120,9 @@ export function DiscoveryMap({
   emptyMessage,
   fixedRouteStops = [],
   geolocationError,
+  initialCenter,
   isLoading,
+  isMapLocked = false,
   loadError,
   nearbyPoints,
   onAddPointToDraft,
@@ -125,6 +130,7 @@ export function DiscoveryMap({
   onChangeRadius,
   onClearDraftRoute,
   onLocateUser,
+  onMapClick,
   onSaveDraftRoute,
   onSearchQueryChange,
   onSelectCategory,
@@ -147,7 +153,7 @@ export function DiscoveryMap({
   const radiusCircleRef = useRef<L.Circle | null>(null)
   const markerRefs = useRef(new Map<string, L.Marker>())
   const controlsRef = useRef<HTMLDivElement | null>(null)
-  const initialCenterRef = useRef(userPosition ?? appMapConfig.defaultCenter)
+  const initialCenterRef = useRef(initialCenter ?? userPosition ?? appMapConfig.defaultCenter)
   const skipSelectedFocusRef = useRef(true)
   const hasAutoFittedRef = useRef(false)
   const selectionSourceRef = useRef<SelectionSource | null>(null)
@@ -158,6 +164,7 @@ export function DiscoveryMap({
   const routeLayerRef = useRef<L.LayerGroup | null>(null)
   const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const onChangeRadiusRef = useRef(onChangeRadius)
+  const onMapClickRef = useRef(onMapClick)
   const selectedPointIdRef = useRef(selectedPointId)
   const popupPointIdRef = useRef<string | null>(null)
   const suppressPopupCloseRef = useRef(false)
@@ -226,6 +233,7 @@ export function DiscoveryMap({
 
   // Keep radius callback ref current so zoomend listener always calls latest version
   onChangeRadiusRef.current = onChangeRadius
+  onMapClickRef.current = onMapClick
   selectedPointIdRef.current = selectedPointId
   const guideGeometry =
     guideRoute.signature === guideSignature && guideRoute.geometry
@@ -282,6 +290,13 @@ export function DiscoveryMap({
         }, 350)
       })
 
+      map.on('click', (event: L.LeafletMouseEvent) => {
+        onMapClickRef.current?.({
+          lat: event.latlng.lat,
+          lng: event.latlng.lng,
+        })
+      })
+
       queueMicrotask(() => setMapLoadError(null))
     } catch (error) {
       console.error(error)
@@ -299,6 +314,25 @@ export function DiscoveryMap({
       mapRef.current = null
     }
   }, [])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    if (isMapLocked) {
+      map.dragging.disable()
+      map.scrollWheelZoom.disable()
+      map.doubleClickZoom.disable()
+      map.touchZoom.disable()
+      mapContainerRef.current?.classList.add('dm--locked')
+    } else {
+      map.dragging.enable()
+      map.scrollWheelZoom.enable()
+      map.doubleClickZoom.enable()
+      map.touchZoom.enable()
+      mapContainerRef.current?.classList.remove('dm--locked')
+    }
+  }, [isMapLocked])
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -551,6 +585,7 @@ export function DiscoveryMap({
               selectionSourceRef.current = 'route'
               onSelectPoint(point.id)
               onBuildRoute(point.id)
+              marker.closePopup()
             },
             onCancelRoute: onClearDraftRoute
               ? () => {
@@ -841,7 +876,7 @@ export function DiscoveryMap({
         </div>
       </div>
 
-      <div className="discovery-map__canvas discovery-map__canvas--wide">
+      <div className={`discovery-map__canvas discovery-map__canvas--wide${isMapLocked ? ' dm--locked' : ''}`}>
         <div className="discovery-map__root" ref={mapContainerRef}></div>
         {isLoading ? (
           <div className="discovery-map__overlay-note">Ищем места рядом...</div>

@@ -141,6 +141,12 @@ body.app-body--home-page {
     transform: translateY(-50%) scale(0.91);
 }
 
+.home-sheet__profile--active {
+    background: var(--color-brand);
+    color: white;
+    border-color: var(--color-brand);
+}
+
 /* ─────────────────────────────────────────────────────────────────────────────
    SCROLLABLE BODY
 ───────────────────────────────────────────────────────────────────────────── */

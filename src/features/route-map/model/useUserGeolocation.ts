@@ -22,8 +22,11 @@ const geolocationOptions = {
   timeout: 12000,
 }
 
+const POSITION_UPDATE_DEBOUNCE_MS = 800
+
 export function useUserGeolocation(): UseUserGeolocationResult {
   const watchIdRef = useRef<number | null>(null)
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [userPosition, setUserPosition] = useState<GeoPoint | null>(null)
   const [status, setStatus] = useState<GeolocationStatus>(() => {
     if (typeof window === 'undefined') {
@@ -48,12 +51,17 @@ export function useUserGeolocation(): UseUserGeolocationResult {
   }, [])
 
   const handlePosition = useCallback((position: GeolocationPosition) => {
-    setUserPosition({
-      lat: position.coords.latitude,
-      lng: position.coords.longitude,
-    })
-    setStatus('tracking')
-    setError(null)
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      setUserPosition({
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+      })
+      setStatus('tracking')
+      setError(null)
+    }, POSITION_UPDATE_DEBOUNCE_MS)
   }, [])
 
   const handleGeolocationError = useCallback((geolocationError: GeolocationPositionError) => {
@@ -102,6 +110,9 @@ export function useUserGeolocation(): UseUserGeolocationResult {
 
     return () => {
       stopWatching()
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
     }
   }, [handleGeolocationError, handlePosition, stopWatching])
 

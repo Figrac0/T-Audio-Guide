@@ -4,6 +4,7 @@ import { BrowserRouter, Link, NavLink } from "react-router-dom";
 import { AppRouter } from "@/app/providers/AppRouter";
 import { AuthProvider } from "@/app/providers/AuthProvider";
 import { useAuth } from "@/app/providers/useAuth";
+import { ManualPositionProvider } from "@/shared/lib/ManualPositionContext";
 import { UserRoutesProvider } from "@/features/user-routes/model/UserRoutesProvider";
 import { appRoutes } from "@/shared/config/routes";
 import "./App.css";
@@ -21,7 +22,9 @@ function App() {
     return (
         <BrowserRouter>
             <AuthProvider>
-                <UserRoutesBoundary />
+                <ManualPositionProvider>
+                    <UserRoutesBoundary />
+                </ManualPositionProvider>
             </AuthProvider>
         </BrowserRouter>
     );

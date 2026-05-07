@@ -34,10 +34,18 @@ export function createLeafletMap(container: HTMLElement, center: GeoPoint, zoom:
   createOpenStreetMapLayer().addTo(map)
 
   window.requestAnimationFrame(() => {
-    map.invalidateSize()
+    try {
+      map.invalidateSize()
+    } catch {
+      // Ignore errors during size invalidation if container isn't ready
+    }
   })
   window.setTimeout(() => {
-    map.invalidateSize()
+    try {
+      map.invalidateSize()
+    } catch {
+      // Ignore errors during size invalidation if container isn't ready
+    }
   }, 180)
 
   return map

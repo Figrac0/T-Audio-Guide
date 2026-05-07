@@ -11,7 +11,6 @@ import { Link, useParams } from 'react-router-dom'
 import {
   getAudioGuideDuration,
   getAudioGuideLanguage,
-  getAudioGuideUrl,
   hasAudioGuideAvailable,
 } from '@/entities/excursion/lib/audio-guide'
 import {
@@ -23,6 +22,7 @@ import { useRouteBySlug } from '@/entities/excursion/model/useRouteBySlug'
 import type { Excursion, GeoPoint, PointCategory, RouteStop } from '@/entities/excursion/model/types'
 import { formatMeters, getDistanceMetersBetween } from '@/features/route-map/lib/route-geometry'
 import { useUserGeolocation } from '@/features/route-map/model/useUserGeolocation'
+import { useAudioGuide } from '@/pages/excursion/model/useAudioGuide'
 import { RouteMap } from '@/features/route-map/ui/RouteMap'
 import { useUserRoutes } from '@/features/user-routes/model/useUserRoutes'
 import { appRoutes } from '@/shared/config/routes'
@@ -142,7 +142,6 @@ export function ExcursionPage() {
       <CompleteScreen
         excursion={excursion}
         isSaved={isSaved}
-        onReturnToInfo={() => { setCurrentStopIndex(0); setPhase('info') }}
         onSave={() => toggleSavedRoute(excursion)}
         onShare={() => void shareRoute(excursion)}
       />
@@ -419,14 +418,10 @@ function NavigationPhase({
   const currentStop = excursion.stops[currentStopIndex] ?? excursion.stops[0]
   const isLastStop = currentStopIndex >= excursion.stops.length - 1
   const currentAudio = currentStop.audio
-  const audioGuideUrl = getAudioGuideUrl(currentAudio)
-  const audioGuideAvailable = hasAudioGuideAvailable(currentAudio)
 
   const [sheetState, setSheetState] = useState<SheetState>('closed')
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  // null means stopped; the number is the stop index currently playing
-  const [playingStopIndex, setPlayingStopIndex] = useState<number | null>(null)
-  const isAudioPlaying = playingStopIndex === currentStopIndex
+  const [initialUserPosition] = useState(userPosition)
+  const { isAudioPlaying, isAudioAvailable, toggleAudio } = useAudioGuide(currentStop, currentStopIndex)
   const sheetStateRef = useRef<SheetState>('closed')
   const sheetRef = useRef<HTMLDivElement>(null)
   const navRowRef = useRef<HTMLDivElement>(null)
@@ -626,22 +621,6 @@ function NavigationPhase({
     setTimeout(clear, 580)
   }
 
-  // Pause and release audio when the active stop changes (cleanup runs before next effect)
-  useEffect(() => {
-    return () => {
-      const prev = audioRef.current
-      audioRef.current = null
-      if (prev) { prev.pause(); prev.src = '' }
-    }
-  }, [currentStopIndex])
-
-  // Release audio on unmount
-  useEffect(() => {
-    return () => {
-      const audio = audioRef.current
-      if (audio) { audio.pause(); audioRef.current = null }
-    }
-  }, [])
 
   // Disable map pointer events when header menu opens (prevents jittering during layout shift)
   useEffect(() => {
@@ -656,23 +635,6 @@ function NavigationPhase({
     return () => window.removeEventListener('app-menu-open', handleMenuOpen)
   }, [])
 
-  const handleToggleAudio = useCallback(() => {
-    if (!audioGuideAvailable || !audioGuideUrl) return
-    if (!audioRef.current) {
-      const audio = new Audio(audioGuideUrl)
-      audio.addEventListener('ended', () => setPlayingStopIndex(null))
-      audio.addEventListener('error', () => setPlayingStopIndex(null))
-      audioRef.current = audio
-    }
-    if (isAudioPlaying) {
-      audioRef.current.pause()
-      setPlayingStopIndex(null)
-    } else {
-      void audioRef.current.play()
-        .then(() => setPlayingStopIndex(currentStopIndex))
-        .catch(() => setPlayingStopIndex(null))
-    }
-  }, [audioGuideAvailable, audioGuideUrl, currentStopIndex, isAudioPlaying])
 
   const handlePrevStop = () => { onStopChange(Math.max(0, currentStopIndex - 1)); snapToPeek() }
   const handleNextStop = () => {
@@ -688,6 +650,7 @@ function NavigationPhase({
   }
 
   const distanceToStop = userPosition ? getDistanceMetersBetween(userPosition, currentStop.coordinates) : null
+  const guideRouteUserPosition = initialUserPosition
 
   return (
     <div className="ep-nav">
@@ -698,7 +661,7 @@ function NavigationPhase({
           routeColor={excursion.routeColor}
           selectedStopId={currentStop.id}
           stops={[currentStop]}
-          userPosition={userPosition}
+          userPosition={guideRouteUserPosition}
         />
       </div>
 
@@ -722,8 +685,8 @@ function NavigationPhase({
           <button
             aria-label={isAudioPlaying ? 'Остановить аудиогид' : 'Запустить аудиогид'}
             className={`ep-nav__audio-btn${isAudioPlaying ? ' ep-nav__audio-btn--playing' : ''}`}
-            disabled={!audioGuideAvailable}
-            onClick={handleToggleAudio}
+            disabled={!isAudioAvailable}
+            onClick={toggleAudio}
             onPointerDown={(e) => e.stopPropagation()}
             type="button"
           >
@@ -818,8 +781,8 @@ function NavigationPhase({
               <div className="ep-nav__audio-actions">
                 <button
                   className="ep-nav__audio-play-btn"
-                  disabled={!audioGuideAvailable}
-                  onClick={handleToggleAudio}
+                  disabled={!isAudioAvailable}
+                  onClick={toggleAudio}
                   type="button"
                 >
                   {isAudioPlaying ? (
@@ -839,7 +802,7 @@ function NavigationPhase({
                     </>
                   )}
                 </button>
-                {!audioGuideAvailable ? (
+                {!isAudioAvailable ? (
                   <p className="ep-nav__audio-placeholder">Сейчас для этой точки доступно только текстовое описание.</p>
                 ) : null}
               </div>
@@ -896,12 +859,11 @@ function NavigationPhase({
 interface CompleteScreenProps {
   excursion: Excursion
   isSaved: boolean
-  onReturnToInfo: () => void
   onSave: () => void
   onShare: () => void
 }
 
-function CompleteScreen({ excursion, isSaved, onReturnToInfo, onSave, onShare }: CompleteScreenProps) {
+function CompleteScreen({ excursion, isSaved, onSave, onShare }: CompleteScreenProps) {
   const [rating, setRating] = useState(0)
   const [hoverRating, setHoverRating] = useState(0)
   const [reviewText, setReviewText] = useState('')
@@ -989,7 +951,6 @@ function CompleteScreen({ excursion, isSaved, onReturnToInfo, onSave, onShare }:
             {isSaved ? 'Сохранено' : 'Сохранить маршрут'}
           </button>
           <button className="button button--ghost" onClick={onShare} type="button">Поделиться</button>
-          <button className="button button--ghost" onClick={onReturnToInfo} type="button">К описанию</button>
           <Link className="button button--ghost" to={appRoutes.excursions}>Все маршруты</Link>
         </div>
       </div>

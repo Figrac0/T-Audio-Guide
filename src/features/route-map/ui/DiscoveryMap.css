@@ -453,3 +453,8 @@
     max-width: calc(100% - 20px);
   }
 }
+
+.dm--locked,
+.dm--locked * {
+  cursor: crosshair !important;
+}

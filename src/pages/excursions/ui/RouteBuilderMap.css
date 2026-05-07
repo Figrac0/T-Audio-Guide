@@ -266,3 +266,8 @@
     animation: none;
   }
 }
+
+.rbm--locked,
+.rbm--locked * {
+  cursor: crosshair !important;
+}

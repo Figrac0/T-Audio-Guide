@@ -206,6 +206,19 @@ body.app-body--routes-page {
     transform: translateY(-50%) scale(0.92);
 }
 
+.ep-sheet__profile--active {
+    background: var(--color-brand);
+    color: white;
+    border-color: var(--color-brand);
+}
+
+.ep-sheet__profile:disabled,
+.ep-sheet__locate:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .ep-sheet__empty-hint {
     position: relative;
     display: flex;

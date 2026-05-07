@@ -367,6 +367,7 @@ export function useExcursionsPageState() {
   return {
     activeTheme,
     canLoadNearbyPlaces,
+    center,
     detailPoint,
     discoveryError,
     draftFullBumpKey,

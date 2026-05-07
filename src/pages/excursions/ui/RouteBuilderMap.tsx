@@ -32,11 +32,14 @@ export interface RouteBuilderMapHandle {
 
 interface RouteBuilderMapProps {
   draftPointOrders: ReadonlyMap<string, number>
+  initialCenter?: GeoPoint
   isDraftFull: boolean
   isLoading: boolean
+  isMapLocked?: boolean
   nearbyPoints: NearbyPoint[]
   onAddPoint: (point: NearbyPoint) => void
   onChangeRadius: (meters: number) => void
+  onMapClick?: (coords: GeoPoint) => void
   onPopupClose: () => void
   onRemovePoint: (pointId: string) => void
   onSelectPoint: (id: string) => void
@@ -50,11 +53,14 @@ interface RouteBuilderMapProps {
 
 export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMapProps>(function RouteBuilderMap({
   draftPointOrders,
+  initialCenter,
   isDraftFull,
   isLoading,
+  isMapLocked = false,
   nearbyPoints,
   onAddPoint,
   onChangeRadius,
+  onMapClick,
   onPopupClose,
   onRemovePoint,
   onSelectPoint,
@@ -73,6 +79,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
   const radiusCircleRef = useRef<L.Circle | null>(null)
   const markerRefsMap = useRef(new Map<string, L.Marker>())
   const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const initialCenterRef = useRef(initialCenter ?? userPosition ?? appMapConfig.defaultCenter)
 
   useImperativeHandle(ref, () => ({
     closePopup: () => { mapRef.current?.closePopup() },
@@ -83,6 +90,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
   const onSelectPointRef = useRef(onSelectPoint)
   const onPopupCloseRef = useRef(onPopupClose)
   const onShowDetailRef = useRef(onShowDetail)
+  const onMapClickRef = useRef(onMapClick)
   const isDraftFullRef = useRef(isDraftFull)
   const onChangeRadiusRef = useRef(onChangeRadius)
   const radiusMetersRef = useRef(radiusMeters)
@@ -94,10 +102,11 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
     onSelectPointRef.current = onSelectPoint
     onPopupCloseRef.current = onPopupClose
     onShowDetailRef.current = onShowDetail
+    onMapClickRef.current = onMapClick
     isDraftFullRef.current = isDraftFull
     onChangeRadiusRef.current = onChangeRadius
     radiusMetersRef.current = radiusMeters
-  }, [isDraftFull, onAddPoint, onChangeRadius, onPopupClose, onRemovePoint, onSelectPoint, onShowDetail, radiusMeters])
+  }, [isDraftFull, onAddPoint, onChangeRadius, onMapClick, onPopupClose, onRemovePoint, onSelectPoint, onShowDetail, radiusMeters])
 
   useEffect(() => {
     selectedPointIdRef.current = selectedPointId
@@ -107,7 +116,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
     const container = containerRef.current
     if (!container || mapRef.current) return
 
-    const map = createLeafletMap(container, appMapConfig.defaultCenter, appMapConfig.defaultZoom)
+    const map = createLeafletMap(container, initialCenterRef.current, appMapConfig.defaultZoom)
     const routeLayer = L.layerGroup().addTo(map)
     const markersLayer = L.layerGroup().addTo(map)
     const userLayer = L.layerGroup().addTo(map)
@@ -129,6 +138,13 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
       })
 
       map.on('popupclose', () => onPopupCloseRef.current())
+
+      map.on('click', (event: L.LeafletMouseEvent) => {
+        onMapClickRef.current?.({
+          lat: event.latlng.lat,
+          lng: event.latlng.lng,
+        })
+      })
 
     // When returning to the tab the map container may have an invalid size.
     // invalidateSize() recalculates and stops the map from "trembling".
@@ -157,6 +173,34 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
       mapRef.current = null
     }
   }, [])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    if (isMapLocked) {
+      map.dragging.disable()
+      map.scrollWheelZoom.disable()
+      map.doubleClickZoom.disable()
+      map.touchZoom.disable()
+    } else {
+      map.dragging.enable()
+      map.scrollWheelZoom.enable()
+      map.doubleClickZoom.enable()
+      map.touchZoom.enable()
+    }
+  }, [isMapLocked])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !userPosition) return
+
+    applyLeafletLocation(map, {
+      center: toLngLat(userPosition),
+      zoom: 15.5,
+      duration: 600,
+    })
+  }, [userPosition])
 
   useEffect(() => {
     const layer = routeLayerRef.current
@@ -312,7 +356,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
   }, [recenterKey, userPosition])
 
   return (
-    <div className="rbm">
+    <div className={`rbm${isMapLocked ? ' rbm--locked' : ''}`}>
       <div className="rbm__container" ref={containerRef} />
       {isLoading ? <div className="rbm__loader" role="status">Загрузка мест…</div> : null}
     </div>

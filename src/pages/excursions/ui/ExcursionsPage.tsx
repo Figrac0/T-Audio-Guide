@@ -18,6 +18,7 @@ import {
   formatTheme,
 } from '@/shared/lib/format'
 import { buildPlacePlaceholderImage, buildRoutePlaceholderImage } from '@/shared/lib/placeholder-images'
+import { useManualPosition } from '@/shared/lib/ManualPositionContext'
 import { FooterFeatureIcon } from '@/shared/ui/FooterFeatureIcon'
 import { ResilientImage } from '@/shared/ui/ResilientImage'
 import { SmartPlaceImage } from '@/shared/ui/SmartPlaceImage'
@@ -70,6 +71,8 @@ function getSheetTranslateY(el: HTMLElement): number {
 export function ExcursionsPage() {
   const state = useExcursionsPageState()
   const [showAll, setShowAll] = useState(false)
+  const { isOverrideActive, manualPosition, mode: overrideMode, setManualPosition, toggleOverride } = useManualPosition()
+  const effectiveUserPosition = isOverrideActive ? manualPosition : state.userPosition
   const catalogInitial = useCatalogInitial()
   const draftPointOrders = useMemo(
     () =>
@@ -321,6 +324,17 @@ export function ExcursionsPage() {
     const hasDraft = hasDraftStopsRef.current
     animateSheetPosition(hasDraft ? peekTranslateRef.current : closedTranslateRef.current)
   }, [animateSheetPosition])
+
+  const handleToggleOverride = useCallback(() => {
+    if (overrideMode === 'off') animateSheetPosition(closedTranslateRef.current)
+    toggleOverride()
+  }, [overrideMode, animateSheetPosition, toggleOverride])
+
+  const handleMapClick = useCallback((coords: { lat: number; lng: number }) => {
+    if (overrideMode === 'waiting') {
+      setManualPosition(coords)
+    }
+  }, [overrideMode, setManualPosition])
 
   const updateSheetBounds = useCallback((hasDraft: boolean) => {
     if (!hasMeasuredRef.current) return // first-measure is handled by useLayoutEffect
@@ -594,11 +608,14 @@ export function ExcursionsPage() {
         <RouteBuilderMap
           ref={mapHandleRef}
           draftPointOrders={draftPointOrders}
+          initialCenter={state.center}
           isDraftFull={isDraftAtLimit}
           isLoading={state.isLoading || !state.canLoadNearbyPlaces}
+          isMapLocked={overrideMode === 'waiting'}
           nearbyPoints={state.nearbyPoints}
           onAddPoint={state.handleAddPoint}
           onChangeRadius={state.setRadiusMeters}
+          onMapClick={handleMapClick}
           onPopupClose={state.handlePopupClose}
           onRemovePoint={state.handleRemovePointFromDraft}
           onSelectPoint={state.handleSelectPoint}
@@ -607,7 +624,7 @@ export function ExcursionsPage() {
           recenterKey={state.recenterKey}
           routeState={state.routeState}
           selectedPointId={state.selectedPointId}
-          userPosition={state.userPosition}
+          userPosition={effectiveUserPosition}
         />
       </div>
 
@@ -643,22 +660,20 @@ export function ExcursionsPage() {
         >
           <div className="ep-sheet__bar-row">
             <div className="ep-sheet__handle" />
-            <Link
-              aria-label="Открыть профиль"
-              className="ep-sheet__profile"
+            <button
+              aria-label={overrideMode !== 'off' ? "Вернуться к реальной геопозиции" : "Установить собственное местоположение"}
+              className={`ep-sheet__profile${overrideMode !== 'off' ? ' ep-sheet__profile--active' : ''}`}
+              disabled={hasDraftStops}
+              onClick={handleToggleOverride}
               onPointerDown={(e) => e.stopPropagation()}
-              to={appRoutes.profile}
+              title={hasDraftStops ? "Недоступно при наличии точек в маршруте" : (isOverrideActive ? "Нажмите ещё раз чтобы вернуться к реальной геопозиции" : "Нажмите, а затем кликните на карту чтобы установить своё местоположение")}
+              type="button"
             >
               <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16">
-                <circle cx="12" cy="8" r="3.2" stroke="currentColor" strokeWidth="2" />
-                <path
-                  d="M5.5 20c1.1-4 3.4-6 6.5-6s5.4 2 6.5 6"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeWidth="2"
-                />
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+                <circle cx="12" cy="12" r="3" fill="currentColor" />
               </svg>
-            </Link>
+            </button>
             <button
               aria-label="Найти моё местоположение"
               className="ep-sheet__locate"

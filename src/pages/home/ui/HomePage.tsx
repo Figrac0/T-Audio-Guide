@@ -30,6 +30,7 @@ import {
     getStoredDiscoveryContext,
     saveDiscoveryContext,
 } from "@/shared/lib/discovery-context";
+import { useManualPosition } from "@/shared/lib/ManualPositionContext";
 import {
     formatDuration,
     formatPointCategory,
@@ -188,7 +189,16 @@ export function HomePage() {
         userPosition,
     } = useUserGeolocation();
 
-    const currentCenter = userPosition ?? storedContext.center;
+    const {
+        isOverrideActive,
+        manualPosition,
+        mode: overrideMode,
+        setManualPosition,
+        toggleOverride,
+    } = useManualPosition();
+
+    const effectiveUserPosition = isOverrideActive ? manualPosition : userPosition;
+    const currentCenter = effectiveUserPosition ?? storedContext.center;
     const canLoadNearbyPlaces =
         Boolean(userPosition) ||
         geolocationStatus === "blocked" ||
@@ -417,6 +427,12 @@ export function HomePage() {
         setSelectedPointId(pointId);
     }, []);
 
+    const handleMapClick = useCallback((coords: { lat: number; lng: number }) => {
+        if (overrideMode === 'waiting') {
+            setManualPosition(coords);
+        }
+    }, [overrideMode, setManualPosition]);
+
     const cycleSelectedPoint = useCallback(
         (direction: 1 | -1) => {
             if (!nearbyPoints.length) return;
@@ -470,6 +486,11 @@ export function HomePage() {
         setSheetState("closed");
         snapSheet(sheet, closedT, 480);
     }, []);
+
+    const handleToggleOverride = useCallback(() => {
+        if (overrideMode === 'off') snapToClosed();
+        toggleOverride();
+    }, [overrideMode, snapToClosed, toggleOverride]);
 
     const handleGoToPlace = useCallback(
         (point: NearbyPoint) => {
@@ -842,7 +863,9 @@ export function HomePage() {
                     fixedRouteStops={savedDraftPreviewStops}
                     fullscreen
                     geolocationError={geolocationError}
+                    initialCenter={currentCenter}
                     isLoading={isLoading || !canLoadNearbyPlaces}
+                    isMapLocked={overrideMode === 'waiting'}
                     loadError={discoveryError}
                     nearbyPoints={nearbyPoints}
                     onAddPointToDraft={handleAddPointToRoute}
@@ -850,6 +873,7 @@ export function HomePage() {
                     onChangeRadius={setRadiusMeters}
                     onClearDraftRoute={handleClearDraftRoute}
                     onLocateUser={requestLocation}
+                    onMapClick={handleMapClick}
                     onSaveDraftRoute={handleSaveDraftRoute}
                     onSelectCategory={setActivePointCategory}
                     onSelectNextPoint={() => cycleSelectedPoint(1)}
@@ -861,7 +885,7 @@ export function HomePage() {
                     selectedPointId={effectiveSelectedPointId}
                     showDirectRouteInPopup={true}
                     showPopupRouteActions={false}
-                    userPosition={userPosition}
+                    userPosition={effectiveUserPosition}
                 />
             </div>
 
@@ -890,11 +914,13 @@ export function HomePage() {
                     role="button"
                     tabIndex={0}>
                     <div className="home-sheet__handle" />
-                    <Link
-                        aria-label="Открыть профиль"
-                        className="home-sheet__profile"
+                    <button
+                        aria-label={overrideMode !== 'off' ? "Вернуться к реальной геопозиции" : "Установить собственное местоположение"}
+                        className={`home-sheet__profile${overrideMode !== 'off' ? ' home-sheet__profile--active' : ''}`}
+                        onClick={handleToggleOverride}
                         onPointerDown={(e) => e.stopPropagation()}
-                        to={appRoutes.profile}>
+                        title={isOverrideActive ? "Нажмите ещё раз чтобы вернуться к реальной геопозиции" : "Нажмите, а затем кликните на карту чтобы установить своё местоположение"}
+                        type="button">
                         <svg
                             aria-hidden="true"
                             fill="none"
@@ -903,19 +929,19 @@ export function HomePage() {
                             width="16">
                             <circle
                                 cx="12"
-                                cy="8"
-                                r="3.2"
+                                cy="12"
+                                r="9"
                                 stroke="currentColor"
                                 strokeWidth="2"
                             />
-                            <path
-                                d="M5.5 20c1.1-4 3.4-6 6.5-6s5.4 2 6.5 6"
-                                stroke="currentColor"
-                                strokeLinecap="round"
-                                strokeWidth="2"
+                            <circle
+                                cx="12"
+                                cy="12"
+                                r="3"
+                                fill="currentColor"
                             />
                         </svg>
-                    </Link>
+                    </button>
 
                     {/* Locate button lives inside drag area — always visible */}
                     <button
