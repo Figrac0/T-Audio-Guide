@@ -169,6 +169,7 @@ export function DiscoveryMap({
   const popupPointIdRef = useRef<string | null>(null)
   const suppressPopupCloseRef = useRef(false)
   const userClosedPopupRef = useRef(false)
+  const userInteractedWithMapRef = useRef(false)
   const [mapLoadError, setMapLoadError] = useState<string | null>(null)
   const [openMenu, setOpenMenu] = useState<'category' | 'radius' | null>(null)
   const [guideRoute, setGuideRoute] = useState<{
@@ -300,6 +301,14 @@ export function DiscoveryMap({
           lat: event.latlng.lat,
           lng: event.latlng.lng,
         })
+      })
+
+      map.on('movestart', () => {
+        userInteractedWithMapRef.current = true
+      })
+
+      map.on('zoomstart', () => {
+        userInteractedWithMapRef.current = true
       })
 
       queueMicrotask(() => setMapLoadError(null))
@@ -473,7 +482,7 @@ export function DiscoveryMap({
     const routeSignature = `${routeTargetId ?? ''}:${visibleDraftStopsSignature}`
 
     if (draftBounds && visibleDraftStops.length) {
-      if (routeSignature !== lastFittedRouteRef.current) {
+      if (routeSignature !== lastFittedRouteRef.current && !userInteractedWithMapRef.current) {
         lastFittedRouteRef.current = routeSignature
         applyLeafletLocation(map, {
           bounds: draftBounds,
@@ -486,7 +495,7 @@ export function DiscoveryMap({
     }
 
     if (guideBounds && routeTargetId) {
-      if (routeSignature !== lastFittedRouteRef.current) {
+      if (routeSignature !== lastFittedRouteRef.current && !userInteractedWithMapRef.current) {
         lastFittedRouteRef.current = routeSignature
         applyLeafletLocation(map, {
           bounds: guideBounds,
@@ -620,6 +629,7 @@ export function DiscoveryMap({
           preservePageScroll()
           selectionSourceRef.current = 'marker'
           userClosedPopupRef.current = false
+          userInteractedWithMapRef.current = false
           popupPointIdRef.current = point.id
           onSelectPoint(point.id)
           marker.openPopup()
@@ -724,6 +734,12 @@ export function DiscoveryMap({
     if (source === 'marker') {
       popupPointIdRef.current = point.id
       marker.openPopup()
+      return
+    }
+
+    // On mobile, if user has interacted with the map (pan/zoom) after point selection,
+    // don't auto-center to prevent interrupting their navigation
+    if (userInteractedWithMapRef.current) {
       return
     }
 
