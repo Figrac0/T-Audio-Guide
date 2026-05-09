@@ -78,6 +78,11 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
   const userLayerRef = useRef<L.LayerGroup | null>(null)
   const radiusCircleRef = useRef<L.Circle | null>(null)
   const markerRefsMap = useRef(new Map<string, L.Marker>())
+  // Per-marker icon state cache so we only call setIcon when visible state
+  // actually changed (selection or draft order) — avoids needless DOM swaps.
+  const markerIconStateRef = useRef(
+    new Map<string, { selected: boolean; draftOrder: number | null }>(),
+  )
   const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const initialCenterRef = useRef(initialCenter ?? userPosition ?? appMapConfig.defaultCenter)
 
@@ -274,17 +279,52 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
     return () => cancelAnimationFrame(frameId)
   }, [radiusMeters])
 
+  // Markers layer — DIFFED instead of clear+rebuild. With 100-200 points the
+  // old clearLayers + recreate flow was the worst perf hot-spot on mobile:
+  // every nearbyPoints update (radius/zoom refetch) destroyed all 100+ DOM
+  // nodes and rebuilt them, causing visible jank. Now we only add new ids,
+  // remove gone ids, and move existing markers' lat/lng + icon if changed.
   useEffect(() => {
     const layer = markersLayerRef.current
     if (!layer) return
 
-    layer.clearLayers()
-    markerRefsMap.current.clear()
+    const newIds = new Set(nearbyPoints.map((p) => p.id))
+
+    // Remove markers no longer present
+    markerRefsMap.current.forEach((marker, id) => {
+      if (!newIds.has(id)) {
+        layer.removeLayer(marker)
+        markerRefsMap.current.delete(id)
+        markerIconStateRef.current.delete(id)
+      }
+    })
 
     nearbyPoints.forEach((point) => {
       const draftOrder = draftPointOrders.get(point.id) ?? null
+      const isSelected = point.id === selectedPointIdRef.current
+
+      const existing = markerRefsMap.current.get(point.id)
+      if (existing) {
+        // Sync position when point coords shifted (mock backend recomputes
+        // coords relative to the user's center on each fetch).
+        const currentLatLng = existing.getLatLng()
+        if (
+          currentLatLng.lat !== point.coordinates.lat ||
+          currentLatLng.lng !== point.coordinates.lng
+        ) {
+          existing.setLatLng([point.coordinates.lat, point.coordinates.lng])
+        }
+        // Only re-set the icon when its visible state changed.
+        const prev = markerIconStateRef.current.get(point.id)
+        if (!prev || prev.selected !== isSelected || prev.draftOrder !== draftOrder) {
+          existing.setIcon(createPoiIcon(point, isSelected, draftOrder))
+          markerIconStateRef.current.set(point.id, { selected: isSelected, draftOrder })
+        }
+        return
+      }
+
       const marker = L.marker([point.coordinates.lat, point.coordinates.lng], {
-        icon: createPoiIcon(point, point.id === selectedPointIdRef.current, draftOrder),
+        icon: createPoiIcon(point, isSelected, draftOrder),
         title: buildMarkerTitle(point),
       })
 
@@ -292,7 +332,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
         onSelectPointRef.current(point.id)
         mapRef.current?.closePopup()
 
-        const isInDraft = draftOrder !== null
+        const isInDraft = (draftPointOrders.get(point.id) ?? null) !== null
         const closePopup = () => mapRef.current?.closePopup()
 
         const popupEl = buildPopupEl(
@@ -318,21 +358,21 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
 
       marker.addTo(layer)
       markerRefsMap.current.set(point.id, marker)
+      markerIconStateRef.current.set(point.id, { selected: isSelected, draftOrder })
     })
   }, [draftPointOrders, nearbyPoints])
 
+  // Update marker icons when selection changes (without touching nearbyPoints).
   useEffect(() => {
     nearbyPoints.forEach((point) => {
       const marker = markerRefsMap.current.get(point.id)
       if (!marker) return
-
-      marker.setIcon(
-        createPoiIcon(
-          point,
-          point.id === selectedPointId,
-          draftPointOrders.get(point.id) ?? null,
-        ),
-      )
+      const draftOrder = draftPointOrders.get(point.id) ?? null
+      const isSelected = point.id === selectedPointId
+      const prev = markerIconStateRef.current.get(point.id)
+      if (prev && prev.selected === isSelected && prev.draftOrder === draftOrder) return
+      marker.setIcon(createPoiIcon(point, isSelected, draftOrder))
+      markerIconStateRef.current.set(point.id, { selected: isSelected, draftOrder })
     })
   }, [draftPointOrders, nearbyPoints, selectedPointId])
 

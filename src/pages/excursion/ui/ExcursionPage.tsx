@@ -62,6 +62,10 @@ function getSheetTranslateY(el: HTMLElement): number {
   return parseFloat(m[1].split(',')[5] ?? '0')
 }
 
+// iOS-style sheet easing: slow start, gentle stop. Avoids the abrupt arrival
+// that the previous ease-out-quad curve produced near the snap target.
+const SHEET_EASING = 'cubic-bezier(0.32, 0.72, 0, 1)'
+
 // Park sheet at its current visual position (stopping any in-progress animation),
 // force a reflow so the browser commits that state, then start a fresh animation.
 // This prevents jumps when a snap is triggered mid-animation or after a fling.
@@ -71,7 +75,7 @@ function snapSheet(sheet: HTMLElement, toY: number, durationMs: number): void {
   sheet.style.transition = 'none'
   sheet.style.transform = `translateY(${fromY}px)`
   void sheet.offsetHeight // commit park position before starting new animation
-  sheet.style.transition = `transform ${durationMs}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`
+  sheet.style.transition = `transform ${durationMs}ms ${SHEET_EASING}`
   sheet.style.transform = `translateY(${toY}px)`
   const clear = () => { sheet.style.willChange = '' }
   sheet.addEventListener('transitionend', clear, { once: true })
@@ -442,7 +446,7 @@ function NavigationPhase({
     if (!sheet) return
     skipSnapRef.current = true
     setSheetState('closed')
-    snapSheet(sheet, sheet.offsetHeight - CLOSED_HEIGHT, 480)
+    snapSheet(sheet, sheet.offsetHeight - CLOSED_HEIGHT, 560)
   }, [])
 
   const snapToPeek = useCallback(() => {
@@ -454,7 +458,7 @@ function NavigationPhase({
     if (bodyRef.current) bodyRef.current.scrollTop = 0
     skipSnapRef.current = true
     setSheetState('peek')
-    snapSheet(sheet, peekT, 480)
+    snapSheet(sheet, peekT, 560)
     setTimeout(() => {
       if (mapEl) mapEl.style.pointerEvents = ''
     }, 520)
@@ -475,7 +479,7 @@ function NavigationPhase({
     if (!sheet || sheet.offsetHeight === 0) return
     const target = getSnapTranslate(sheetState, sheet.offsetHeight, peekHeightRef.current)
     if (sheetState === 'peek' && bodyRef.current) bodyRef.current.scrollTop = 0
-    snapSheet(sheet, target, 480)
+    snapSheet(sheet, target, 560)
   }, [sheetState])
 
   useLayoutEffect(() => {
@@ -530,7 +534,7 @@ function NavigationPhase({
         if (!sheet) return
         skipSnapRef.current = true
         setSheetState('closed')
-        snapSheet(sheet, sheet.offsetHeight - CLOSED_HEIGHT, 480)
+        snapSheet(sheet, sheet.offsetHeight - CLOSED_HEIGHT, 560)
       }
     }
     const onTouchEnd = () => { reachedTopAt = -1 }
@@ -611,9 +615,11 @@ function NavigationPhase({
     if (nextState === 'peek' && bodyRef.current) bodyRef.current.scrollTop = 0
 
     const absV = Math.abs(velocity)
-    const durationMs = absV > 12 ? 300 : absV > 6 ? 400 : 480
+    // Higher fling velocities use shorter durations so the sheet feels
+    // responsive to flicks; slow drags get the full smooth animation.
+    const durationMs = absV > 12 ? 360 : absV > 6 ? 460 : 560
     void sheet.offsetHeight
-    sheet.style.transition = `transform ${durationMs}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`
+    sheet.style.transition = `transform ${durationMs}ms ${SHEET_EASING}`
     sheet.style.transform = `translateY(${targetT}px)`
 
     const clear = () => { sheet.style.willChange = '' }
@@ -649,7 +655,10 @@ function NavigationPhase({
     snapToPeek()
   }
 
-  const distanceToStop = userPosition ? getDistanceMetersBetween(userPosition, currentStop.coordinates) : null
+  const distanceToStop = useMemo(
+    () => userPosition ? getDistanceMetersBetween(userPosition, currentStop.coordinates) : null,
+    [userPosition, currentStop.coordinates],
+  )
   const guideRouteUserPosition = initialUserPosition
 
   return (
@@ -657,7 +666,7 @@ function NavigationPhase({
       <div className="ep-nav__map">
         <RouteMap
           onLocateUser={requestLocation}
-          onSelect={() => {}}
+          onSelect={() => setSheetState('full')}
           routeColor={excursion.routeColor}
           selectedStopId={currentStop.id}
           stops={[currentStop]}

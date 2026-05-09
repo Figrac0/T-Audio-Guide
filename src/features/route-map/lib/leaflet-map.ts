@@ -130,11 +130,11 @@ export function createRouteStopIcon(
   isStart: boolean,
   isFinish: boolean,
 ) {
-  const hint = isStart ? 'Старт' : isFinish ? 'Финиш' : ''
-
+  // Show only the stop number — no "Старт"/"Финиш" labels above it.
+  // The number alone is sufficient (1 = start, N = finish).
   return L.divIcon({
     className: emptyDivIconClassName,
-    html: `<div class="map-marker${isActive ? ' map-marker--active' : ''}${isStart ? ' map-marker--start' : ''}${isFinish ? ' map-marker--finish' : ''}">${hint ? `<span class="map-marker__hint">${hint}</span>` : ''}<span class="map-marker__core">${stop.order}</span></div>`,
+    html: `<div class="map-marker${isActive ? ' map-marker--active' : ''}${isStart ? ' map-marker--start' : ''}${isFinish ? ' map-marker--finish' : ''}"><span class="map-marker__core">${stop.order}</span></div>`,
     iconSize: [54, 54],
     iconAnchor: [27, 27],
   })

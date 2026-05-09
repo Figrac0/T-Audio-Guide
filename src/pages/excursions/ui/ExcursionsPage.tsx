@@ -167,9 +167,11 @@ export function ExcursionsPage() {
       }
     }
 
-    document.addEventListener('pointermove', onMove)
-    document.addEventListener('pointerup', onUp)
-    document.addEventListener('pointercancel', onUp)
+    // Passive listeners — none of these handlers call preventDefault, so
+    // marking passive lets the browser scroll/compose without waiting on JS.
+    document.addEventListener('pointermove', onMove, { passive: true })
+    document.addEventListener('pointerup', onUp, { passive: true })
+    document.addEventListener('pointercancel', onUp, { passive: true })
   }, [])
 
   // ── Sheet state ─────────────────────────────────────────────────────────────

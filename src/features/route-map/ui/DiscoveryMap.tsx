@@ -407,7 +407,8 @@ export function DiscoveryMap({
       }
     }
 
-    window.addEventListener('pointerdown', handlePointerDown)
+    // Passive — handler only inspects the target, never preventDefaults.
+    window.addEventListener('pointerdown', handlePointerDown, { passive: true })
 
     return () => {
       window.removeEventListener('pointerdown', handlePointerDown)
