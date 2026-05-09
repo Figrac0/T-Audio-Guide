@@ -71,6 +71,7 @@ export function useExcursionsPageState(
   const [radiusMeters, setRadiusMeters] = useState(
     clampDiscoveryRadius(storedContext.radiusMeters ?? appMapConfig.discoveryRadiusMeters),
   )
+  const [debouncedRadiusMeters, setDebouncedRadiusMeters] = useState(radiusMeters)
   const [selectedPointId, setSelectedPointId] = useState('')
   const [detailPointId, setDetailPointId] = useState<string | null>(null)
   const [expandedStopId, setExpandedStopId] = useState<string | null>(null)
@@ -94,12 +95,20 @@ export function useExcursionsPageState(
   const canLoadNearbyPlaces =
     Boolean(userPosition) || Boolean(centerOverride) || geolocationStatus === 'blocked' || geolocationStatus === 'unsupported'
 
+  // Debounce radius changes to avoid excessive API calls while dragging slider
+  useEffect(() => {
+    const timerId = window.setTimeout(() => {
+      setDebouncedRadiusMeters(radiusMeters)
+    }, 600)
+    return () => window.clearTimeout(timerId)
+  }, [radiusMeters])
+
   const { error: discoveryError, excursions, isLoading, nearbyPoints } = useDiscoveryRoutes({
     activePointCategory: 'all',
     center,
     enabled: canLoadNearbyPlaces,
     locale,
-    radiusMeters,
+    radiusMeters: debouncedRadiusMeters,
     search: '',
   })
 

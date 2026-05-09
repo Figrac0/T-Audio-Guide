@@ -18,14 +18,10 @@ export function createOpenStreetMapLayer() {
     attribution: openStreetMapAttribution,
     maxZoom: 19,
     minZoom: 2,
-    // Aggressive tile preloading: load tiles in a 4-tile buffer around viewport
-    keepBuffer: 4,
-    // Load tiles during zoom for seamless experience (not just when idle)
-    updateWhenZooming: true,
+    keepBuffer: 2,
+    updateWhenZooming: false,
     updateWhenIdle: true,
-    // Standard tile size
     tileSize: 256,
-    // Faster tile loading with parallel requests
     crossOrigin: true,
   })
 }
@@ -42,6 +38,7 @@ export function createLeafletMap(container: HTMLElement, center: GeoPoint, zoom:
     easeLinearity: 0.5,
     maxBoundsViscosity: 1.0,
     wheelPxPerZoomLevel: 60,
+    wheelDebounceTime: 60,
     touchZoom: true,
   }).setView(toLeafletLatLng(center), zoom)
 

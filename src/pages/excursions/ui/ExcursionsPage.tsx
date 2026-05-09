@@ -785,7 +785,7 @@ export function ExcursionsPage() {
               Click card = add to route; click again = remove. */}
           {hasDraftStops ? (
             <>
-              <div className={`ep-nearby-wrap${state.isLoading && state.nearbyPoints.length > 0 ? ' ep-nearby-wrap--fading' : ''}`}>
+              <div className="ep-nearby-wrap">
                 <h3 className="ep-nearby-wrap__title">Рядом с вами</h3>
                 {state.nearbyPoints.length > 0 ? (
                   <div className="ep-nearby-strip" ref={nearbyListRef}>

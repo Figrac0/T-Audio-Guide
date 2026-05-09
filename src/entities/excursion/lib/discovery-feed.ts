@@ -498,6 +498,131 @@ const pointTemplates: PointTemplate[] = [
       en: 'Open all day',
     },
   },
+  {
+    id: 'distant-lighthouse-3km',
+    northMeters: 3000,
+    eastMeters: 0,
+    category: 'landmark',
+    rating: 4.5,
+    expectedVisitMinutes: 18,
+    imageUrl: '',
+    title: {
+      ru: 'Маяк (3км)',
+      en: 'Lighthouse (3km)',
+    },
+    shortDescription: {
+      ru: 'Далекая видовая точка на расстоянии 3 километра.',
+      en: 'A distant viewpoint 3 kilometers away.',
+    },
+    description: {
+      ru: 'Точка для проверки работы радиуса на близком расстоянии.',
+      en: 'A point to test radius functionality at short distance.',
+    },
+    scheduleLabel: {
+      ru: 'Доступно весь день',
+      en: 'Open all day',
+    },
+  },
+  {
+    id: 'distant-tower-4km',
+    northMeters: 2900,
+    eastMeters: 2400,
+    category: 'landmark',
+    rating: 4.6,
+    expectedVisitMinutes: 20,
+    imageUrl: '',
+    title: {
+      ru: 'Башня (4км)',
+      en: 'Tower (4km)',
+    },
+    shortDescription: {
+      ru: 'Историческая точка на расстоянии примерно 4 километра.',
+      en: 'A historic point approximately 4 kilometers away.',
+    },
+    description: {
+      ru: 'Точка для проверки видимости при среднем радиусе.',
+      en: 'A point to test visibility at medium radius.',
+    },
+    scheduleLabel: {
+      ru: 'Осмотр снаружи',
+      en: 'Exterior view',
+    },
+  },
+  {
+    id: 'distant-chapel-5km',
+    northMeters: 4200,
+    eastMeters: 2800,
+    category: 'landmark',
+    rating: 4.7,
+    expectedVisitMinutes: 15,
+    imageUrl: '',
+    title: {
+      ru: 'Часовня (5км)',
+      en: 'Chapel (5km)',
+    },
+    shortDescription: {
+      ru: 'Религиозная точка на расстоянии 5 километров.',
+      en: 'A religious site 5 kilometers away.',
+    },
+    description: {
+      ru: 'Проверка работы радиуса на расстоянии 5км.',
+      en: 'Testing radius functionality at 5km distance.',
+    },
+    scheduleLabel: {
+      ru: 'Круглосуточно',
+      en: 'Open 24/7',
+    },
+  },
+  {
+    id: 'distant-monastery-10km',
+    northMeters: 8500,
+    eastMeters: 5200,
+    category: 'landmark',
+    rating: 4.8,
+    expectedVisitMinutes: 25,
+    imageUrl: '',
+    title: {
+      ru: 'Монастырь (10км)',
+      en: 'Monastery (10km)',
+    },
+    shortDescription: {
+      ru: 'Историческое место на дальнем расстоянии 10 километров.',
+      en: 'A historic site 10 kilometers away.',
+    },
+    description: {
+      ru: 'Дальняя точка для проверки больших радиусов.',
+      en: 'A far point for testing larger radius values.',
+    },
+    scheduleLabel: {
+      ru: 'Экскурсии до 17:00',
+      en: 'Tours until 5 PM',
+    },
+  },
+  {
+    id: 'distant-estate-15km',
+    northMeters: 12800,
+    eastMeters: 7600,
+    category: 'landmark',
+    rating: 4.4,
+    expectedVisitMinutes: 30,
+    imageUrl: '',
+    title: {
+      ru: 'Усадьба (15км)',
+      en: 'Estate (15km)',
+    },
+    shortDescription: {
+      ru: 'Старинная усадьба на расстоянии 15 километров.',
+      en: 'An old estate 15 kilometers away.',
+    },
+    description: {
+      ru: 'Самая дальняя точка для тестирования максимального радиуса.',
+      en: 'The farthest point for testing maximum radius.',
+    },
+    scheduleLabel: {
+      ru: 'По выходным',
+      en: 'Weekends only',
+    },
+  },
 ]
 
 const routeTemplates: RouteTemplate[] = [

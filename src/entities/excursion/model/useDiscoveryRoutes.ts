@@ -18,6 +18,65 @@ interface UseDiscoveryRoutesParams {
   search?: string
 }
 
+// Compare two NearbyPoint objects for content equality. If equal, the previous
+// object reference can be reused to avoid triggering child re-renders/image reloads.
+function nearbyPointsEqual(a: NearbyPoint, b: NearbyPoint): boolean {
+  return (
+    a.id === b.id &&
+    a.title === b.title &&
+    a.category === b.category &&
+    a.distanceMeters === b.distanceMeters &&
+    a.coordinates.lat === b.coordinates.lat &&
+    a.coordinates.lng === b.coordinates.lng &&
+    a.imageUrl === b.imageUrl &&
+    a.shortDescription === b.shortDescription &&
+    a.description === b.description &&
+    a.rating === b.rating &&
+    a.expectedVisitMinutes === b.expectedVisitMinutes &&
+    a.scheduleLabel === b.scheduleLabel &&
+    a.audioGuideUrl === b.audioGuideUrl
+  )
+}
+
+function excursionsEqual(a: Excursion, b: Excursion): boolean {
+  return (
+    a.id === b.id &&
+    a.slug === b.slug &&
+    a.title === b.title &&
+    a.theme === b.theme &&
+    a.durationMinutes === b.durationMinutes &&
+    a.distanceKm === b.distanceKm &&
+    a.difficulty === b.difficulty &&
+    a.coverImageUrl === b.coverImageUrl &&
+    a.routeColor === b.routeColor &&
+    a.stops.length === b.stops.length &&
+    a.stops.every((stop, i) => stop.id === b.stops[i]?.id)
+  )
+}
+
+// Stabilize array references when content is unchanged. Mock API rebuilds
+// every object on every call, so without this every zoom/radius update would
+// fan out into list re-mounts, image reloads, and marker icon swaps.
+function stabilizeArray<T extends { id: string | number }>(
+  prev: T[],
+  next: T[],
+  isEqual: (a: T, b: T) => boolean,
+): T[] {
+  if (prev.length === 0) return next
+  const prevById = new Map<string | number, T>(prev.map((item) => [item.id, item]))
+  const reused = next.map((nextItem) => {
+    const prevItem = prevById.get(nextItem.id)
+    return prevItem && isEqual(prevItem, nextItem) ? prevItem : nextItem
+  })
+  if (
+    reused.length === prev.length &&
+    reused.every((item, i) => item === prev[i])
+  ) {
+    return prev
+  }
+  return reused
+}
+
 export function useDiscoveryRoutes({
   activePointCategory,
   center,
@@ -62,8 +121,12 @@ export function useDiscoveryRoutes({
             return
           }
 
-          setNearbyPoints(response.nearbyPoints)
-          setExcursions(response.excursions)
+          setNearbyPoints((prev) =>
+            stabilizeArray(prev, response.nearbyPoints, nearbyPointsEqual),
+          )
+          setExcursions((prev) =>
+            stabilizeArray(prev, response.excursions, excursionsEqual),
+          )
         } catch (loadError) {
           if (!isActive) {
             return

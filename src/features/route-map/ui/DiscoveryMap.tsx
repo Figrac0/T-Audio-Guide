@@ -152,6 +152,11 @@ export function DiscoveryMap({
   const overlayRef = useRef<L.LayerGroup | null>(null)
   const radiusCircleRef = useRef<L.Circle | null>(null)
   const markerRefs = useRef(new Map<string, L.Marker>())
+  // Tracks last applied icon state per marker — avoids redundant setIcon swaps
+  // (which recreate the DOM node even with identical HTML, causing micro-flicker).
+  const markerIconStateRef = useRef(
+    new Map<string, { active: boolean; draftOrder: number | null }>(),
+  )
   const controlsRef = useRef<HTMLDivElement | null>(null)
   const initialCenterRef = useRef(initialCenter ?? userPosition ?? appMapConfig.defaultCenter)
   const skipSelectedFocusRef = useRef(true)
@@ -324,10 +329,16 @@ export function DiscoveryMap({
         radiusInterpolationRef.current = requestAnimationFrame(animate)
       }
 
-      // Update radius only on zoom changes
+      // Update radius only on zoom changes — debounced so fast wheel/pinch zoom
+      // doesn't fire multiple API-triggering interpolations in a row.
       map.on('zoomend', () => {
-        const newRadius = getDiscoveryRadiusForZoom(map.getZoom())
-        updateTargetRadius(newRadius)
+        if (zoomDebounceRef.current !== null) {
+          clearTimeout(zoomDebounceRef.current)
+        }
+        zoomDebounceRef.current = window.setTimeout(() => {
+          const newRadius = getDiscoveryRadiusForZoom(map.getZoom())
+          updateTargetRadius(newRadius)
+        }, 250)
       })
 
       map.on('click', (event: L.LeafletMouseEvent) => {
@@ -574,7 +585,8 @@ export function DiscoveryMap({
   }, [draftBounds, guideBounds, nearbyPoints.length, pointsBounds, routeTargetId, userPosition, visibleDraftStops.length, visibleDraftStopsSignature])
 
   // Route layer: circle + polylines + user marker — rebuilt only when geometry/position changes.
-  // Intentionally excludes displayRadius: the animation effect handles smooth radius updates.
+  // Intentionally excludes displayRadius: the dedicated effect below updates circle
+  // via setRadius() in-place, avoiding ~36 layer rebuilds per radius interpolation.
   useEffect(() => {
     const routeLayer = routeLayerRef.current
     if (!routeLayer) return
@@ -582,7 +594,7 @@ export function DiscoveryMap({
     routeLayer.clearLayers()
 
     if (userPosition) {
-      const circle = createDiscoveryRadiusCircle(userPosition, displayRadius)
+      const circle = createDiscoveryRadiusCircle(userPosition, displayRadiusRef.current)
       circle.addTo(routeLayer)
       radiusCircleRef.current = circle
     } else {
@@ -603,65 +615,93 @@ export function DiscoveryMap({
         title: 'Ваше местоположение',
       }).addTo(routeLayer)
     }
-  }, [draftGeometry, displayRadius, guideGeometry, userPosition])
+  }, [draftGeometry, guideGeometry, userPosition])
 
-  // Markers layer: POI markers only — rebuilt when the point set or selection changes.
-  // Kept separate from the route layer so zoom/radius changes don't thrash polylines.
+  // Markers layer: POI markers — DIFFED on each update instead of clear+rebuild.
+  // For 100-200 markers, recreating all DOM nodes on every nearbyPoints change
+  // (which happens on every zoom→radius change) caused severe lag and white screen.
+  // Now we add only new ids, remove gone ids, and update icons/popups in-place.
   useEffect(() => {
     const overlay = overlayRef.current
     const map = mapRef.current
     if (!overlay || !map) return
 
     suppressPopupCloseRef.current = true
-    overlay.clearLayers()
-    markerRefs.current.clear()
 
+    const newIds = new Set(nearbyPoints.map((point) => point.id))
+
+    // Remove markers that are no longer in the points list
+    markerRefs.current.forEach((marker, id) => {
+      if (!newIds.has(id)) {
+        overlay.removeLayer(marker)
+        markerRefs.current.delete(id)
+        markerIconStateRef.current.delete(id)
+      }
+    })
+
+    // Add new / update existing
     nearbyPoints.forEach((point) => {
       const googleMapsUrl = buildGoogleMapsUrl(point.coordinates, userPosition)
       const isInDraft = visibleDraftPointIds.has(point.id)
       const draftOrder = visibleDraftOrderMap.get(point.id) ?? null
-      const marker = L.marker([point.coordinates.lat, point.coordinates.lng], {
-        icon: createPoiIcon(point, point.id === selectedPointIdRef.current, draftOrder),
-        title: buildMarkerTitle(point),
-      })
-        .bindPopup(
-          buildPopupContent({
-            googleMapsUrl,
-            showDirectRoute: showDirectRouteInPopup || showPopupRouteActions,
-            showRouteActions: showPopupRouteActions,
-            isRouteTarget: point.id === routeTargetId,
-            onBuildRoute: () => {
+      const isActive = point.id === selectedPointIdRef.current
+
+      const popupContent = buildPopupContent({
+        googleMapsUrl,
+        showDirectRoute: showDirectRouteInPopup || showPopupRouteActions,
+        showRouteActions: showPopupRouteActions,
+        isRouteTarget: point.id === routeTargetId,
+        onBuildRoute: () => {
+          preservePageScroll()
+          selectionSourceRef.current = 'route'
+          onSelectPoint(point.id)
+          onBuildRoute(point.id)
+          markerRefs.current.get(point.id)?.closePopup()
+        },
+        onCancelRoute: onClearDraftRoute
+          ? () => {
+              preservePageScroll()
+              onClearDraftRoute()
+            }
+          : undefined,
+        onAddPointToDraft: onAddPointToDraft
+          ? () => {
               preservePageScroll()
               selectionSourceRef.current = 'route'
               onSelectPoint(point.id)
               onBuildRoute(point.id)
-              marker.closePopup()
-            },
-            onCancelRoute: onClearDraftRoute
-              ? () => {
-                  preservePageScroll()
-                  onClearDraftRoute()
-                }
-              : undefined,
-            onAddPointToDraft: onAddPointToDraft
-              ? () => {
-                  preservePageScroll()
-                  selectionSourceRef.current = 'route'
-                  onSelectPoint(point.id)
-                  onBuildRoute(point.id)
-                  onAddPointToDraft(point)
-                }
-              : undefined,
-            canAddToDraft: Boolean(onAddPointToDraft && !isInDraft && draftStops.length < 6),
-            isInDraft,
-            point,
-          }),
-          {
-            autoPan: true,
-            className: routeMapPopupClassName,
-            keepInView: true,
-          },
-        )
+              onAddPointToDraft(point)
+            }
+          : undefined,
+        canAddToDraft: Boolean(onAddPointToDraft && !isInDraft && draftStops.length < 6),
+        isInDraft,
+        point,
+      })
+
+      const existing = markerRefs.current.get(point.id)
+      if (existing) {
+        const prevIconState = markerIconStateRef.current.get(point.id)
+        if (
+          !prevIconState ||
+          prevIconState.active !== isActive ||
+          prevIconState.draftOrder !== draftOrder
+        ) {
+          existing.setIcon(createPoiIcon(point, isActive, draftOrder))
+          markerIconStateRef.current.set(point.id, { active: isActive, draftOrder })
+        }
+        existing.setPopupContent(popupContent)
+        return
+      }
+
+      const newMarker = L.marker([point.coordinates.lat, point.coordinates.lng], {
+        icon: createPoiIcon(point, isActive, draftOrder),
+        title: buildMarkerTitle(point),
+      })
+        .bindPopup(popupContent, {
+          autoPan: true,
+          className: routeMapPopupClassName,
+          keepInView: true,
+        })
         .on('click', () => {
           preservePageScroll()
           selectionSourceRef.current = 'marker'
@@ -669,11 +709,12 @@ export function DiscoveryMap({
           userInteractedWithMapRef.current = false
           popupPointIdRef.current = point.id
           onSelectPoint(point.id)
-          marker.openPopup()
+          newMarker.openPopup()
         })
 
-      marker.addTo(overlay)
-      markerRefs.current.set(point.id, marker)
+      newMarker.addTo(overlay)
+      markerRefs.current.set(point.id, newMarker)
+      markerIconStateRef.current.set(point.id, { active: isActive, draftOrder })
     })
 
     suppressPopupCloseRef.current = false

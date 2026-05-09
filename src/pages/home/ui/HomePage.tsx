@@ -146,6 +146,8 @@ export function HomePage() {
             storedContext.radiusMeters ?? appMapConfig.discoveryRadiusMeters,
         ),
     );
+    const [debouncedRadiusMeters, setDebouncedRadiusMeters] =
+        useState<number>(radiusMeters);
     const [activeRouteTheme, setActiveRouteTheme] = useState<
         ExcursionTheme | "all"
     >("all");
@@ -204,6 +206,15 @@ export function HomePage() {
         geolocationStatus === "blocked" ||
         geolocationStatus === "unsupported";
 
+    // Debounce radius changes — avoids triggering an API request and full
+    // marker re-render on every pixel of slider/zoom movement.
+    useEffect(() => {
+        const timerId = window.setTimeout(() => {
+            setDebouncedRadiusMeters(radiusMeters);
+        }, 600);
+        return () => window.clearTimeout(timerId);
+    }, [radiusMeters]);
+
     const {
         error: discoveryError,
         excursions,
@@ -214,7 +225,7 @@ export function HomePage() {
         center: currentCenter,
         enabled: canLoadNearbyPlaces,
         locale: audioLocale,
-        radiusMeters,
+        radiusMeters: debouncedRadiusMeters,
         search: "",
     });
 
@@ -1096,7 +1107,7 @@ export function HomePage() {
 
                     {/* ── Nearby cards ── */}
                     <div
-                        className={`home-sheet__section${isLoading && nearbyPoints.length > 0 ? ' home-sheet__section--fading' : ''}`}
+                        className="home-sheet__section"
                     >
                         <h3 className="home-sheet__section-title">Рядом с вами</h3>
                         {nearbyPoints.length > 0 ? (
