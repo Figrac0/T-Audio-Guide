@@ -8,7 +8,8 @@ import type {
 interface PointsSearchParams {
   location: { latitude: number; longitude: number }
   radiusKilometers: number
-  categorySlugs?: string[]
+  // Backend swagger PointSearchRequest: { location, radiusKilometers, categoryIds: number[], visitTime }
+  categoryIds?: number[]
   visitTime?: number
 }
 

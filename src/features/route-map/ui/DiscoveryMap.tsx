@@ -237,9 +237,13 @@ export function DiscoveryMap({
       .map((point) => `${point.lat.toFixed(5)}:${point.lng.toFixed(5)}`)
       .join('|')
   }, [userPosition, visibleDraftStops])
+  // Signature must include guidedPoint coordinates, not just id: when the user
+  // toggles manual position the center changes and points get re-derived with
+  // shifted coordinates (mock API generates them relative to center). If only
+  // id were tracked, the route would keep pointing at stale coordinates.
   const guideSignature =
     userPosition && guidedPoint
-      ? `${guidedPoint.id}:${userPosition.lat.toFixed(5)}:${userPosition.lng.toFixed(5)}`
+      ? `${guidedPoint.id}:${guidedPoint.coordinates.lat.toFixed(5)}:${guidedPoint.coordinates.lng.toFixed(5)}:${userPosition.lat.toFixed(5)}:${userPosition.lng.toFixed(5)}`
       : ''
 
   // Keep radius callback ref current so zoomend listener always calls latest version
@@ -421,6 +425,18 @@ export function DiscoveryMap({
         return
       }
 
+      // Skip building while nearby data is being refetched after a
+      // userPosition change. With the mock backend, point coordinates are
+      // derived from the user's center — so an in-flight refetch will return
+      // shifted coordinates and the value of `guidedPoint` we have right now
+      // is stale. Building a route from stale coordinates would draw the
+      // line to where the point USED to be (off-screen, far from the marker).
+      // The effect will re-run automatically once the new data arrives
+      // (guideSignature changes when guidedPoint.coordinates change).
+      if (isLoading) {
+        return
+      }
+
       const cachedResult = getCachedWalkingRouteBuildResult([
         userPosition,
         guidedPoint.coordinates,
@@ -463,7 +479,7 @@ export function DiscoveryMap({
   // list guidedPoint/userPosition separately; doing so causes spurious rebuilds
   // whenever nearbyPoints gets a new array reference after zoom → radius refetch.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [guideSignature])
+  }, [guideSignature, isLoading])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -680,6 +696,17 @@ export function DiscoveryMap({
 
       const existing = markerRefs.current.get(point.id)
       if (existing) {
+        // Sync position when the point's coordinates change. Mock API derives
+        // coords relative to the user's center, so toggling manual position
+        // shifts every point — without this the marker stays at the previous
+        // location even after nearbyPoints reflects the new coordinates.
+        const currentLatLng = existing.getLatLng()
+        if (
+          currentLatLng.lat !== point.coordinates.lat ||
+          currentLatLng.lng !== point.coordinates.lng
+        ) {
+          existing.setLatLng([point.coordinates.lat, point.coordinates.lng])
+        }
         const prevIconState = markerIconStateRef.current.get(point.id)
         if (
           !prevIconState ||
@@ -698,9 +725,15 @@ export function DiscoveryMap({
         title: buildMarkerTitle(point),
       })
         .bindPopup(popupContent, {
+          // autoPan animates once on popup open so the user sees it; that's
+          // a one-shot pan and does not restrict subsequent panning.
           autoPan: true,
+          // keepInView would continuously re-pan the map back whenever the
+          // user drags it while the popup is open — feels like the camera is
+          // "locked" to the marker. Disabled so users can freely move around
+          // while a popup is visible.
+          keepInView: false,
           className: routeMapPopupClassName,
-          keepInView: true,
         })
         .on('click', () => {
           preservePageScroll()

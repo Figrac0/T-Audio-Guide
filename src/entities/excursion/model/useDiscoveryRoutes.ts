@@ -99,15 +99,20 @@ export function useDiscoveryRoutes({
       return undefined
     }
 
+    // Set loading immediately on dep change — not after the debounce. This
+    // signals to consumers (DiscoveryMap guide-route effect) that the current
+    // nearbyPoints data is potentially stale: any route built right now would
+    // use coordinates from the previous fetch, which is exactly what causes
+    // the "route to old point location" bug after toggling manual position.
+    setIsLoading(true)
+    setError(null)
+
     let isActive = true
 
     // Debounce: wait 300 ms before firing the API call so rapid radius changes
     // from scroll events don't flood the network.
     const debounceTimer = setTimeout(() => {
       async function loadDiscoveryFeed() {
-        setIsLoading(true)
-        setError(null)
-
         try {
           const response = await appApi.getDiscoveryFeed({
             category: activePointCategory,

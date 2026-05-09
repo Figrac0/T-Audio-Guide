@@ -27,8 +27,12 @@ export interface ApiPointShort {
 
 export interface ApiPointMedia {
   url: string
-  type: string   // 'IMAGE' | 'VIDEO' | 'AUDIO'
+  // Backend uses uppercase enum: 'PHOTO' | 'VIDEO' | 'AUDIO'
+  type: string
   sortOrder: number
+  // Spoken/written narration text — populated for audio guides; may also be
+  // present on photos as alt-text style narration.
+  transcript?: string | null
 }
 
 /** GET /points/{pointId} → PointDetailResponse */
@@ -49,17 +53,19 @@ export interface ApiPointDetail {
 /** POST /excursions/search → ExcursionListResponse.excursions[] */
 export interface ApiExcursionShort {
   id: number
-  routeType?: string
-  visibility?: string
-  owner?: boolean
+  routeType?: string         // 'PREBUILT' | 'CUSTOM'
+  visibility?: string        // 'PUBLIC' | 'PRIVATE'
+  owner?: boolean            // true if current user owns this custom excursion
   title: string
   description?: string
   shortDescription?: string
-  distance?: number      // meters, int32
-  durationMin?: number   // minutes, int32 — swagger field name
-  pointsCount?: number   // swagger field name
+  distance?: number          // meters, int32
+  durationMin?: number       // minutes, int32
+  pointsCount?: number       // total stops in the route
   coordinates?: ApiGeoPoint
   categoryIds?: number[]
+  rating?: number            // 0..5 average rating
+  reviewsCount?: number
 }
 
 /**

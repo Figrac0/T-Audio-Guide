@@ -1,4 +1,5 @@
 import { authService } from '@/shared/api/authService'
+import { getCategoryIdsForSlug } from '@/shared/api/categoriesStore'
 import type {
   DiscoveryFeedDto,
   FrontendApi,
@@ -20,6 +21,13 @@ import { profileService } from '@/shared/api/profileService'
 
 const useMockApi = import.meta.env.VITE_USE_MOCK_API !== 'false' || !import.meta.env.VITE_API_URL
 
+// Extract numeric backend id from slug "excursion-{id}". Slugs are produced by
+// mapExcursionFromShort and are the only way the UI references excursions.
+function excursionIdFromSlug(slug: string): number | null {
+  const match = slug.match(/^excursion-(\d+)$/)
+  return match ? Number(match[1]) : null
+}
+
 const httpApi: FrontendApi = {
   changePassword(payload) {
     return authService.changePassword(payload)
@@ -29,24 +37,42 @@ const httpApi: FrontendApi = {
     const { route } = payload
     if (!route.stops.length) throw new Error('Маршрут должен содержать хотя бы одну точку')
 
+    // Backend ExcursionPointOrderItem uses 1-based order (per swagger example:
+    // { pointId: 1, order: 1 }). Frontend RouteStop.order is also 1-based, so
+    // pass through. Fall back to index+1 if order is missing.
     const validPoints = route.stops
-      .map((stop) => ({ pointId: parseInt(stop.id, 10), order: stop.order }))
+      .map((stop, index) => ({
+        pointId: parseInt(stop.id, 10),
+        order: stop.order ?? index + 1,
+      }))
       .filter((p) => !isNaN(p.pointId))
 
     if (!validPoints.length) throw new Error('Все точки маршрута должны быть корректны')
 
+    // POST /excursions per swagger CreateCustomExcursionRequest accepts points
+    // in the body and returns full ExcursionDetailResponse with points
+    // populated — single round-trip.
     const created = await excursionsService.createExcursion({
       title: route.title,
       description: route.description,
+      shortDescription: route.tagline || undefined,
+      visibility: 'PUBLIC',
       points: validPoints,
     })
+
     return mapExcursionFromDetail(created)
   },
 
   async getDiscoveryFeed(payload): Promise<DiscoveryFeedDto> {
     // swagger: radiusKilometers is integer [1, 15]
     const radiusKm = Math.max(1, Math.min(15, Math.round(payload.radiusMeters / 1000)))
-    const categorySlug = payload.category !== 'all' ? payload.category : undefined
+
+    // Resolve frontend category slug ('museum', 'food', ...) to backend
+    // numeric category IDs. A single slug can map to multiple backend
+    // categories (e.g. 'museum' covers "Музей" and "Галерея"). Empty array
+    // means "no filter" — backend returns all categories in radius.
+    const categoryIds =
+      payload.category !== 'all' ? await getCategoryIdsForSlug(payload.category) : []
 
     const location = { latitude: payload.center.lat, longitude: payload.center.lng }
 
@@ -55,13 +81,14 @@ const httpApi: FrontendApi = {
         .searchPoints({
           location,
           radiusKilometers: radiusKm,
-          categorySlugs: categorySlug ? [categorySlug] : [],
+          categoryIds,
         })
         .catch(() => []),
       excursionsService
         .searchExcursions({
           location,
           radiusKilometers: radiusKm,
+          categoryIds,
         })
         .catch(() => []),
     ])
@@ -144,17 +171,25 @@ const httpApi: FrontendApi = {
     return authService.register(payload)
   },
 
-  removeSavedRoute(payload) {
-    return request<void>(`/profile/routes/saved/${payload.slug}`, {
-      method: 'DELETE',
-    })
+  async removeSavedRoute(payload) {
+    // Backend models "saved" as favorites: POST /excursions/{id}/unfavorite.
+    const id = excursionIdFromSlug(payload.slug)
+    if (id == null) {
+      // Slug doesn't reference a known backend excursion (e.g. local-only
+      // draft). Nothing to call — silently succeed.
+      return
+    }
+    await excursionsService.removeFavorite(id)
   },
 
   async saveRoute(payload) {
-    return request('/profile/routes/saved', {
-      body: JSON.stringify(payload),
-      method: 'POST',
-    })
+    // Backend models "saved" as favorites: POST /excursions/{id}/favorite.
+    const id = excursionIdFromSlug(payload.route.slug)
+    if (id == null) {
+      throw new Error('Невозможно сохранить локальный маршрут — нет идентификатора экскурсии.')
+    }
+    await excursionsService.addFavorite(id)
+    return payload.route
   },
 
   shareRoute(payload): Promise<ShareRouteDto> {
