@@ -1077,9 +1077,10 @@ body.app-body--routes-page {
     left: 6px;
     padding: 2px 7px;
     border-radius: var(--radius-pill);
-    background: rgba(0, 0, 0, 0.52);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    /* Solid darker background instead of backdrop-filter blur — appears on
+       every excursion card; backdrop-filter is one of the most expensive
+       compositor operations on mobile. */
+    background: rgba(0, 0, 0, 0.62);
     color: #fff;
     font-size: 0.67rem;
     font-weight: 700;

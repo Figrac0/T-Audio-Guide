@@ -460,6 +460,18 @@ export function HomePage() {
         [effectiveSelectedPointId, nearbyPoints],
     );
 
+    // Pre-bound directional cyclers — passing inline arrows
+    // `() => cycleSelectedPoint(1)` would create new function refs every
+    // render and trigger DiscoveryMap's marker effect cascade.
+    const handleSelectNextPoint = useCallback(
+        () => cycleSelectedPoint(1),
+        [cycleSelectedPoint],
+    );
+    const handleSelectPreviousPoint = useCallback(
+        () => cycleSelectedPoint(-1),
+        [cycleSelectedPoint],
+    );
+
     // ── Bottom sheet ────────────────────────────────────────────────────────────
 
     const [sheetState, setSheetState] = useState<SheetState>("closed");
@@ -887,9 +899,9 @@ export function HomePage() {
                     onMapClick={handleMapClick}
                     onSaveDraftRoute={handleSaveDraftRoute}
                     onSelectCategory={setActivePointCategory}
-                    onSelectNextPoint={() => cycleSelectedPoint(1)}
+                    onSelectNextPoint={handleSelectNextPoint}
                     onSelectPoint={handleMapPointSelect}
-                    onSelectPreviousPoint={() => cycleSelectedPoint(-1)}
+                    onSelectPreviousPoint={handleSelectPreviousPoint}
                     radiusMeters={radiusMeters}
                     recenterTrigger={recenterTrigger}
                     routeTargetId={effectiveRouteTargetId}

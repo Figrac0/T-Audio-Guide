@@ -19,9 +19,11 @@
   line-height: 0;
   text-decoration: none;
   text-indent: 0;
+  /* Transitioning `filter` triggers GPU re-rasterization on every frame —
+     transform + opacity are both compositor-only properties and animate
+     at 60 fps without re-paint cost on mobile. */
   transition:
     transform 180ms ease,
-    filter 180ms ease,
     opacity 180ms ease;
 }
 

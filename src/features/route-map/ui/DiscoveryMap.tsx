@@ -533,7 +533,12 @@ export function DiscoveryMap({
     return () => {
       controller.abort()
     }
-  }, [draftSignature, userPosition, visibleDraftStops])
+  // draftSignature already encodes userPosition + each stop's coordinates
+  // (see line 230). userPosition / visibleDraftStops are read inside the
+  // closure but listing them here would re-fire the effect on identity-only
+  // changes (new array refs without coordinate changes).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftSignature])
 
   useEffect(() => {
     const map = mapRef.current
@@ -792,21 +797,21 @@ export function DiscoveryMap({
     circle.setRadius(displayRadius)
   }, [displayRadius])
 
+  // Selection-only icon update. The main marker diff effect uses
+  // selectedPointIdRef and won't re-run when ONLY selection changes, so we
+  // need this separate pass. Use the icon-state cache to avoid redundant
+  // setIcon calls — typically only 0-2 markers actually change visual state
+  // (the previous selected loses --active, the new one gains it).
   useEffect(() => {
     nearbyPoints.forEach((point) => {
       const marker = markerRefs.current.get(point.id)
-
-      if (!marker) {
-        return
-      }
-
-      marker.setIcon(
-        createPoiIcon(
-          point,
-          point.id === selectedPointId,
-          visibleDraftOrderMap.get(point.id) ?? null,
-        ),
-      )
+      if (!marker) return
+      const isActive = point.id === selectedPointId
+      const draftOrder = visibleDraftOrderMap.get(point.id) ?? null
+      const prev = markerIconStateRef.current.get(point.id)
+      if (prev && prev.active === isActive && prev.draftOrder === draftOrder) return
+      marker.setIcon(createPoiIcon(point, isActive, draftOrder))
+      markerIconStateRef.current.set(point.id, { active: isActive, draftOrder })
     })
   }, [nearbyPoints, selectedPointId, visibleDraftOrderMap])
 

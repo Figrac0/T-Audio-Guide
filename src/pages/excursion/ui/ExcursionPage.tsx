@@ -661,15 +661,23 @@ function NavigationPhase({
   )
   const guideRouteUserPosition = initialUserPosition
 
+  // Stable references for RouteMap props — passing inline `[currentStop]` /
+  // `() => setSheetState('full')` would create new array/function references
+  // on every render, causing the entire LeafletRouteMap overlay (markers,
+  // route polyline, user marker) to rebuild on every parent re-render during
+  // navigation. With audio-guide state changes that's many wasted rebuilds.
+  const navStops = useMemo(() => [currentStop], [currentStop])
+  const handleNavMarkerSelect = useCallback(() => setSheetState('full'), [])
+
   return (
     <div className="ep-nav">
       <div className="ep-nav__map">
         <RouteMap
           onLocateUser={requestLocation}
-          onSelect={() => setSheetState('full')}
+          onSelect={handleNavMarkerSelect}
           routeColor={excursion.routeColor}
           selectedStopId={currentStop.id}
-          stops={[currentStop]}
+          stops={navStops}
           userPosition={guideRouteUserPosition}
         />
       </div>
