@@ -35,17 +35,14 @@ function saveToStorage(mode: OverrideMode, position: GeoPoint | null): void {
 }
 
 export function ManualPositionProvider({ children }: { children: ReactNode }) {
-  const [mode, setMode] = useState<OverrideMode>('off')
-  const [manualPositionState, setManualPositionState] = useState<GeoPoint | null>(null)
-  const [isHydrated, setIsHydrated] = useState(false)
-
-  // Hydrate from localStorage on mount
-  useEffect(() => {
-    const { mode: storedMode, position } = loadFromStorage()
-    setMode(storedMode)
-    setManualPositionState(position)
-    setIsHydrated(true)
-  }, [])
+  const [mode, setMode] = useState<OverrideMode>(() => {
+    const { mode: storedMode } = loadFromStorage()
+    return storedMode
+  })
+  const [manualPositionState, setManualPositionState] = useState<GeoPoint | null>(() => {
+    const { position } = loadFromStorage()
+    return position
+  })
 
   const toggleOverride = useCallback(() => {
     setMode((prev) => {
@@ -63,9 +60,8 @@ export function ManualPositionProvider({ children }: { children: ReactNode }) {
 
   // Save whenever mode or position changes
   useEffect(() => {
-    if (!isHydrated) return
     saveToStorage(mode, mode === 'active' ? manualPositionState : null)
-  }, [mode, manualPositionState, isHydrated])
+  }, [mode, manualPositionState])
 
   const value: ManualPositionContextType = {
     mode,
@@ -82,6 +78,7 @@ export function ManualPositionProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useManualPosition(): ManualPositionContextType {
   const context = useContext(ManualPositionContext)
   if (!context) {

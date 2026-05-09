@@ -170,8 +170,12 @@ export function DiscoveryMap({
   const suppressPopupCloseRef = useRef(false)
   const userClosedPopupRef = useRef(false)
   const userInteractedWithMapRef = useRef(false)
+  const displayRadiusRef = useRef(radiusMeters)
+  const targetRadiusRef = useRef(radiusMeters)
+  const radiusInterpolationRef = useRef<ReturnType<typeof requestAnimationFrame> | null>(null)
   const [mapLoadError, setMapLoadError] = useState<string | null>(null)
   const [openMenu, setOpenMenu] = useState<'category' | 'radius' | null>(null)
+  const [displayRadius, setDisplayRadius] = useState(radiusMeters)
   const [guideRoute, setGuideRoute] = useState<{
     geometry: RouteGeometry | null
     signature: string
@@ -285,15 +289,45 @@ export function DiscoveryMap({
         userClosedPopupRef.current = true
       })
 
-      // Dynamic radius: debounced to prevent rapid-fire API calls on every scroll tick
+      // Smooth radius interpolation on zoom changes
+      const updateTargetRadius = (newTarget: number) => {
+        newTarget = Math.round(newTarget)
+        if (newTarget === targetRadiusRef.current) return
+
+        targetRadiusRef.current = newTarget
+
+        if (radiusInterpolationRef.current !== null) {
+          cancelAnimationFrame(radiusInterpolationRef.current)
+        }
+
+        const startRadius = displayRadiusRef.current
+        const startTime = performance.now()
+        const duration = 600
+
+        const animate = (now: number) => {
+          const elapsed = now - startTime
+          const progress = Math.min(1, elapsed / duration)
+          const eased = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress
+
+          const newRadius = Math.round(startRadius + (newTarget - startRadius) * eased)
+          displayRadiusRef.current = newRadius
+          setDisplayRadius(newRadius)
+
+          if (progress < 1) {
+            radiusInterpolationRef.current = requestAnimationFrame(animate)
+          } else {
+            radiusInterpolationRef.current = null
+            onChangeRadiusRef.current(newTarget)
+          }
+        }
+
+        radiusInterpolationRef.current = requestAnimationFrame(animate)
+      }
+
+      // Update radius only on zoom changes
       map.on('zoomend', () => {
-        if (zoomDebounceRef.current !== null) clearTimeout(zoomDebounceRef.current)
-        // Debounce radius changes to reduce API requests - increased from 350ms to 400ms
-        // This gives users better UX while still being responsive
-        zoomDebounceRef.current = setTimeout(() => {
-          const newRadius = getDiscoveryRadiusForZoom(map.getZoom())
-          onChangeRadiusRef.current(newRadius)
-        }, 400)
+        const newRadius = getDiscoveryRadiusForZoom(map.getZoom())
+        updateTargetRadius(newRadius)
       })
 
       map.on('click', (event: L.LeafletMouseEvent) => {
@@ -305,10 +339,12 @@ export function DiscoveryMap({
 
       map.on('movestart', () => {
         userInteractedWithMapRef.current = true
+        userClosedPopupRef.current = true
       })
 
       map.on('zoomstart', () => {
         userInteractedWithMapRef.current = true
+        userClosedPopupRef.current = true
       })
 
       queueMicrotask(() => setMapLoadError(null))
@@ -319,6 +355,7 @@ export function DiscoveryMap({
 
     return () => {
       if (zoomDebounceRef.current !== null) clearTimeout(zoomDebounceRef.current)
+      if (radiusInterpolationRef.current !== null) cancelAnimationFrame(radiusInterpolationRef.current)
       routeLayerRef.current?.clearLayers()
       routeLayerRef.current = null
       overlayRef.current?.clearLayers()
@@ -482,7 +519,7 @@ export function DiscoveryMap({
     const routeSignature = `${routeTargetId ?? ''}:${visibleDraftStopsSignature}`
 
     if (draftBounds && visibleDraftStops.length) {
-      if (routeSignature !== lastFittedRouteRef.current && !userInteractedWithMapRef.current) {
+      if (routeSignature !== lastFittedRouteRef.current && !userInteractedWithMapRef.current && !userClosedPopupRef.current) {
         lastFittedRouteRef.current = routeSignature
         applyLeafletLocation(map, {
           bounds: draftBounds,
@@ -495,7 +532,7 @@ export function DiscoveryMap({
     }
 
     if (guideBounds && routeTargetId) {
-      if (routeSignature !== lastFittedRouteRef.current && !userInteractedWithMapRef.current) {
+      if (routeSignature !== lastFittedRouteRef.current && !userInteractedWithMapRef.current && !userClosedPopupRef.current) {
         lastFittedRouteRef.current = routeSignature
         applyLeafletLocation(map, {
           bounds: guideBounds,
@@ -537,7 +574,7 @@ export function DiscoveryMap({
   }, [draftBounds, guideBounds, nearbyPoints.length, pointsBounds, routeTargetId, userPosition, visibleDraftStops.length, visibleDraftStopsSignature])
 
   // Route layer: circle + polylines + user marker — rebuilt only when geometry/position changes.
-  // Intentionally excludes radiusMeters: the animation effect handles smooth radius updates.
+  // Intentionally excludes displayRadius: the animation effect handles smooth radius updates.
   useEffect(() => {
     const routeLayer = routeLayerRef.current
     if (!routeLayer) return
@@ -545,7 +582,7 @@ export function DiscoveryMap({
     routeLayer.clearLayers()
 
     if (userPosition) {
-      const circle = createDiscoveryRadiusCircle(userPosition, radiusMeters)
+      const circle = createDiscoveryRadiusCircle(userPosition, displayRadius)
       circle.addTo(routeLayer)
       radiusCircleRef.current = circle
     } else {
@@ -566,7 +603,7 @@ export function DiscoveryMap({
         title: 'Ваше местоположение',
       }).addTo(routeLayer)
     }
-  }, [draftGeometry, guideGeometry, radiusMeters, userPosition])
+  }, [draftGeometry, displayRadius, guideGeometry, userPosition])
 
   // Markers layer: POI markers only — rebuilt when the point set or selection changes.
   // Kept separate from the route layer so zoom/radius changes don't thrash polylines.
@@ -665,29 +702,20 @@ export function DiscoveryMap({
     }
   }, [draftStops.length, nearbyPoints, onAddPointToDraft, onBuildRoute, onClearDraftRoute, onSelectPoint, routeTargetId, showDirectRouteInPopup, showPopupRouteActions, userPosition, visibleDraftOrderMap, visibleDraftPointIds])
 
-  // Animate radius circle smoothly when radiusMeters changes (no full redraw)
+
+  // Initialize and sync when radiusMeters changes from parent (e.g., from radius menu)
+  useEffect(() => {
+    targetRadiusRef.current = radiusMeters
+    displayRadiusRef.current = radiusMeters
+    setDisplayRadius(radiusMeters)
+  }, [radiusMeters])
+
+  // Update radius circle when displayRadius changes (smooth via interpolation above)
   useEffect(() => {
     const circle = radiusCircleRef.current
     if (!circle) return
-    const start = circle.getRadius()
-    const end = radiusMeters
-    if (Math.abs(end - start) < 5) {
-      circle.setRadius(end)
-      return
-    }
-    const duration = 380
-    const t0 = performance.now()
-    let raf: number
-    const circleLayer = circle
-    function step(now: number) {
-      const p = Math.min(1, (now - t0) / duration)
-      const eased = 1 - Math.pow(1 - p, 3)
-      circleLayer.setRadius(start + (end - start) * eased)
-      if (p < 1) raf = requestAnimationFrame(step)
-    }
-    raf = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(raf)
-  }, [radiusMeters])
+    circle.setRadius(displayRadius)
+  }, [displayRadius])
 
   useEffect(() => {
     nearbyPoints.forEach((point) => {
@@ -737,9 +765,9 @@ export function DiscoveryMap({
       return
     }
 
-    // On mobile, if user has interacted with the map (pan/zoom) after point selection,
+    // On mobile, if user has interacted with the map (pan/zoom) or closed popup,
     // don't auto-center to prevent interrupting their navigation
-    if (userInteractedWithMapRef.current) {
+    if (userInteractedWithMapRef.current || userClosedPopupRef.current) {
       return
     }
 

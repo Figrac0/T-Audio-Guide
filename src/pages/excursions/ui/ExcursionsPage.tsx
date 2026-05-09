@@ -69,10 +69,11 @@ function getSheetTranslateY(el: HTMLElement): number {
 }
 
 export function ExcursionsPage() {
-  const state = useExcursionsPageState()
-  const [showAll, setShowAll] = useState(false)
   const { isOverrideActive, manualPosition, mode: overrideMode, setManualPosition, toggleOverride } = useManualPosition()
-  const effectiveUserPosition = isOverrideActive ? manualPosition : state.userPosition
+  const effectiveUserPosition = isOverrideActive ? manualPosition : null
+  const state = useExcursionsPageState(effectiveUserPosition, effectiveUserPosition)
+  const [showAll, setShowAll] = useState(false)
+  const finalEffectiveUserPosition = effectiveUserPosition ?? state.userPosition
   const catalogInitial = useCatalogInitial()
   const draftPointOrders = useMemo(
     () =>
@@ -624,7 +625,7 @@ export function ExcursionsPage() {
           recenterKey={state.recenterKey}
           routeState={state.routeState}
           selectedPointId={state.selectedPointId}
-          userPosition={effectiveUserPosition}
+          userPosition={finalEffectiveUserPosition}
         />
       </div>
 

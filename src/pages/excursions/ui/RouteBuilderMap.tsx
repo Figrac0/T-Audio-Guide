@@ -134,7 +134,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
 
         zoomDebounceRef.current = setTimeout(() => {
           onChangeRadiusRef.current(getDiscoveryRadiusForZoom(map.getZoom()))
-        }, 400)
+        }, 200)
       })
 
       map.on('popupclose', () => onPopupCloseRef.current())
@@ -259,7 +259,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
       return
     }
 
-    const duration = 380
+    const duration = 600
     const startedAt = performance.now()
     let frameId = 0
     const circleLayer = circle

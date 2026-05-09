@@ -41,7 +41,10 @@ export interface PlannerRouteState {
   segments: LngLat[][]
 }
 
-export function useExcursionsPageState() {
+export function useExcursionsPageState(
+  centerOverride?: { lat: number; lng: number } | null,
+  effectiveUserPosition?: { lat: number; lng: number } | null,
+) {
   const navigate = useNavigate()
   const {
     addPointToDraft,
@@ -87,9 +90,9 @@ export function useExcursionsPageState() {
     userPosition,
   } = useUserGeolocation()
 
-  const center = userPosition ?? storedContext.center
+  const center = centerOverride ?? userPosition ?? storedContext.center
   const canLoadNearbyPlaces =
-    Boolean(userPosition) || geolocationStatus === 'blocked' || geolocationStatus === 'unsupported'
+    Boolean(userPosition) || Boolean(centerOverride) || geolocationStatus === 'blocked' || geolocationStatus === 'unsupported'
 
   const { error: discoveryError, excursions, isLoading, nearbyPoints } = useDiscoveryRoutes({
     activePointCategory: 'all',
@@ -120,18 +123,19 @@ export function useExcursionsPageState() {
     return () => window.clearTimeout(id)
   }, [notice])
 
-  // Build route segments. When userPosition is available it is prepended as point[0],
+  // Build route segments. When effectiveUserPosition is available it is prepended as point[0],
   // making segments[0] the guide segment (user → first stop), rendered dashed.
+  const startPos = effectiveUserPosition ?? userPosition
   const cachedRouteSegments = useMemo(() => {
-    if (draftStops.length === 0 || (draftStops.length === 1 && !userPosition)) {
+    if (draftStops.length === 0 || (draftStops.length === 1 && !startPos)) {
       return null
     }
 
     const points = [
-      ...(userPosition ? [userPosition] : []),
+      ...(startPos ? [startPos] : []),
       ...draftStops.map((stop) => stop.coordinates),
     ]
-    const hasLeadSegment = Boolean(userPosition)
+    const hasLeadSegment = Boolean(startPos)
     const signature = `${hasLeadSegment ? 'lead' : 'plain'}:${points
       .map((point) => `${point.lat.toFixed(5)}:${point.lng.toFixed(5)}`)
       .join('|')}`
@@ -153,16 +157,16 @@ export function useExcursionsPageState() {
     }
 
     return { signature, segments }
-  }, [draftStops, userPosition])
+  }, [draftStops, startPos])
 
   useEffect(() => {
-    if (draftStops.length === 0 || (draftStops.length === 1 && !userPosition)) {
+    if (draftStops.length === 0 || (draftStops.length === 1 && !startPos)) {
       return
     }
 
-    const hasLeadSegment = Boolean(userPosition)
+    const hasLeadSegment = Boolean(startPos)
     const points = [
-      ...(userPosition ? [userPosition] : []),
+      ...(startPos ? [startPos] : []),
       ...draftStops.map((s) => s.coordinates),
     ]
     const signature = `${hasLeadSegment ? 'lead' : 'plain'}:${points
@@ -194,7 +198,7 @@ export function useExcursionsPageState() {
 
     void buildSegments()
     return () => controller.abort()
-  }, [draftStops, userPosition])
+  }, [draftStops, startPos])
 
   const filteredExcursions = useMemo(
     () =>
@@ -208,17 +212,17 @@ export function useExcursionsPageState() {
 
   const routePoints = useMemo(
     () => [
-      ...(userPosition ? [userPosition] : []),
+      ...(startPos ? [startPos] : []),
       ...draftStops.map((stop) => stop.coordinates),
     ],
-    [draftStops, userPosition],
+    [draftStops, startPos],
   )
 
   const routeSignature = useMemo(() => {
-    if (draftStops.length === 0 || (draftStops.length === 1 && !userPosition)) return ''
-    const prefix = userPosition ? 'lead' : 'plain'
+    if (draftStops.length === 0 || (draftStops.length === 1 && !startPos)) return ''
+    const prefix = startPos ? 'lead' : 'plain'
     return `${prefix}:${routePoints.map((p) => `${p.lat.toFixed(5)}:${p.lng.toFixed(5)}`).join('|')}`
-  }, [draftStops.length, routePoints, userPosition])
+  }, [draftStops.length, routePoints, startPos])
 
   const fallbackRouteSegments = useMemo(() => {
     if (!routeSignature) {
@@ -235,7 +239,7 @@ export function useExcursionsPageState() {
   const routeState = useMemo<PlannerRouteState>(() => {
     if (routeSegmentsState.signature === routeSignature) {
       return {
-        hasLeadSegment: Boolean(userPosition),
+        hasLeadSegment: Boolean(startPos),
         segments:
           routeSegmentsState.segments.length > 0 ? routeSegmentsState.segments : fallbackRouteSegments,
       }
@@ -243,7 +247,7 @@ export function useExcursionsPageState() {
 
     if (cachedRouteSegments?.signature === routeSignature) {
       return {
-        hasLeadSegment: Boolean(userPosition),
+        hasLeadSegment: Boolean(startPos),
         segments:
           cachedRouteSegments.segments.length > 0
             ? cachedRouteSegments.segments
@@ -252,7 +256,7 @@ export function useExcursionsPageState() {
     }
 
     if (routeSignature) {
-      return { hasLeadSegment: Boolean(userPosition), segments: fallbackRouteSegments }
+      return { hasLeadSegment: Boolean(startPos), segments: fallbackRouteSegments }
     }
     return { hasLeadSegment: false, segments: [] }
   }, [
@@ -261,7 +265,7 @@ export function useExcursionsPageState() {
     routeSegmentsState.segments,
     routeSegmentsState.signature,
     routeSignature,
-    userPosition,
+    startPos,
   ])
 
   const handleSelectPoint = useCallback((pointId: string) => {

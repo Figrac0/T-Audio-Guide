@@ -18,9 +18,15 @@ export function createOpenStreetMapLayer() {
     attribution: openStreetMapAttribution,
     maxZoom: 19,
     minZoom: 2,
-    keepBuffer: 2,
-    updateWhenZooming: false,
+    // Aggressive tile preloading: load tiles in a 4-tile buffer around viewport
+    keepBuffer: 4,
+    // Load tiles during zoom for seamless experience (not just when idle)
+    updateWhenZooming: true,
     updateWhenIdle: true,
+    // Standard tile size
+    tileSize: 256,
+    // Faster tile loading with parallel requests
+    crossOrigin: true,
   })
 }
 
