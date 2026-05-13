@@ -19,7 +19,22 @@ import { mockApi } from '@/shared/api/mock/mockApi'
 import { pointsService } from '@/shared/api/pointsService'
 import { profileService } from '@/shared/api/profileService'
 
-const useMockApi = import.meta.env.VITE_USE_MOCK_API !== 'false' || !import.meta.env.VITE_API_URL
+// Mock vs real backend selection.
+// - Explicit override: VITE_USE_MOCK_API='true' → mock, ='false' → real backend.
+// - Implicit default (no override): mock only if VITE_API_URL is missing.
+const explicitMockFlag = import.meta.env.VITE_USE_MOCK_API
+const useMockApi =
+  explicitMockFlag === 'true' ||
+  (explicitMockFlag !== 'false' && !import.meta.env.VITE_API_URL)
+
+if (typeof window !== 'undefined') {
+  // Surface which API is in effect — helps when the dev server kept stale
+  // env values from before a `.env` file existed.
+  console.info(
+    `[t-guide] API mode: ${useMockApi ? 'MOCK (in-memory)' : 'REAL backend'}` +
+      (useMockApi ? '' : ` → ${import.meta.env.VITE_API_URL}`),
+  )
+}
 
 // Extract numeric backend id from slug "excursion-{id}". Slugs are produced by
 // mapExcursionFromShort and are the only way the UI references excursions.

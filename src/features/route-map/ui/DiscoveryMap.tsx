@@ -59,7 +59,6 @@ interface DiscoveryMapProps {
   fullscreen?: boolean
   emptyMessage: string
   fixedRouteStops?: RouteStop[]
-  geolocationError: string | null
   initialCenter?: GeoPoint
   isLoading: boolean
   isMapLocked?: boolean
@@ -119,7 +118,6 @@ export function DiscoveryMap({
   fullscreen = false,
   emptyMessage,
   fixedRouteStops = [],
-  geolocationError,
   initialCenter,
   isLoading,
   isMapLocked = false,
@@ -1093,7 +1091,8 @@ export function DiscoveryMap({
         </div>
       </div>
 
-      {geolocationError ? <p className="map-card__note">{geolocationError}</p> : null}
+      {/* Geolocation error banner is rendered by the parent (HomePage) so it
+          can be dismissed and auto-hide on sheet open. */}
     </section>
   )
 }

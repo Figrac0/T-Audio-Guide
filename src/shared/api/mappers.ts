@@ -147,6 +147,26 @@ export function mapCategoryName(name: string): PointCategory {
   return categoryNameMap[name.toLowerCase()] ?? 'landmark'
 }
 
+// Slugs are the canonical, language-agnostic identifier; prefer them when
+// backend includes the slug field. Falls back to name matching otherwise.
+const validFrontendSlugs: ReadonlySet<PointCategory> = new Set([
+  'museum',
+  'food',
+  'park',
+  'entertainment',
+  'landmark',
+])
+
+export function mapCategoryFromBackend(category: { slug?: string; name?: string }): PointCategory {
+  if (category.slug && validFrontendSlugs.has(category.slug as PointCategory)) {
+    return category.slug as PointCategory
+  }
+  if (category.slug && categoryNameMap[category.slug.toLowerCase()]) {
+    return categoryNameMap[category.slug.toLowerCase()]
+  }
+  return mapCategoryName(category.name ?? '')
+}
+
 // ── Haversine distance (meters) ──────────────────────────────────────────────
 
 export function haversineDistance(

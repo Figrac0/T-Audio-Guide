@@ -214,13 +214,16 @@ export const mockApi: FrontendApi = {
     await wait(responseDelayMs)
 
     const users = loadUsers()
-    const normalizedPhone = normalizePhone(request.phone)
+    const normalizedPhone = request.phone ? normalizePhone(request.phone) : ''
 
     if (users.some((user) => user.email.toLowerCase() === request.email.toLowerCase())) {
       throw new Error('Пользователь с такой почтой уже существует.')
     }
 
-    if (users.some((user) => normalizePhone(user.phone) === normalizedPhone)) {
+    if (
+      normalizedPhone &&
+      users.some((user) => normalizePhone(user.phone) === normalizedPhone)
+    ) {
       throw new Error('Пользователь с таким телефоном уже существует.')
     }
 
@@ -229,7 +232,7 @@ export const mockApi: FrontendApi = {
       username: request.email.trim().split('@')[0] || `user-${Date.now()}`,
       name: request.name.trim(),
       email: request.email.trim(),
-      phone: request.phone.trim(),
+      phone: request.phone?.trim() ?? '',
       password: request.password,
       language: request.language,
       role: 'user',
@@ -436,10 +439,8 @@ function createGuestSession(): SessionDto {
 function toProfile(user: MockUserRecord): UserProfileDto {
   return {
     id: user.id,
-    username: user.username,
     name: user.name,
     email: user.email,
-    phone: user.phone,
     lang: user.language,
     language: user.language,
     role: user.role,

@@ -25,6 +25,68 @@ body.app-body--home-page {
     background: #e8edf4;
 }
 
+/* Geolocation banner — sits above the sheet but below modal layers. Auto-hides
+   when the sheet opens past peek to give the user full screen for the list. */
+.home-geo-banner {
+    position: absolute;
+    z-index: 6;
+    bottom: 72px;
+    left: 12px;
+    right: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid rgba(212, 70, 70, 0.35);
+    border-radius: 14px;
+    background: #fff1f1;
+    color: #b03434;
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1.35;
+    box-shadow: 0 8px 20px rgba(31, 37, 51, 0.12);
+    animation: home-geo-banner-enter 0.22s ease both;
+}
+
+.home-geo-banner__text {
+    flex: 1;
+    min-width: 0;
+}
+
+.home-geo-banner__close {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    margin: -4px -4px -4px 4px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(176, 52, 52, 0.1);
+    color: #b03434;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.home-geo-banner__close:active {
+    background: rgba(176, 52, 52, 0.2);
+}
+
+@keyframes home-geo-banner-enter {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .home-page__map .discovery-map,
 .home-page__map .discovery-map__root {
     height: 100%;

@@ -8,9 +8,9 @@
 
 export type UserRole = 'guest' | 'user' | 'admin'
 
+// Matches swagger UserResponse: { id, email, name, lang, role }
 export interface BackendUserDto {
-  id: string
-  username: string
+  id: string | number
   email: string
   name: string
   lang: SupportedLocale
@@ -19,10 +19,10 @@ export interface BackendUserDto {
 
 export interface UserProfileDto {
   id: string
-  username?: string
   name: string
   email: string
-  phone?: string
+  // Always present internally; `lang` mirrors `language` for back-compat with
+  // older components that read either field.
   lang?: SupportedLocale
   language: SupportedLocale
   role: UserRole
@@ -60,9 +60,12 @@ export interface ChangePasswordRequestDto {
   newPassword: string
 }
 
+// Backend RegistrationRequest accepts only: email, name, password, lang.
+// `phone` is kept here so existing UI forms still compile, but it's never
+// sent to the backend (silently dropped at the service layer).
 export interface RegisterRequestDto {
   name: string
-  phone: string
+  phone?: string
   email: string
   password: string
   language: SupportedLocale

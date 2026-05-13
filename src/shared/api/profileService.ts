@@ -8,11 +8,18 @@ import type {
 } from '@/shared/api/contracts'
 
 export const profileService = {
+  /** GET /profile → UserResponse */
   async getProfile() {
     const response = await request<BackendUserDto | UserProfileDto>('/profile')
     return normalizeProfile(response)
   },
 
+  /**
+   * PATCH /profile → UserResponse
+   *
+   * Swagger PatchUserRequest only accepts { email, name, lang }. Lang is
+   * upper-cased for the backend (the wire format is "RU"/"EN").
+   */
   async updateProfile(payload: UpdateProfileRequestDto) {
     const response = await request<BackendUserDto | UserProfileDto>('/profile', {
       body: JSON.stringify({
@@ -28,18 +35,24 @@ export const profileService = {
 }
 
 function normalizeProfile(profile: BackendUserDto | UserProfileDto): UserProfileDto {
-  // Backend sends lang as "RU" (uppercase) and role as "USER" (uppercase)
-  const rawLang = 'language' in profile ? profile.language : profile.lang
-  const language = (rawLang?.toLowerCase() ?? 'ru') as SupportedLocale
+  // Backend sends lang as "RU" (uppercase) and role as "USER" (uppercase);
+  // normalize both to internal lowercase form.
+  const rawLang =
+    ('language' in profile && profile.language) ||
+    ('lang' in profile && profile.lang) ||
+    'ru'
+  const language = (
+    typeof rawLang === 'string' ? rawLang.toLowerCase() : 'ru'
+  ) as SupportedLocale
 
   return {
     email: profile.email,
-    id: String(profile.id),  // backend sends int64 (number)
+    id: String(profile.id),
     lang: language,
     language,
     name: profile.name,
-    phone: 'phone' in profile ? profile.phone : undefined,
-    role: (profile.role?.toLowerCase() ?? 'user') as UserRole,
-    username: 'username' in profile ? profile.username : undefined,
+    role: (
+      typeof profile.role === 'string' ? profile.role.toLowerCase() : 'user'
+    ) as UserRole,
   }
 }

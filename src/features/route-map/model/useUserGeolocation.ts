@@ -68,11 +68,11 @@ export function useUserGeolocation(): UseUserGeolocationResult {
     setStatus('blocked')
 
     if (geolocationError.code === geolocationError.PERMISSION_DENIED) {
-      setError('Доступ к геопозиции отключен. Можно продолжить с картой по умолчанию.')
+      setError('Геолокация недоступна — установите свою точку вручную, нажав на карту.')
       return
     }
 
-    setError('Не удалось определить текущее местоположение.')
+    setError('Не удалось определить местоположение — поставьте точку вручную на карте.')
   }, [])
 
   const startWatching = useCallback(() => {

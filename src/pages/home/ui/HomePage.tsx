@@ -168,6 +168,10 @@ export function HomePage() {
     >("success");
     const [recenterTrigger, setRecenterTrigger] = useState(0);
 
+    // Tracks the last dismissed geolocation error string. The banner re-appears
+    // if a different error arrives, but stays dismissed for the current one.
+    const [dismissedGeoError, setDismissedGeoError] = useState<string | null>(null);
+
     // Tracks whether data has ever arrived; set during render so it's instant.
     const hasHadDataRef = useRef(false);
     // Fallback: show empty state after 3 s even if no data arrived yet.
@@ -885,7 +889,6 @@ export function HomePage() {
                     emptyMessage="В этом радиусе нет доступных точек."
                     fixedRouteStops={savedDraftPreviewStops}
                     fullscreen
-                    geolocationError={geolocationError}
                     initialCenter={currentCenter}
                     isLoading={isLoading || !canLoadNearbyPlaces}
                     isMapLocked={overrideMode === 'waiting'}
@@ -910,6 +913,26 @@ export function HomePage() {
                     showPopupRouteActions={false}
                     userPosition={effectiveUserPosition}
                 />
+                {/* Geolocation banner: shown only when the sheet is collapsed
+                    (closed/peek). Hides on user dismiss; re-appears if the
+                    error message changes (e.g. permission → unsupported). */}
+                {geolocationError &&
+                geolocationError !== dismissedGeoError &&
+                (sheetState === "closed" || sheetState === "peek") ? (
+                    <div className="home-geo-banner" role="status">
+                        <span className="home-geo-banner__text">
+                            {geolocationError}
+                        </span>
+                        <button
+                            aria-label="Закрыть"
+                            className="home-geo-banner__close"
+                            onClick={() => setDismissedGeoError(geolocationError)}
+                            type="button"
+                        >
+                            ×
+                        </button>
+                    </div>
+                ) : null}
             </div>
 
             <div className="home-sheet" ref={sheetRef}>
