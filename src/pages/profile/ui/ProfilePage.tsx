@@ -268,12 +268,21 @@ export function ProfilePage() {
                         историей прохождения.
                     </p>
                 </div>
-                <button
-                    className="button button--secondary"
-                    onClick={() => void signOut()}
-                    type="button">
-                    Выйти
-                </button>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {profile?.role === "admin" ? (
+                        <Link
+                            className="button button--secondary"
+                            to={appRoutes.admin}>
+                            Админ-панель
+                        </Link>
+                    ) : null}
+                    <button
+                        className="button button--secondary"
+                        onClick={() => void signOut()}
+                        type="button">
+                        Выйти
+                    </button>
+                </div>
             </article>
 
             <section className="profile-page__layout">

@@ -35,7 +35,12 @@ export interface ApiPointMedia {
   transcript?: string | null
 }
 
-/** GET /points/{pointId} → PointDetailResponse */
+/**
+ * GET /points/{pointId} → PointDetailResponse
+ * Also covers AdminPointDetailResponse (extra `active`, `createdAt`,
+ * `updatedAt`, media items carry `id`). All extra fields optional so the
+ * type works for both public and admin endpoints.
+ */
 export interface ApiPointDetail {
   id: number
   title: string
@@ -48,6 +53,10 @@ export interface ApiPointDetail {
   visitTime?: number | null
   workingHours?: string | null
   media?: ApiPointMedia[]
+  // Admin-only fields (AdminPointDetailResponse)
+  active?: boolean
+  createdAt?: string
+  updatedAt?: string
 }
 
 /** POST /excursions/search → ExcursionListResponse.excursions[] */

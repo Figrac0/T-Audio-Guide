@@ -34,6 +34,11 @@ const NotFoundPage = lazy(async () =>
     default: module.NotFoundPage,
   })),
 )
+const AdminPage = lazy(async () =>
+  import('@/pages/admin/ui/AdminPage').then((module) => ({
+    default: module.AdminPage,
+  })),
+)
 
 export function AppRouter() {
   return (
@@ -46,6 +51,9 @@ export function AppRouter() {
           <Route path={appRoutes.excursion()} element={<ExcursionPage />} />
           <Route path={appRoutes.profile} element={<ProfilePage />} />
           <Route path={appRoutes.savedRoutes} element={<ProfilePage />} />
+        </Route>
+        <Route element={<AdminRoute />}>
+          <Route path={appRoutes.admin} element={<AdminPage />} />
         </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
@@ -69,6 +77,34 @@ function ProtectedRoute() {
         to={appRoutes.signIn}
       />
     )
+  }
+
+  return <Outlet />
+}
+
+// Admin-only route: requires both auth and role === 'admin'.
+// Non-admin authenticated users get redirected to their profile so they don't
+// see a confusing sign-in screen they can't get past.
+function AdminRoute() {
+  const { isLoading, session } = useAuth()
+  const location = useLocation()
+
+  if (isLoading) {
+    return null
+  }
+
+  if (!session?.isAuthenticated || !session.profile) {
+    return (
+      <Navigate
+        replace
+        state={{ from: `${location.pathname}${location.search}` }}
+        to={appRoutes.signIn}
+      />
+    )
+  }
+
+  if (session.profile.role !== 'admin') {
+    return <Navigate replace to={appRoutes.profile} />
   }
 
   return <Outlet />

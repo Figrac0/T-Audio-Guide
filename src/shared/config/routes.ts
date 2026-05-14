@@ -5,4 +5,5 @@ export const appRoutes = {
   signIn: '/auth/sign-in',
   profile: '/profile',
   savedRoutes: '/profile/routes',
+  admin: '/admin',
 }
