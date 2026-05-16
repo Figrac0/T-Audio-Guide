@@ -19,6 +19,10 @@ import {
   updateLastRouteProgress,
 } from '@/entities/excursion/lib/last-routes'
 import { useRouteBySlug } from '@/entities/excursion/model/useRouteBySlug'
+import {
+  toBackendPointId,
+  usePointDetailsMap,
+} from '@/entities/excursion/model/usePointDetailsMap'
 import type { Excursion, GeoPoint, PointCategory, RouteStop } from '@/entities/excursion/model/types'
 import { formatMeters, getDistanceMetersBetween } from '@/features/route-map/lib/route-geometry'
 import { useUserGeolocation } from '@/features/route-map/model/useUserGeolocation'
@@ -33,9 +37,9 @@ import {
   formatDistance,
   formatDuration,
   formatLocaleLabel,
-  formatPointCategory,
   formatStopCount,
   formatTheme,
+  getPointCategoryLabel,
 } from '@/shared/lib/format'
 import { ResilientImage } from '@/shared/ui/ResilientImage'
 import './ExcursionPage.css'
@@ -62,9 +66,9 @@ function getSheetTranslateY(el: HTMLElement): number {
   return parseFloat(m[1].split(',')[5] ?? '0')
 }
 
-// iOS-style sheet easing: slow start, gentle stop. Avoids the abrupt arrival
-// that the previous ease-out-quad curve produced near the snap target.
-const SHEET_EASING = 'cubic-bezier(0.32, 0.72, 0, 1)'
+// Sheet easing — same curve as the Home and Excursions pages so the open/close
+// motion feels identical across the app (even ease-out, no abrupt rush).
+const SHEET_EASING = 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
 
 // Park sheet at its current visual position (stopping any in-progress animation),
 // force a reflow so the browser commits that state, then start a fresh animation.
@@ -105,6 +109,45 @@ export function ExcursionPage() {
     [...personalRoutes, ...savedRoutes].find((r) => r.slug === slug) ?? null
   const excursion = (route as Excursion | null) ?? locallyStoredRoute
 
+  // Excursion-detail points are PointShortItem — no full description, no
+  // photos. Backfill both from /points/{id} so the walkthrough shows the
+  // full description and real uploaded images.
+  const stopIds = useMemo(
+    () => excursion?.stops.map((stop) => stop.id) ?? [],
+    [excursion],
+  )
+  const stopDetailsMap = usePointDetailsMap(stopIds)
+  const enrichedExcursion = useMemo<Excursion | null>(() => {
+    if (!excursion) return null
+    if (stopDetailsMap.size === 0) return excursion
+    return {
+      ...excursion,
+      stops: excursion.stops.map((stop) => {
+        const data = stopDetailsMap.get(toBackendPointId(stop.id))
+        if (!data) return stop
+        return {
+          ...stop,
+          description: data.description || stop.description,
+          shortDescription: data.shortDescription || stop.shortDescription,
+          imageUrl: data.imageUrl || stop.imageUrl,
+          scheduleLabel: stop.scheduleLabel || data.workingHours,
+          // Excursion-detail points carry no media — backfill the audio guide
+          // from /points/{id} so uploaded audio is playable during the walk.
+          audio: data.audioUrl
+            ? {
+                ...stop.audio,
+                hasAudioGuide: true,
+                audioGuideUrl: data.audioUrl,
+                url: data.audioUrl,
+                transcriptPreview:
+                  data.audioTranscript ?? stop.audio.transcriptPreview,
+              }
+            : stop.audio,
+        }
+      }),
+    }
+  }, [excursion, stopDetailsMap])
+
   const [phase, setPhase] = useState<Phase>('info')
   const [currentStopIndex, setCurrentStopIndex] = useState(0)
 
@@ -139,15 +182,16 @@ export function ExcursionPage() {
     )
   }
 
-  const isSaved = isRouteSaved(excursion.slug)
+  const displayExcursion = enrichedExcursion ?? excursion
+  const isSaved = isRouteSaved(displayExcursion.slug)
 
   if (phase === 'complete') {
     return (
       <CompleteScreen
-        excursion={excursion}
+        excursion={displayExcursion}
         isSaved={isSaved}
-        onSave={() => toggleSavedRoute(excursion)}
-        onShare={() => void shareRoute(excursion)}
+        onSave={() => toggleSavedRoute(displayExcursion)}
+        onShare={() => void shareRoute(displayExcursion)}
       />
     )
   }
@@ -156,7 +200,7 @@ export function ExcursionPage() {
     return (
       <NavigationPhase
         currentStopIndex={currentStopIndex}
-        excursion={excursion}
+        excursion={displayExcursion}
         onComplete={() => setPhase('complete')}
         onStopChange={setCurrentStopIndex}
         requestLocation={requestLocation}
@@ -167,13 +211,13 @@ export function ExcursionPage() {
 
   return (
     <InfoPhase
-      excursion={excursion}
+      excursion={displayExcursion}
       geolocationError={geolocationError}
       isSaved={isSaved}
-      onSave={() => toggleSavedRoute(excursion)}
-      onShare={() => void shareRoute(excursion)}
+      onSave={() => toggleSavedRoute(displayExcursion)}
+      onShare={() => void shareRoute(displayExcursion)}
       onStart={() => {
-        startLastRoute(excursion)
+        startLastRoute(displayExcursion)
         setCurrentStopIndex(0)
         setPhase('navigation')
       }}
@@ -222,9 +266,16 @@ interface InfoPhaseProps {
 
 function InfoPhase({ excursion, geolocationError, isSaved, onSave, onShare, onStart }: InfoPhaseProps) {
   const routePlaceholder = useMemo(
-    () => buildRoutePlaceholderImage(excursion.theme),
-    [excursion.theme],
+    () => buildRoutePlaceholderImage(excursion.theme, excursion.id),
+    [excursion.theme, excursion.id],
   )
+  // Split the full description into paragraphs for the "О маршруте" panel.
+  const aboutParagraphs = excursion.description
+    ? excursion.description
+        .split(/\n+/)
+        .map((paragraph) => paragraph.trim())
+        .filter(Boolean)
+    : []
 
   return (
     <div className="ep-info">
@@ -286,7 +337,16 @@ function InfoPhase({ excursion, geolocationError, isSaved, onSave, onShare, onSt
             <span className="ep-info__stat-label">Формат</span>
           </div>
         </div>
-        <p className="ep-info__desc">{excursion.description}</p>
+        {aboutParagraphs.length > 0 && (
+          <section className="ep-info__about" aria-label="Описание маршрута">
+            <span className="ep-info__about-label">О маршруте</span>
+            {aboutParagraphs.map((paragraph, index) => (
+              <p className="ep-info__desc" key={index}>
+                {paragraph}
+              </p>
+            ))}
+          </section>
+        )}
 
         {geolocationError ? <p className="ep-info__geo-error">{geolocationError}</p> : null}
       </div>
@@ -370,7 +430,7 @@ function StopCard({ stop, index }: { stop: RouteStop; index: number }) {
           />
         )}
         <span aria-label={`Точка ${index + 1}`} className="ep-stop-card__num">{index + 1}</span>
-        <span className="ep-stop-card__cat">{formatPointCategory(stop.category)}</span>
+        <span className="ep-stop-card__cat">{getPointCategoryLabel(stop)}</span>
       </div>
 
       <div className="ep-stop-card__body">
@@ -422,6 +482,15 @@ function NavigationPhase({
   const currentStop = excursion.stops[currentStopIndex] ?? excursion.stops[0]
   const isLastStop = currentStopIndex >= excursion.stops.length - 1
   const currentAudio = currentStop.audio
+  // Split the description into paragraphs so it reads as structured prose,
+  // matching the point-detail panel on the Excursions page.
+  const navDescription = currentStop.description || currentStop.shortDescription
+  const navDescriptionParagraphs = navDescription
+    ? navDescription
+        .split(/\n+/)
+        .map((paragraph) => paragraph.trim())
+        .filter(Boolean)
+    : []
 
   const [sheetState, setSheetState] = useState<SheetState>('closed')
   const [initialUserPosition] = useState(userPosition)
@@ -446,7 +515,7 @@ function NavigationPhase({
     if (!sheet) return
     skipSnapRef.current = true
     setSheetState('closed')
-    snapSheet(sheet, sheet.offsetHeight - CLOSED_HEIGHT, 560)
+    snapSheet(sheet, sheet.offsetHeight - CLOSED_HEIGHT, 480)
   }, [])
 
   const snapToPeek = useCallback(() => {
@@ -458,7 +527,7 @@ function NavigationPhase({
     if (bodyRef.current) bodyRef.current.scrollTop = 0
     skipSnapRef.current = true
     setSheetState('peek')
-    snapSheet(sheet, peekT, 560)
+    snapSheet(sheet, peekT, 480)
     setTimeout(() => {
       if (mapEl) mapEl.style.pointerEvents = ''
     }, 520)
@@ -479,7 +548,7 @@ function NavigationPhase({
     if (!sheet || sheet.offsetHeight === 0) return
     const target = getSnapTranslate(sheetState, sheet.offsetHeight, peekHeightRef.current)
     if (sheetState === 'peek' && bodyRef.current) bodyRef.current.scrollTop = 0
-    snapSheet(sheet, target, 560)
+    snapSheet(sheet, target, 480)
   }, [sheetState])
 
   useLayoutEffect(() => {
@@ -534,7 +603,7 @@ function NavigationPhase({
         if (!sheet) return
         skipSnapRef.current = true
         setSheetState('closed')
-        snapSheet(sheet, sheet.offsetHeight - CLOSED_HEIGHT, 560)
+        snapSheet(sheet, sheet.offsetHeight - CLOSED_HEIGHT, 480)
       }
     }
     const onTouchEnd = () => { reachedTopAt = -1 }
@@ -617,7 +686,7 @@ function NavigationPhase({
     const absV = Math.abs(velocity)
     // Higher fling velocities use shorter durations so the sheet feels
     // responsive to flicks; slow drags get the full smooth animation.
-    const durationMs = absV > 12 ? 360 : absV > 6 ? 460 : 560
+    const durationMs = absV > 12 ? 300 : absV > 6 ? 400 : 480
     void sheet.offsetHeight
     sheet.style.transition = `transform ${durationMs}ms ${SHEET_EASING}`
     sheet.style.transform = `translateY(${targetT}px)`
@@ -761,7 +830,7 @@ function NavigationPhase({
                   style={getStopFallbackStyle(currentStop.category)}
                 />
               )}
-              <span className="ep-nav__stop-cat">{formatPointCategory(currentStop.category)}</span>
+              <span className="ep-nav__stop-cat">{getPointCategoryLabel(currentStop)}</span>
             </div>
 
             <div className="ep-nav__stop-header">
@@ -779,7 +848,16 @@ function NavigationPhase({
               </div>
             </div>
 
-            <p className="ep-nav__stop-desc">{currentStop.description || currentStop.shortDescription}</p>
+            {navDescriptionParagraphs.length > 0 && (
+              <section className="ep-nav__about" aria-label="Описание точки">
+                <span className="ep-nav__about-label">О месте</span>
+                {navDescriptionParagraphs.map((paragraph, index) => (
+                  <p className="ep-nav__stop-desc" key={index}>
+                    {paragraph}
+                  </p>
+                ))}
+              </section>
+            )}
 
             <div className="ep-nav__audio">
               <div className="ep-nav__audio-head">

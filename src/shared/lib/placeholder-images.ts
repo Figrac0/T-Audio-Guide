@@ -1,4 +1,4 @@
-﻿import type { ExcursionTheme, PointCategory } from '@/entities/excursion/model/types'
+import type { ExcursionTheme, PointCategory } from '@/entities/excursion/model/types'
 
 interface IllustrationPalette {
   accent: string
@@ -100,11 +100,6 @@ export function buildPlacePlaceholderImage(category: PointCategory) {
   return buildIllustrationDataUrl(palette, 1200, 720)
 }
 
-export function buildRoutePlaceholderImage(theme: ExcursionTheme) {
-  const palette = routePalettes[theme]
-  return buildIllustrationDataUrl(palette, 1400, 840)
-}
-
 function buildIllustrationDataUrl(
   palette: IllustrationPalette,
   width: number,
@@ -142,5 +137,178 @@ function buildIllustrationDataUrl(
     </svg>
   `.trim()
 
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
+}
+
+// ── Route fallback illustrations ─────────────────────────────────────────────
+// Routes get their own family of abstract covers — distinct from the place
+// illustration above. There are six designs; an excursion picks one by its id
+// (so the same route is always rendered the same way) and is tinted with the
+// palette of its theme. Each design is deliberately abstract and "intriguing"
+// rather than literal.
+
+const ROUTE_W = 1400
+const ROUTE_H = 840
+
+function routeBackdrop(p: IllustrationPalette): string {
+  return (
+    `<defs><linearGradient id="rbg" x1="0" y1="0" x2="1" y2="1">` +
+    `<stop offset="0" stop-color="${p.backgroundFrom}"/>` +
+    `<stop offset="1" stop-color="${p.backgroundTo}"/>` +
+    `</linearGradient></defs>` +
+    `<rect width="${ROUTE_W}" height="${ROUTE_H}" rx="44" fill="url(#rbg)"/>`
+  )
+}
+
+// 0 — winding trail with stop nodes
+function routeWindingTrail(p: IllustrationPalette): string {
+  const trail = 'M150 702 C 384 540 472 742 704 600 C 904 478 986 360 1284 282'
+  return (
+    routeBackdrop(p) +
+    `<circle cx="240" cy="180" r="184" fill="${p.glow}" opacity="0.6"/>` +
+    `<circle cx="1212" cy="690" r="208" fill="${p.glow}" opacity="0.5"/>` +
+    `<circle cx="1184" cy="150" r="72" fill="${p.accentSoft}" opacity="0.45"/>` +
+    `<path d="${trail}" fill="none" stroke="${p.accent}" stroke-opacity="0.16" stroke-width="56" stroke-linecap="round"/>` +
+    `<path d="${trail}" fill="none" stroke="${p.accent}" stroke-width="20" stroke-linecap="round" stroke-dasharray="3 44"/>` +
+    `<circle cx="150" cy="702" r="40" fill="${p.accent}"/><circle cx="150" cy="702" r="17" fill="${p.backgroundFrom}"/>` +
+    `<circle cx="704" cy="600" r="32" fill="${p.accent}" opacity="0.92"/><circle cx="704" cy="600" r="13" fill="${p.backgroundFrom}"/>` +
+    `<circle cx="1284" cy="282" r="44" fill="${p.accent}"/><circle cx="1284" cy="282" r="19" fill="${p.backgroundFrom}"/>`
+  )
+}
+
+// 1 — layered hills with a rising sun
+function routeLayeredHills(p: IllustrationPalette): string {
+  return (
+    routeBackdrop(p) +
+    `<circle cx="1052" cy="262" r="206" fill="${p.glow}" opacity="0.5"/>` +
+    `<circle cx="1052" cy="262" r="118" fill="${p.accentSoft}" opacity="0.72"/>` +
+    `<path d="M0 532 Q 352 392 724 516 T 1400 470 V840 H0 Z" fill="${p.accentSoft}" opacity="0.5"/>` +
+    `<path d="M0 648 Q 388 506 784 630 T 1400 582 V840 H0 Z" fill="${p.accent}" opacity="0.58"/>` +
+    `<path d="M0 748 Q 360 662 742 732 T 1400 702 V840 H0 Z" fill="${p.foreground}" opacity="0.78"/>` +
+    `<path d="M250 248 q 26 -26 52 0" stroke="${p.foreground}" stroke-opacity="0.3" stroke-width="7" fill="none" stroke-linecap="round"/>` +
+    `<path d="M338 206 q 26 -26 52 0" stroke="${p.foreground}" stroke-opacity="0.24" stroke-width="7" fill="none" stroke-linecap="round"/>`
+  )
+}
+
+// 2 — compass rose / radial route star
+function routeCompassRose(p: IllustrationPalette): string {
+  const rays = [
+    [830, 430, 1030, 430],
+    [792, 522, 933, 663],
+    [700, 560, 700, 760],
+    [608, 522, 467, 663],
+    [570, 430, 370, 430],
+    [608, 338, 467, 197],
+    [700, 300, 700, 100],
+    [792, 338, 933, 197],
+  ]
+    .map(([x1, y1, x2, y2]) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`)
+    .join('')
+  return (
+    routeBackdrop(p) +
+    `<circle cx="240" cy="190" r="120" fill="${p.glow}" opacity="0.55"/>` +
+    `<circle cx="1180" cy="660" r="150" fill="${p.glow}" opacity="0.5"/>` +
+    `<g fill="none" stroke="${p.accent}" stroke-opacity="0.14">` +
+    `<circle cx="700" cy="430" r="300" stroke-width="6"/>` +
+    `<circle cx="700" cy="430" r="208" stroke-width="6"/>` +
+    `<circle cx="700" cy="430" r="118" stroke-width="6"/></g>` +
+    `<g stroke="${p.accentSoft}" stroke-width="13" stroke-linecap="round" stroke-opacity="0.6">${rays}</g>` +
+    `<circle cx="700" cy="430" r="60" fill="${p.accent}"/>` +
+    `<circle cx="700" cy="430" r="26" fill="${p.backgroundFrom}"/>`
+  )
+}
+
+// 3 — flowing river ribbons
+function routeRibbons(p: IllustrationPalette): string {
+  return (
+    routeBackdrop(p) +
+    `<circle cx="1170" cy="176" r="158" fill="${p.glow}" opacity="0.55"/>` +
+    `<circle cx="220" cy="690" r="180" fill="${p.glow}" opacity="0.45"/>` +
+    `<path d="M-60 278 C 320 158 624 402 1460 222" fill="none" stroke="${p.accentSoft}" stroke-width="78" stroke-linecap="round" opacity="0.5"/>` +
+    `<path d="M-60 470 C 360 360 704 622 1460 420" fill="none" stroke="${p.accent}" stroke-width="98" stroke-linecap="round" opacity="0.6"/>` +
+    `<path d="M-60 652 C 320 560 684 784 1460 602" fill="none" stroke="${p.foreground}" stroke-width="56" stroke-linecap="round" opacity="0.32"/>` +
+    `<path d="M-60 762 C 384 692 724 862 1460 722" fill="none" stroke="${p.accentSoft}" stroke-width="38" stroke-linecap="round" opacity="0.42"/>`
+  )
+}
+
+// 4 — abstract city skyline
+function routeSkyline(p: IllustrationPalette): string {
+  return (
+    routeBackdrop(p) +
+    `<circle cx="1132" cy="206" r="158" fill="${p.glow}" opacity="0.42"/>` +
+    `<circle cx="1132" cy="206" r="96" fill="${p.accentSoft}" opacity="0.6"/>` +
+    `<rect x="0" y="648" width="1400" height="192" fill="${p.foreground}" opacity="0.1"/>` +
+    `<rect x="168" y="404" width="150" height="248" rx="22" fill="${p.accent}" opacity="0.85"/>` +
+    `<rect x="350" y="320" width="182" height="332" rx="24" fill="${p.foreground}" opacity="0.8"/>` +
+    `<rect x="566" y="452" width="140" height="200" rx="20" fill="${p.accentSoft}" opacity="0.9"/>` +
+    `<rect x="740" y="270" width="172" height="382" rx="26" fill="${p.accent}" opacity="0.78"/>` +
+    `<rect x="946" y="420" width="150" height="232" rx="22" fill="${p.foreground}" opacity="0.7"/>` +
+    `<rect x="1128" y="500" width="128" height="152" rx="18" fill="${p.accentSoft}" opacity="0.85"/>` +
+    `<g fill="${p.backgroundFrom}" opacity="0.85">` +
+    `<rect x="392" y="368" width="28" height="34" rx="7"/>` +
+    `<rect x="446" y="368" width="28" height="34" rx="7"/>` +
+    `<rect x="392" y="430" width="28" height="34" rx="7"/>` +
+    `<rect x="446" y="430" width="28" height="34" rx="7"/>` +
+    `<rect x="784" y="320" width="28" height="34" rx="7"/>` +
+    `<rect x="840" y="320" width="28" height="34" rx="7"/>` +
+    `<rect x="784" y="382" width="28" height="34" rx="7"/>` +
+    `<rect x="840" y="382" width="28" height="34" rx="7"/></g>`
+  )
+}
+
+// 5 — constellation of connected stops
+function routeConstellation(p: IllustrationPalette): string {
+  const nodes: Array<[number, number, number, number]> = [
+    [224, 566, 46, 22],
+    [470, 360, 40, 19],
+    [704, 566, 44, 21],
+    [922, 300, 40, 19],
+    [1132, 520, 42, 20],
+    [1268, 300, 46, 23],
+  ]
+  const dots = nodes
+    .map(
+      ([cx, cy, halo, core]) =>
+        `<circle cx="${cx}" cy="${cy}" r="${halo}" fill="${p.accentSoft}" opacity="0.32"/>` +
+        `<circle cx="${cx}" cy="${cy}" r="${core}" fill="${p.accent}"/>` +
+        `<circle cx="${cx}" cy="${cy}" r="${Math.round(core * 0.38)}" fill="${p.backgroundFrom}"/>`,
+    )
+    .join('')
+  return (
+    routeBackdrop(p) +
+    `<circle cx="262" cy="638" r="178" fill="${p.glow}" opacity="0.48"/>` +
+    `<circle cx="1148" cy="222" r="158" fill="${p.glow}" opacity="0.48"/>` +
+    `<path d="M224 566 L470 360 L704 566 L922 300 L1132 520 L1268 300" fill="none" stroke="${p.accent}" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.5" stroke-dasharray="2 24"/>` +
+    `<g>${dots}</g>`
+  )
+}
+
+const routeDesigns: Array<(p: IllustrationPalette) => string> = [
+  routeWindingTrail,
+  routeLayeredHills,
+  routeCompassRose,
+  routeRibbons,
+  routeSkyline,
+  routeConstellation,
+]
+
+const routeThemeOrder: ExcursionTheme[] = ['walk', 'food', 'nature', 'fun', 'mixed']
+
+/**
+ * Abstract fallback cover for a route. `seed` (typically the excursion id)
+ * picks one of six designs deterministically; `theme` chooses the palette.
+ * Without a seed the design is derived from the theme so each theme still
+ * looks distinct.
+ */
+export function buildRoutePlaceholderImage(theme: ExcursionTheme, seed?: number) {
+  const palette = routePalettes[theme]
+  const designIndex =
+    seed != null && Number.isFinite(seed)
+      ? Math.abs(Math.trunc(seed)) % routeDesigns.length
+      : (routeThemeOrder.indexOf(theme) + 1) % routeDesigns.length
+  const inner = routeDesigns[designIndex](palette)
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${ROUTE_W} ${ROUTE_H}" ` +
+    `width="${ROUTE_W}" height="${ROUTE_H}" fill="none">${inner}</svg>`
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
 }

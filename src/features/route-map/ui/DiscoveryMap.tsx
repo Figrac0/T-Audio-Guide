@@ -38,7 +38,9 @@ import '@/features/route-map/ui/map-marker-skin.css'
 import '@/features/route-map/ui/leaflet-popup-close.css'
 
 export interface DiscoveryCategoryOption {
-  id: PointCategory | 'all'
+  // `id` is either a backend categoryId (number) or 'all'.
+  // Legacy frontend slugs are still accepted for back-compat.
+  id: PointCategory | 'all' | number
   label: string
 }
 
@@ -48,7 +50,7 @@ export interface DiscoveryRadiusOption {
 }
 
 interface DiscoveryMapProps {
-  activeCategory: PointCategory | 'all'
+  activeCategory: PointCategory | 'all' | number
   canSaveDraftRoute?: boolean
   categoryOptions: DiscoveryCategoryOption[]
   draftStops?: RouteStop[]
@@ -72,7 +74,7 @@ interface DiscoveryMapProps {
   onMapClick?: (coords: GeoPoint) => void
   onSaveDraftRoute?: () => void
   onSearchQueryChange?: (value: string) => void
-  onSelectCategory: (category: PointCategory | 'all') => void
+  onSelectCategory: (category: PointCategory | 'all' | number) => void
   onSelectNextPoint: () => void
   onSelectPoint: (pointId: string) => void
   onSelectPreviousPoint: () => void
@@ -905,7 +907,7 @@ export function DiscoveryMap({
     setOpenMenu((current) => (current === menu ? null : menu))
   }
 
-  function handleCategorySelect(category: PointCategory | 'all') {
+  function handleCategorySelect(category: PointCategory | 'all' | number) {
     onSelectCategory(category)
     setOpenMenu(null)
   }

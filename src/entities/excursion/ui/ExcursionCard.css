@@ -22,7 +22,9 @@
 
 .card__cover-link {
   display: block;
-  height: 90px;
+  /* Matches the 1400×840 (5:3) route fallback illustration so it shows in
+     full instead of being cropped to a thin strip. */
+  aspect-ratio: 5 / 3;
   flex-shrink: 0;
 }
 
@@ -138,7 +140,9 @@
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  /* Short descriptions are brief — show up to 4 lines so the card conveys
+     what the route is about. Cards stay equal height via the grid. */
+  -webkit-line-clamp: 4;
 }
 
 .card__description {
@@ -294,10 +298,6 @@
     border-radius: 22px;
   }
 
-  .card__cover-link {
-    height: 80px;
-  }
-
   .card__content {
     gap: 9px;
     padding: 13px 16px 15px;
@@ -314,10 +314,6 @@
 }
 
 @media (max-width: 520px) {
-  .card__cover-link {
-    height: 72px;
-  }
-
   .card__theme-badge {
     top: 9px;
     left: 9px;

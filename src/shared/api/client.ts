@@ -1,3 +1,4 @@
+import type { Excursion, SupportedLocale } from '@/entities/excursion/model/types'
 import { authService } from '@/shared/api/authService'
 import { getCategoryIdsForSlug } from '@/shared/api/categoriesStore'
 import type {
@@ -10,6 +11,7 @@ import type {
 } from '@/shared/api/contracts'
 import { excursionsService } from '@/shared/api/excursionsService'
 import { request } from '@/shared/api/http'
+import type { ApiExcursionDetail, ApiExcursionShort } from '@/shared/api/mappers'
 import {
   mapExcursionFromDetail,
   mapExcursionFromShort,
@@ -18,6 +20,34 @@ import {
 import { mockApi } from '@/shared/api/mock/mockApi'
 import { pointsService } from '@/shared/api/pointsService'
 import { profileService } from '@/shared/api/profileService'
+
+// The /excursions/search list omits the point array, so cards and theme
+// filters would have nothing to work with. Hydrate each excursion with its
+// detail (which carries the stops). Details are stable within a session, so
+// they are cached by id — repeated feed reloads then cost no extra requests.
+const excursionDetailCache = new Map<number, ApiExcursionDetail>()
+
+async function hydrateExcursions(
+  shorts: ApiExcursionShort[],
+  locale: SupportedLocale,
+): Promise<Excursion[]> {
+  return Promise.all(
+    shorts.map(async (short) => {
+      try {
+        let detail = excursionDetailCache.get(short.id)
+        if (!detail) {
+          detail = await excursionsService.getExcursionById(short.id)
+          excursionDetailCache.set(short.id, detail)
+        }
+        return mapExcursionFromDetail(detail, locale)
+      } catch {
+        // Detail unavailable — fall back to the list-only mapping so the
+        // catalog still renders (theme filter then uses the derived theme).
+        return mapExcursionFromShort(short)
+      }
+    }),
+  )
+}
 
 // Mock vs real backend selection.
 // - Explicit override: VITE_USE_MOCK_API='true' → mock, ='false' → real backend.
@@ -82,12 +112,16 @@ const httpApi: FrontendApi = {
     // swagger: radiusKilometers is integer [1, 15]
     const radiusKm = Math.max(1, Math.min(15, Math.round(payload.radiusMeters / 1000)))
 
-    // Resolve frontend category slug ('museum', 'food', ...) to backend
-    // numeric category IDs. A single slug can map to multiple backend
-    // categories (e.g. 'museum' covers "Музей" and "Галерея"). Empty array
-    // means "no filter" — backend returns all categories in radius.
-    const categoryIds =
-      payload.category !== 'all' ? await getCategoryIdsForSlug(payload.category) : []
+    // category can be:
+    //  - 'all' → no filter
+    //  - number (backend categoryId) → exact filter, sent as [id]
+    //  - string slug (legacy) → resolve to backend IDs via lookup
+    let categoryIds: number[] = []
+    if (typeof payload.category === 'number') {
+      categoryIds = [payload.category]
+    } else if (payload.category !== 'all') {
+      categoryIds = await getCategoryIdsForSlug(payload.category)
+    }
 
     const location = { latitude: payload.center.lat, longitude: payload.center.lng }
 
@@ -127,7 +161,7 @@ const httpApi: FrontendApi = {
       appliedCategory: payload.category,
       appliedRadiusMeters: payload.radiusMeters,
       center: payload.center,
-      excursions: rawExcursions.map(mapExcursionFromShort),
+      excursions: await hydrateExcursions(rawExcursions, payload.locale),
       nearbyPoints,
     }
   },
@@ -165,7 +199,7 @@ const httpApi: FrontendApi = {
       location: { latitude: payload.center.lat, longitude: payload.center.lng },
       radiusKilometers: radiusKm,
     })
-    return rawExcursions.map(mapExcursionFromShort)
+    return hydrateExcursions(rawExcursions, payload.locale)
   },
 
   getSession() {

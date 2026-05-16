@@ -342,13 +342,16 @@ async function getRoutesCatalogFromRequest(
   await wait(responseDelayMs)
 
   const baseFeed = createDiscoveryFeed(request.center, request.locale)
+  // Mock doesn't know about backend categoryIds — coerce them to 'all'.
+  const categoryFilter =
+    typeof request.category === 'number' ? 'all' : request.category
   const nearbyPoints =
-    request.category === 'all'
+    categoryFilter === 'all'
       ? baseFeed.nearbyPoints
-      : baseFeed.nearbyPoints.filter((point) => point.category === request.category)
+      : baseFeed.nearbyPoints.filter((point) => point.category === categoryFilter)
 
   return createDiscoveryRoutes({
-    activePointCategory: request.category,
+    activePointCategory: categoryFilter,
     center: request.center,
     locale: request.locale,
     nearbyPoints: nearbyPoints.filter((point) => point.distanceMeters <= request.radiusMeters),

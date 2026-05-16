@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import * as L from 'leaflet'
 
 import type { GeoPoint, NearbyPoint } from '@/entities/excursion/model/types'
+import { fetchPointDetailData } from '@/entities/excursion/model/usePointDetailsMap'
 import type { PlannerRouteState } from '@/pages/excursions/model/useExcursionsPageState'
 import {
   applyLeafletLocation,
@@ -20,7 +21,7 @@ import {
 } from '@/features/route-map/lib/route-geometry'
 import { appMapConfig } from '@/shared/config/map'
 import { getDiscoveryRadiusForZoom } from '@/shared/lib/discovery-radius'
-import { formatDuration, formatPointCategory } from '@/shared/lib/format'
+import { formatDuration, getPointCategoryLabel } from '@/shared/lib/format'
 import { buildPlacePlaceholderImage } from '@/shared/lib/placeholder-images'
 import '@/features/route-map/ui/map-marker-skin.css'
 import '@/features/route-map/ui/leaflet-popup-close.css'
@@ -425,6 +426,14 @@ function buildPopupEl(
   image.loading = 'lazy'
   image.onerror = () => { image.src = placeholder }
   cover.appendChild(image)
+
+  // Search results carry no photo — backfill the real uploaded image from
+  // /points/{id} (cached) once the popup is shown.
+  if (!point.imageUrl) {
+    void fetchPointDetailData(point.id).then((data) => {
+      if (data?.imageUrl) image.src = data.imageUrl
+    })
+  }
   root.appendChild(cover)
 
   // Body
@@ -437,7 +446,7 @@ function buildPopupEl(
 
   const category = document.createElement('span')
   category.className = 'rbm-popup__cat'
-  category.textContent = formatPointCategory(point.category)
+  category.textContent = getPointCategoryLabel(point)
   topRow.appendChild(category)
 
   const chips = document.createElement('div')

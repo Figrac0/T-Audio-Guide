@@ -30,6 +30,10 @@ export interface RouteStop {
   order: number
   title: string
   category: PointCategory
+  // Exact backend category name ("Музеи", "Исторические места"). The `category`
+  // enum above is a best-effort bucket for icon selection; this preserves the
+  // admin-chosen label verbatim for display.
+  categoryName?: string
   shortDescription: string
   description: string
   coordinates: GeoPoint
@@ -44,6 +48,8 @@ export interface NearbyPoint {
   id: string
   title: string
   category: PointCategory
+  // Exact backend category name — see RouteStop.categoryName.
+  categoryName?: string
   shortDescription: string
   description: string
   coordinates: GeoPoint
@@ -68,6 +74,9 @@ export interface Excursion {
   district: string
   durationMinutes: number
   distanceKm: number
+  // Stop count from the list endpoint (which omits the point array). Cards use
+  // it as a fallback when `stops` hasn't been hydrated from the detail call.
+  pointsCount?: number
   startLabel: string
   finishLabel: string
   coverImageUrl: string

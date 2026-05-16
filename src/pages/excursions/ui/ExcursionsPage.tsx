@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { Link } from 'react-router-dom'
 
 import type { Excursion, NearbyPoint, RouteStop } from '@/entities/excursion/model/types'
+import { usePointDetailsMap } from '@/entities/excursion/model/usePointDetailsMap'
 import {
   durationOptions,
   themeOptions,
@@ -16,6 +17,7 @@ import {
   formatPointCategory,
   formatStopCount,
   formatTheme,
+  getPointCategoryLabel,
 } from '@/shared/lib/format'
 import { buildPlacePlaceholderImage, buildRoutePlaceholderImage } from '@/shared/lib/placeholder-images'
 import { useManualPosition } from '@/shared/lib/ManualPositionContext'
@@ -603,7 +605,29 @@ export function ExcursionsPage() {
   }, [animateSheetPosition])
 
   const hasMoreExcursions = state.excursions.length > catalogInitial
-  const detailPoint = state.detailPoint
+
+  // Search results carry no photos or full description — backfill from
+  // /points/{id} so the nearby strip and detail panel show real data.
+  const nearbyPointIds = useMemo(
+    () => state.nearbyPoints.map((point) => point.id),
+    [state.nearbyPoints],
+  )
+  const pointDetailsMap = usePointDetailsMap(nearbyPointIds)
+
+  const detailPoint = useMemo<NearbyPoint | null>(() => {
+    const base = state.detailPoint
+    if (!base) return null
+    const data = pointDetailsMap.get(base.id)
+    if (!data) return base
+    return {
+      ...base,
+      description: data.description || base.description,
+      shortDescription: data.shortDescription || base.shortDescription,
+      imageUrl: data.imageUrl || base.imageUrl,
+      addressLabel: base.addressLabel || data.address || undefined,
+      scheduleLabel: base.scheduleLabel || data.workingHours,
+    }
+  }, [state.detailPoint, pointDetailsMap])
 
   return (
     <div className="ep">
@@ -813,7 +837,7 @@ export function ExcursionsPage() {
                               category={point.category}
                               loading="lazy"
                               referrerPolicy="no-referrer"
-                              src={point.imageUrl}
+                              src={pointDetailsMap.get(point.id)?.imageUrl || point.imageUrl}
                               title={point.title}
                             />
                             <span className="ep-nearby-card__dist">{formatMeters(point.distanceMeters)}</span>
@@ -824,7 +848,7 @@ export function ExcursionsPage() {
                             )}
                           </div>
                           <div className="ep-nearby-card__body">
-                            <span className="ep-nearby-card__cat">{formatPointCategory(point.category)}</span>
+                            <span className="ep-nearby-card__cat">{getPointCategoryLabel(point)}</span>
                             <p className="ep-nearby-card__name">{point.title}</p>
                           </div>
                         </button>
@@ -1080,7 +1104,7 @@ interface ExcursionCardProps {
 }
 
 const ExcursionCard = memo(function ExcursionCard({ excursion }: ExcursionCardProps) {
-  const placeholder = buildRoutePlaceholderImage(excursion.theme)
+  const placeholder = buildRoutePlaceholderImage(excursion.theme, excursion.id)
 
   return (
     <article className="ep-card">
@@ -1101,20 +1125,29 @@ const ExcursionCard = memo(function ExcursionCard({ excursion }: ExcursionCardPr
           <span className="ep-card__district">{excursion.district}</span>
           <h3 className="ep-card__title">{excursion.title}</h3>
           <p className="ep-card__tagline">{excursion.tagline}</p>
-          <p className="ep-card__description">{excursion.description}</p>
         </div>
 
         <div className="ep-card__stats">
           <span className="ep-card__stat">{formatDistance(excursion.distanceKm)}</span>
-          <span className="ep-card__stat">{formatStopCount(excursion.stops.length)}</span>
+          <span className="ep-card__stat">
+            {formatStopCount(excursion.stops.length || excursion.pointsCount || 0)}
+          </span>
           <span className="ep-card__stat">{formatDuration(excursion.durationMinutes)}</span>
         </div>
 
         <div className="ep-card__details">
           <span className="ep-card__detail"><strong>Сложность:</strong> {formatDifficulty(excursion.difficulty)}</span>
           <span className="ep-card__detail"><strong>Для кого:</strong> {excursion.audienceLabel}</span>
-          <span className="ep-card__detail"><strong>Старт:</strong> {excursion.startLabel}</span>
-          <span className="ep-card__detail"><strong>Финиш:</strong> {excursion.finishLabel}</span>
+          {excursion.startLabel ? (
+            <span className="ep-card__detail ep-card__detail--line" title={excursion.startLabel}>
+              <strong>Старт:</strong> {excursion.startLabel}
+            </span>
+          ) : null}
+          {excursion.finishLabel ? (
+            <span className="ep-card__detail ep-card__detail--line" title={excursion.finishLabel}>
+              <strong>Финиш:</strong> {excursion.finishLabel}
+            </span>
+          ) : null}
         </div>
 
         <Link className="button button--primary ep-card__open" to={appRoutes.excursion(excursion.slug)}>
@@ -1147,6 +1180,14 @@ function PointDetailPanel({
   const walkMinutes = Math.max(1, Math.round((point.distanceMeters / 1000) * 12))
   const placeholder = buildPlacePlaceholderImage(point.category)
   const detailDescription = point.description || point.shortDescription
+  // Split into paragraphs on blank lines / line breaks so a long description
+  // reads as structured prose instead of one dense block.
+  const descriptionParagraphs = detailDescription
+    ? detailDescription
+        .split(/\n+/)
+        .map((paragraph) => paragraph.trim())
+        .filter(Boolean)
+    : []
   const routeActionDisabled = !isInDraft && isDraftFull
   const routeActionLabel = isInDraft
     ? '− Убрать из маршрута'
@@ -1162,6 +1203,7 @@ function PointDetailPanel({
 
   return (
     <div className="ep-detail">
+      <div className="ep-detail__main">
       <div className="ep-detail__cover-shell">
         <div className="ep-detail__cover">
           <img
@@ -1169,7 +1211,7 @@ function PointDetailPanel({
             onError={(e) => { (e.target as HTMLImageElement).src = placeholder }}
             src={point.imageUrl || placeholder}
           />
-          <span className="ep-detail__cat">{formatPointCategory(point.category)}</span>
+          <span className="ep-detail__cat">{getPointCategoryLabel(point)}</span>
         </div>
       </div>
 
@@ -1191,8 +1233,15 @@ function PointDetailPanel({
           )}
         </div>
 
-        {detailDescription && (
-          <p className="ep-detail__full-desc">{detailDescription}</p>
+        {descriptionParagraphs.length > 0 && (
+          <section className="ep-detail__about" aria-label="Описание точки">
+            <span className="ep-detail__about-label">О месте</span>
+            {descriptionParagraphs.map((paragraph, index) => (
+              <p className="ep-detail__full-desc" key={index}>
+                {paragraph}
+              </p>
+            ))}
+          </section>
         )}
 
         <div className="ep-detail__actions" aria-label="Действия с точкой">
@@ -1225,6 +1274,7 @@ function PointDetailPanel({
             {point.addressLabel}
           </p>
         )}
+      </div>
       </div>
 
       <footer className="ep-footer ep-detail__footer">

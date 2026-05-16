@@ -117,12 +117,15 @@ export interface DiscoveryFeedRequest {
   center: GeoPoint
   locale: SupportedLocale
   radiusMeters: number
-  category: PointCategory | 'all'
+  // Either a backend category id (preferred — exact match), or a legacy
+  // frontend slug for backwards compat with older callers. `'all'` disables
+  // category filtering.
+  category: PointCategory | 'all' | number
   search?: string
 }
 
 export interface DiscoveryFeedDto {
-  appliedCategory: PointCategory | 'all'
+  appliedCategory: PointCategory | 'all' | number
   appliedRadiusMeters: number
   center: GeoPoint
   excursions: Excursion[]
@@ -133,14 +136,14 @@ export interface RouteCatalogRequest {
   center: GeoPoint
   locale: SupportedLocale
   radiusMeters: number
-  category: PointCategory | 'all'
+  category: PointCategory | 'all' | number
 }
 
 export interface RouteDetailsRequest {
   center: GeoPoint
   locale: SupportedLocale
   radiusMeters: number
-  category: PointCategory | 'all'
+  category: PointCategory | 'all' | number
   slug: string
 }
 

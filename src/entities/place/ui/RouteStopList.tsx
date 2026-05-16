@@ -1,8 +1,8 @@
 ﻿import type { RouteStop } from '@/entities/excursion/model/types'
 import {
   formatDuration,
-  formatPointCategory,
   formatRating,
+  getPointCategoryLabel,
 } from '@/shared/lib/format'
 import './RouteStopList.css'
 
@@ -39,7 +39,7 @@ export function RouteStopList({
             >
               <div className="stop-list__title-row">
                 <div>
-                  <p className="eyebrow">{formatPointCategory(stop.category)}</p>
+                  <p className="eyebrow">{getPointCategoryLabel(stop)}</p>
                   <h3 className="stop-list__title">{stop.title}</h3>
                   <p className="stop-list__summary">{stop.shortDescription}</p>
                 </div>

@@ -1,11 +1,13 @@
 import type {
   Excursion,
+  ExcursionDifficulty,
   ExcursionTheme,
   NearbyPoint,
   PointCategory,
   RouteStop,
   SupportedLocale,
 } from '@/entities/excursion/model/types'
+import { deriveExcursionTheme } from '@/shared/lib/excursion-theme'
 
 // ── Swagger-accurate backend types ───────────────────────────────────────────
 
@@ -152,8 +154,63 @@ const categoryNameMap: Record<string, PointCategory> = {
   монумент: 'landmark',
 }
 
+// Backend category names are free-form ("Музеи", "Музеи города", "Истор. места").
+// The exact dictionary above can't cover every wording an admin types, so we
+// fall back to keyword-fragment matching: a category whose name CONTAINS one of
+// these fragments resolves to the matching frontend slug. Without this, every
+// unrecognised name collapsed to 'landmark' — making museums, parks, etc. all
+// render with the same icon and the "История" label.
+const categoryKeywordGroups: ReadonlyArray<{
+  category: PointCategory
+  fragments: readonly string[]
+}> = [
+  {
+    category: 'museum',
+    fragments: ['музе', 'галере', 'выставк', 'экспозиц', 'museum', 'gallery', 'exhib'],
+  },
+  {
+    category: 'food',
+    fragments: [
+      'ресторан', 'кафе', 'еда', 'гастро', 'кухн', 'пекарн',
+      'food', 'cafe', 'coffee', 'restaurant', 'dining', 'bakery',
+    ],
+  },
+  {
+    category: 'park',
+    fragments: ['парк', 'сад', 'сквер', 'природ', 'озелен', 'park', 'garden', 'nature'],
+  },
+  {
+    category: 'entertainment',
+    fragments: [
+      'развлеч', 'театр', 'кино', 'квест', 'аттракцион', 'клуб', 'концерт',
+      'entertain', 'theater', 'theatre', 'cinema', 'fun', 'club',
+    ],
+  },
+  {
+    category: 'landmark',
+    fragments: [
+      'достоприм', 'памятник', 'монумент', 'храм', 'собор', 'церков',
+      'истор', 'архитект', 'landmark', 'monument', 'history', 'attraction', 'temple',
+    ],
+  },
+]
+
 export function mapCategoryName(name: string): PointCategory {
-  return categoryNameMap[name.toLowerCase()] ?? 'landmark'
+  const normalized = name.trim().toLowerCase()
+  if (!normalized) return 'landmark'
+
+  // Exact dictionary match first — authoritative for canonical slugs/names.
+  const exact = categoryNameMap[normalized]
+  if (exact) return exact
+
+  // Keyword-fragment fallback for free-form admin-created category names.
+  for (const group of categoryKeywordGroups) {
+    if (group.fragments.some((fragment) => normalized.includes(fragment))) {
+      return group.category
+    }
+  }
+
+  return 'landmark'
 }
 
 // Slugs are the canonical, language-agnostic identifier; prefer them when
@@ -231,6 +288,7 @@ export function mapNearbyPointFromShort(
     id: String(point.id),
     title: point.title,
     category: mapCategoryName(point.categoryName),
+    categoryName: point.categoryName,
     shortDescription: point.shortDescription ?? '',
     description: '',
     coordinates: { lat: point.coordinates.latitude, lng: point.coordinates.longitude },
@@ -258,6 +316,7 @@ export function mapNearbyPointFromDetail(
     id: String(point.id),
     title: point.title,
     category: mapCategoryName(point.categoryName),
+    categoryName: point.categoryName,
     shortDescription: point.shortDescription ?? point.description ?? '',
     description: point.description ?? '',
     coordinates: { lat: point.coordinates.latitude, lng: point.coordinates.longitude },
@@ -289,6 +348,7 @@ export function mapRouteStopFromApiPoint(
     order,
     title: point.title,
     category: mapCategoryName(point.categoryName),
+    categoryName: point.categoryName,
     shortDescription: point.shortDescription ?? '',
     description: '',
     coordinates: { lat: point.coordinates.latitude, lng: point.coordinates.longitude },
@@ -312,8 +372,16 @@ export function mapRouteStopFromApiPoint(
 
 // ── Excursion mappers ────────────────────────────────────────────────────────
 
+// Difficulty by route length: 0–2 km — Легко, 2–4 km — Средне, 4+ km — Сложно.
+function difficultyFromDistance(distanceKm: number): ExcursionDifficulty {
+  if (distanceKm < 2) return 'easy'
+  if (distanceKm < 4) return 'medium'
+  return 'hard'
+}
+
 export function mapExcursionFromShort(exc: ApiExcursionShort): Excursion {
   const theme = inferTheme(exc.title, exc.description ?? exc.shortDescription ?? '')
+  const distanceKm = (exc.distance ?? 0) / 1000
   return {
     id: exc.id,
     slug: `excursion-${exc.id}`,
@@ -324,12 +392,13 @@ export function mapExcursionFromShort(exc: ApiExcursionShort): Excursion {
     theme,
     district: '',
     durationMinutes: exc.durationMin ?? 60,
-    distanceKm: (exc.distance ?? 0) / 1000,
+    distanceKm,
+    pointsCount: exc.pointsCount,
     startLabel: '',
     finishLabel: '',
     coverImageUrl: '',
     routeColor: '#0f766e',
-    difficulty: 'easy',
+    difficulty: difficultyFromDistance(distanceKm),
     audienceLabel: 'Все',
     stops: [],
   }
@@ -359,6 +428,10 @@ export function mapExcursionFromDetail(
 
   return {
     ...base,
+    // Theme derived from the actual stop categories — far more accurate than
+    // the title/description keyword guess used for list-only excursions.
+    theme: stops.length > 0 ? deriveExcursionTheme(stops) : base.theme,
+    pointsCount: stops.length || base.pointsCount,
     startLabel: stops[0]?.title ?? '',
     finishLabel: stops[stops.length - 1]?.title ?? '',
     stops,

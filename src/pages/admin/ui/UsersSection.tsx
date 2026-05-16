@@ -55,7 +55,7 @@ export function UsersSection() {
               <th style={{ width: 60 }}>ID</th>
               <th>Email</th>
               <th style={{ width: 90 }}>Роль</th>
-              <th style={{ width: 90 }}>Активен</th>
+              <th style={{ width: 90, textAlign: 'center' }}>Активен</th>
               <th style={{ width: 160 }}>Создан</th>
               <th style={{ width: 140 }}>Действия</th>
             </tr>
@@ -79,7 +79,7 @@ export function UsersSection() {
                       {u.role}
                     </span>
                   </td>
-                  <td>{u.active ? '✓' : '—'}</td>
+                  <td style={{ textAlign: 'center' }}>{u.active ? '✓' : '—'}</td>
                   <td className="admin-table__mono">{formatDate(u.createdAt)}</td>
                   <td>
                     <button

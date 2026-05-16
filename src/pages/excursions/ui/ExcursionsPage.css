@@ -1529,6 +1529,15 @@ body.app-body--routes-page {
     color: var(--color-text);
 }
 
+/* Старт/Финиш — single line; the place name truncates with an ellipsis
+   instead of wrapping onto a second line. */
+.ep-card__detail--line {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
 .ep-card__open {
     justify-self: center;
     min-height: 38px;
@@ -1817,7 +1826,18 @@ body.app-body--routes-page {
     isolation: isolate;
 }
 
-.ep-detail::before {
+/* Wraps the cover + body (everything except the footer). Grows to fill all
+   available height so the decorative background reaches right down to the
+   footer with no empty gap, while never bleeding underneath it. */
+.ep-detail__main {
+    position: relative;
+    display: flex;
+    flex: 1 0 auto;
+    flex-direction: column;
+    isolation: isolate;
+}
+
+.ep-detail__main::before {
     content: "";
     position: absolute;
     inset: 0;
@@ -1862,7 +1882,7 @@ body.app-body--routes-page {
         );
 }
 
-.ep-detail::after {
+.ep-detail__main::after {
     content: "";
     position: absolute;
     inset: 0;
@@ -2081,14 +2101,66 @@ body.app-body--routes-page {
     white-space: nowrap;
 }
 
+/* Reading panel — turns a long description into structured, editorial prose
+   instead of one flat block of text. */
+.ep-detail__about {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    justify-self: stretch;
+    padding: clamp(16px, 2.4vw, 24px) clamp(16px, 2.6vw, 26px);
+    border: 1px solid rgba(164, 198, 109, 0.26);
+    border-left: 3px solid var(--color-brand);
+    border-radius: 18px;
+    background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.88),
+        rgba(247, 251, 248, 0.8)
+    );
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.7),
+        0 10px 28px rgba(31, 37, 51, 0.05);
+}
+
+.ep-detail__about-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-brand-strong);
+    font-size: 0.7rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.ep-detail__about-label::before {
+    content: "";
+    width: 18px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--color-brand);
+}
+
 .ep-detail__full-desc {
     margin: 0;
     color: var(--color-text-secondary);
-    font-size: 0.94rem;
-    line-height: 1.72;
+    font-size: 0.96rem;
+    line-height: 1.78;
+    text-align: left;
     text-wrap: pretty;
     width: 100%;
-    justify-self: stretch;
+}
+
+/* Spacing between consecutive paragraphs of a multi-paragraph description. */
+.ep-detail__full-desc + .ep-detail__full-desc {
+    margin-top: 2px;
+}
+
+/* Accent the opening letter in brand green — same size, no drop-cap. */
+.ep-detail__about .ep-detail__full-desc:first-of-type::first-letter {
+    color: var(--color-brand-strong);
+    font-weight: 900;
 }
 
 .ep-detail__actions {
@@ -2128,11 +2200,11 @@ body.app-body--routes-page {
 }
 
 @media (min-width: 1024px) {
-    .ep-detail::before {
+    .ep-detail__main::before {
         opacity: 1;
     }
 
-    .ep-detail::after {
+    .ep-detail__main::after {
         opacity: 0.22;
         background:
             radial-gradient(
@@ -2247,6 +2319,13 @@ body.app-body--routes-page {
 
     .ep-detail__body {
         width: min(100%, 760px);
+        /* Breathing room so the actions (incl. "Закрыть") don't sit flush
+           against the footer on tall desktop screens. */
+        padding-bottom: clamp(48px, 7vh, 104px);
+    }
+
+    .ep-detail__actions {
+        margin-top: 8px;
     }
 
     .ep-detail__footer {
@@ -2270,7 +2349,7 @@ body.app-body--routes-page {
 }
 
 @media (min-width: 1360px) {
-    .ep-detail::before {
+    .ep-detail__main::before {
         opacity: 1;
         background:
             radial-gradient(
@@ -2310,7 +2389,7 @@ body.app-body--routes-page {
             );
     }
 
-    .ep-detail::after {
+    .ep-detail__main::after {
         opacity: 0.26;
         background:
             radial-gradient(

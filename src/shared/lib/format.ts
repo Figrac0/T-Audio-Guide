@@ -51,7 +51,7 @@ export function formatDifficulty(difficulty: ExcursionDifficulty): string {
     case 'medium':
       return 'Средне'
     case 'hard':
-      return 'Насыщенно'
+      return 'Сложно'
     default:
       return 'Маршрут'
   }
@@ -89,6 +89,18 @@ export function formatPointCategory(category: PointCategory): string {
     default:
       return 'Точка'
   }
+}
+
+// Prefer the verbatim backend category name when available — the `category`
+// enum only has 5 buckets, so admin-created categories without a verbatim
+// dictionary match all collapse to "История". Falls back to the enum label
+// for mock data / points that carry no categoryName.
+export function getPointCategoryLabel(point: {
+  category: PointCategory
+  categoryName?: string
+}): string {
+  const name = point.categoryName?.trim()
+  return name && name.length > 0 ? name : formatPointCategory(point.category)
 }
 
 export function formatCoordinates(point: GeoPoint): string {

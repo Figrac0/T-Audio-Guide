@@ -9,7 +9,7 @@ import type {
 import { appApi } from '@/shared/api/client'
 
 interface UseRouteBySlugParams {
-  activePointCategory: PointCategory | 'all'
+  activePointCategory: PointCategory | 'all' | number
   center: GeoPoint
   enabled?: boolean
   locale: SupportedLocale

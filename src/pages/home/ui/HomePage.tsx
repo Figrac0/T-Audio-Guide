@@ -16,12 +16,16 @@ import type {
     SupportedLocale,
 } from "@/entities/excursion/model/types";
 import { useDiscoveryRoutes } from "@/entities/excursion/model/useDiscoveryRoutes";
+import { usePointDetail } from "@/entities/excursion/model/usePointDetail";
+import { usePointDetailsMap } from "@/entities/excursion/model/usePointDetailsMap";
 import { formatMeters } from "@/features/route-map/lib/route-geometry";
 import { useUserGeolocation } from "@/features/route-map/model/useUserGeolocation";
 import type { DiscoveryCategoryOption } from "@/features/route-map/ui/DiscoveryMap";
 import { DiscoveryMap } from "@/features/route-map/ui/DiscoveryMap";
 import { useAuth } from "@/app/providers/useAuth";
 import { useUserRoutes } from "@/features/user-routes/model/useUserRoutes";
+import { useCategories } from "@/shared/api/categoriesStore";
+import type { ApiCategory } from "@/shared/api/mappers";
 import { appMapConfig } from "@/shared/config/map";
 import { appRoutes } from "@/shared/config/routes";
 import { clampDiscoveryRadius } from "@/shared/lib/discovery-radius";
@@ -33,9 +37,10 @@ import {
 import { useManualPosition } from "@/shared/lib/ManualPositionContext";
 import {
     formatDuration,
-    formatPointCategory,
     formatTheme,
+    getPointCategoryLabel,
 } from "@/shared/lib/format";
+import { matchesExcursionThemeFilter } from "@/shared/lib/excursion-theme";
 import { SmartPlaceImage } from "@/shared/ui/SmartPlaceImage";
 import { FooterFeatureIcon } from "@/shared/ui/FooterFeatureIcon";
 import { ExcursionCatalog } from "@/widgets/excursion-catalog/ui/ExcursionCatalog";
@@ -86,15 +91,9 @@ function snapSheet(
     setTimeout(clear, durationMs + 100);
 }
 
-const nearbyCategoryOptions: DiscoveryCategoryOption[] = [
-    { id: "all", label: "Все" },
-    { id: "museum", label: "Музеи" },
-    { id: "entertainment", label: "Развлечения" },
-    { id: "landmark", label: "История" },
-    { id: "food", label: "Еда" },
-    { id: "park", label: "Природа" },
-];
-
+// Category tabs are built dynamically inside the HomePage component from
+// the backend's /points/categories list — admins can add/remove categories
+// freely and the UI mirrors them without code changes.
 const categoryIcons: Record<string, string> = {
     all: "◎",
     museum: "🏛",
@@ -103,6 +102,19 @@ const categoryIcons: Record<string, string> = {
     food: "🍽",
     park: "🌿",
 };
+
+// Map a backend category (slug/name) to an icon. Backend categories can have
+// arbitrary names; we look up known patterns and fallback to a generic pin.
+function pickCategoryIcon(slug: string | undefined, name: string | undefined): string {
+    if (slug && categoryIcons[slug]) return categoryIcons[slug]
+    const text = `${slug ?? ''} ${name ?? ''}`.toLowerCase()
+    if (/музе|museum|gallery|галер/.test(text)) return "🏛"
+    if (/ресторан|кафе|еда|food|restaurant|cafe/.test(text)) return "🍽"
+    if (/парк|сад|приро|park|garden|nature/.test(text)) return "🌿"
+    if (/развле|театр|кино|entert|theat|cinema|fun/.test(text)) return "✨"
+    if (/истор|достоприм|памят|history|landmark|monument/.test(text)) return "📍"
+    return "📍"
+}
 
 const routeThemeOptions: Array<ExcursionTheme | "all"> = [
     "all",
@@ -138,9 +150,62 @@ export function HomePage() {
     const [audioLocale] = useState<SupportedLocale>(
         storedContext.locale ?? detectedLocale,
     );
+    // Category filter accepts backend categoryId (number) or 'all'.
+    // Legacy frontend slugs from older sessions auto-convert to 'all' below.
     const [activePointCategory, setActivePointCategory] = useState<
-        PointCategory | "all"
-    >(storedContext.activePointCategory ?? "all");
+        PointCategory | "all" | number
+    >(() => {
+        const stored = storedContext.activePointCategory
+        return stored ?? "all"
+    });
+
+    // Load backend categories — used for tabs and slug→icon mapping.
+    const { categories: backendCategories } = useCategories();
+
+    // Build category tabs dynamically from backend. "Все" is always first.
+    const nearbyCategoryOptions = useMemo<DiscoveryCategoryOption[]>(() => {
+        return [
+            { id: "all" as const, label: "Все" },
+            ...backendCategories.map((c: ApiCategory) => ({
+                id: c.id,
+                label: c.name,
+            })),
+        ];
+    }, [backendCategories]);
+
+    // Resolve icon for a given tab option (backend categories use their slug)
+    const getTabIcon = useCallback(
+        (id: PointCategory | "all" | number): string => {
+            if (id === "all") return categoryIcons.all;
+            if (typeof id === "number") {
+                const cat = backendCategories.find(
+                    (c: ApiCategory) => c.id === id,
+                );
+                return pickCategoryIcon(cat?.slug, cat?.name);
+            }
+            return categoryIcons[id] ?? "📍";
+        },
+        [backendCategories],
+    );
+
+    // If the stored category slug is stale (no longer a valid frontend enum
+    // value AND not a backend id), drop it to 'all' or pick a matching id.
+    useEffect(() => {
+        if (
+            typeof activePointCategory === "string" &&
+            activePointCategory !== "all"
+        ) {
+            if (backendCategories.length === 0) return;
+            const match = backendCategories.find(
+                (c: ApiCategory) =>
+                    c.slug === activePointCategory ||
+                    pickCategoryIcon(c.slug, c.name) ===
+                        categoryIcons[activePointCategory],
+            );
+            setActivePointCategory(match ? match.id : "all");
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [backendCategories]);
     const [radiusMeters, setRadiusMeters] = useState<number>(
         clampDiscoveryRadius(
             storedContext.radiusMeters ?? appMapConfig.discoveryRadiusMeters,
@@ -233,6 +298,14 @@ export function HomePage() {
         search: "",
     });
 
+    // Search results carry no photos — backfill them from /points/{id} so the
+    // "Рядом с вами" cards show real uploaded images instead of placeholders.
+    const nearbyPointIds = useMemo(
+        () => nearbyPoints.map((point) => point.id),
+        [nearbyPoints],
+    );
+    const pointDetailsMap = usePointDetailsMap(nearbyPointIds);
+
     useEffect(() => {
         saveDiscoveryContext({
             activePointCategory,
@@ -275,9 +348,17 @@ export function HomePage() {
 
     const effectiveSelectedPointId =
         nearbyPoints.find((p) => p.id === selectedPointId)?.id ?? "";
-    const selectedPoint = effectiveSelectedPointId
+    const selectedPointFallback = effectiveSelectedPointId
         ? (nearbyPoints.find((p) => p.id === effectiveSelectedPointId) ?? null)
         : null;
+    // Fetches /points/{id} once per selection — gives us full description,
+    // address and media (photo/audio) which /points/search omits.
+    const selectedPoint = usePointDetail(
+        effectiveSelectedPointId || null,
+        selectedPointFallback,
+        currentCenter.lat,
+        currentCenter.lng,
+    );
     const effectiveRouteTargetId =
         routeTargetId && nearbyPoints.some((p) => p.id === routeTargetId)
             ? routeTargetId
@@ -285,12 +366,13 @@ export function HomePage() {
     const visibleRoutes = useMemo(
         () =>
             excursions.filter((e) => {
-                const matchesTheme =
-                    activeRouteTheme === "all" || e.theme === activeRouteTheme;
                 const matchesDuration =
                     maxRouteDuration === null ||
                     e.durationMinutes <= maxRouteDuration;
-                return matchesTheme && matchesDuration;
+                return (
+                    matchesExcursionThemeFilter(e, activeRouteTheme) &&
+                    matchesDuration
+                );
             }),
         [activeRouteTheme, excursions, maxRouteDuration],
     );
@@ -1039,15 +1121,13 @@ export function HomePage() {
                                     className={`home-sheet__cat${activePointCategory === opt.id ? " home-sheet__cat--active" : ""}`}
                                     key={opt.id}
                                     onClick={() =>
-                                        setActivePointCategory(
-                                            opt.id as PointCategory | "all",
-                                        )
+                                        setActivePointCategory(opt.id)
                                     }
                                     type="button">
                                     <span
                                         className="home-sheet__cat-icon"
                                         aria-hidden="true">
-                                        {categoryIcons[opt.id]}
+                                        {getTabIcon(opt.id)}
                                     </span>
                                     {opt.label}
                                 </button>
@@ -1064,8 +1144,8 @@ export function HomePage() {
                                 <div className="home-sheet__place-top">
                                     <div className="home-sheet__place-meta">
                                         <span className="home-sheet__place-cat">
-                                            {formatPointCategory(
-                                                selectedPoint.category,
+                                            {getPointCategoryLabel(
+                                                selectedPoint,
                                             )}
                                         </span>
                                         <span className="home-sheet__place-dist">
@@ -1106,11 +1186,11 @@ export function HomePage() {
                                         {selectedPoint.scheduleLabel}
                                     </p>
                                 )}
-                                {(selectedPoint.description ||
-                                    selectedPoint.shortDescription) && (
+                                {(selectedPoint.shortDescription ||
+                                    selectedPoint.description) && (
                                     <p className="home-sheet__place-desc">
-                                        {selectedPoint.description ||
-                                            selectedPoint.shortDescription}
+                                        {selectedPoint.shortDescription ||
+                                            selectedPoint.description}
                                     </p>
                                 )}
                                 {(selectedPoint.rating > 0 ||
@@ -1172,7 +1252,12 @@ export function HomePage() {
                                                 category={point.category}
                                                 loading="lazy"
                                                 referrerPolicy="no-referrer"
-                                                src={point.imageUrl}
+                                                src={
+                                                    pointDetailsMap.get(
+                                                        point.id,
+                                                    )?.imageUrl ||
+                                                    point.imageUrl
+                                                }
                                                 title={point.title}
                                             />
                                             <span className="home-card__dist-badge">
@@ -1183,8 +1268,8 @@ export function HomePage() {
                                         </div>
                                         <div className="home-card__body">
                                             <span className="home-card__cat">
-                                                {formatPointCategory(
-                                                    point.category,
+                                                {getPointCategoryLabel(
+                                                    point,
                                                 )}
                                             </span>
                                             <p className="home-card__title">

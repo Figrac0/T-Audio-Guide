@@ -111,7 +111,7 @@ export function PointsSection() {
               <th>Название</th>
               <th>Категория</th>
               <th style={{ width: 100 }}>Время</th>
-              <th style={{ width: 100 }}>Активна</th>
+              <th style={{ width: 100, textAlign: 'center' }}>Активна</th>
               <th style={{ width: 160 }}>Создана</th>
               <th style={{ width: 180 }}>Действия</th>
             </tr>
@@ -134,7 +134,7 @@ export function PointsSection() {
                   <td>{p.title}</td>
                   <td>{p.categoryName}</td>
                   <td>{p.visitTime ? `${p.visitTime} мин` : '—'}</td>
-                  <td>{p.active ? '✓' : '—'}</td>
+                  <td style={{ textAlign: 'center' }}>{p.active ? '✓' : '—'}</td>
                   <td className="admin-table__mono">{formatDate(p.createdAt)}</td>
                   <td>
                     <div className="admin-table__actions">

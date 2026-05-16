@@ -1,7 +1,9 @@
 export const appMapConfig = {
+  // Default map center when the user has no geolocation —
+  // площадь Куйбышева, Самара.
   defaultCenter: {
-    lat: 55.751244,
-    lng: 37.618423,
+    lat: 53.1956,
+    lng: 50.1015,
   },
   defaultZoom: 14,
   discoveryRadiusMeters: 1200,

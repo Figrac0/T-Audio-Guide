@@ -18,6 +18,7 @@ import { useUserRoutes } from '@/features/user-routes/model/useUserRoutes'
 import { appMapConfig } from '@/shared/config/map'
 import { appRoutes } from '@/shared/config/routes'
 import { clampDiscoveryRadius } from '@/shared/lib/discovery-radius'
+import { matchesExcursionThemeFilter } from '@/shared/lib/excursion-theme'
 import {
   detectSupportedLocale,
   getStoredDiscoveryContext,
@@ -213,7 +214,7 @@ export function useExcursionsPageState(
     () =>
       excursions.filter(
         (ex) =>
-          (activeTheme === 'all' || ex.theme === activeTheme) &&
+          matchesExcursionThemeFilter(ex, activeTheme) &&
           (maxDuration === null || ex.durationMinutes <= maxDuration),
       ),
     [excursions, activeTheme, maxDuration],

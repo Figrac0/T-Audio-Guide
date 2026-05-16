@@ -23,7 +23,10 @@ export function AdminModal({ isOpen, onClose, title, children, size = 'md' }: Ad
     const prevHtmlOverflow = html.style.overflow
     const prevBodyOverflow = body.style.overflow
     // Compensate for the scrollbar disappearing so the layout doesn't shift.
-    const scrollbarWidth = window.innerWidth - html.clientWidth
+    // Math.max guards against weird devtools/zoom states where innerWidth
+    // can momentarily be < clientWidth (would otherwise add negative padding
+    // and cause horizontal layout glitches).
+    const scrollbarWidth = Math.max(0, window.innerWidth - html.clientWidth)
     const prevBodyPaddingRight = body.style.paddingRight
     html.style.overflow = 'hidden'
     body.style.overflow = 'hidden'

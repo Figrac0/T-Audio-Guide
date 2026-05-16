@@ -10,7 +10,7 @@ import type {
 import { appApi } from '@/shared/api/client'
 
 interface UseDiscoveryRoutesParams {
-  activePointCategory: PointCategory | 'all'
+  activePointCategory: PointCategory | 'all' | number
   center: GeoPoint
   enabled?: boolean
   locale: SupportedLocale
@@ -25,6 +25,7 @@ function nearbyPointsEqual(a: NearbyPoint, b: NearbyPoint): boolean {
     a.id === b.id &&
     a.title === b.title &&
     a.category === b.category &&
+    a.categoryName === b.categoryName &&
     a.distanceMeters === b.distanceMeters &&
     a.coordinates.lat === b.coordinates.lat &&
     a.coordinates.lng === b.coordinates.lng &&

@@ -29,8 +29,8 @@ export function ExcursionCard({ excursion }: ExcursionCardProps) {
   const isAuthenticated = Boolean(session?.isAuthenticated && session.profile)
   const routeUrl = appRoutes.excursion(excursion.slug)
   const isSaved = isRouteSaved(excursion.slug)
-  const coverFallbacks = [buildRoutePlaceholderImage(excursion.theme)]
-  const routePlaceholder = buildRoutePlaceholderImage(excursion.theme)
+  const routePlaceholder = buildRoutePlaceholderImage(excursion.theme, excursion.id)
+  const coverFallbacks = [routePlaceholder]
   const coverSrc =
     excursion.coverImageUrl && !excursion.coverImageUrl.startsWith('/illustrations/')
       ? excursion.coverImageUrl
@@ -64,10 +64,9 @@ export function ExcursionCard({ excursion }: ExcursionCardProps) {
           <Link className="card__title-link" to={routeUrl}>
             <h3 className="card__title">{excursion.title}</h3>
           </Link>
-          <p className="card__tagline">{excursion.tagline}</p>
         </div>
 
-        <p className="card__description">{excursion.description}</p>
+        <p className="card__tagline">{excursion.tagline || excursion.description}</p>
 
         <div className="card__stop-preview">
           <span className="chip chip--accent">{excursion.audienceLabel}</span>
@@ -77,19 +76,27 @@ export function ExcursionCard({ excursion }: ExcursionCardProps) {
         <div className="card__stats">
           <div className="card__stats-row">
             <span className="card__stat-badge">{formatDistance(excursion.distanceKm)}</span>
-            <span className="card__stat-badge">{formatStopCount(excursion.stops.length)}</span>
+            <span className="card__stat-badge">
+              {formatStopCount(excursion.stops.length || excursion.pointsCount || 0)}
+            </span>
           </div>
           <div className="card__stat-duration">{formatDuration(excursion.durationMinutes)}</div>
         </div>
 
-        <div className="card__route-points">
-          <span className="card__route-point">
-            <strong>Старт:</strong> {excursion.startLabel}
-          </span>
-          <span className="card__route-point">
-            <strong>Финиш:</strong> {excursion.finishLabel}
-          </span>
-        </div>
+        {(excursion.startLabel || excursion.finishLabel) ? (
+          <div className="card__route-points">
+            {excursion.startLabel ? (
+              <span className="card__route-point" title={excursion.startLabel}>
+                <strong>Старт:</strong> {excursion.startLabel}
+              </span>
+            ) : null}
+            {excursion.finishLabel ? (
+              <span className="card__route-point" title={excursion.finishLabel}>
+                <strong>Финиш:</strong> {excursion.finishLabel}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="card__actions">
           <Link className="button button--primary" to={routeUrl}>

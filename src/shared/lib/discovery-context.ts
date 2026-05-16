@@ -7,7 +7,9 @@ import { appMapConfig } from '@/shared/config/map'
 import { clampDiscoveryRadius } from '@/shared/lib/discovery-radius'
 
 export interface DiscoveryContext {
-  activePointCategory: PointCategory | 'all'
+  // Backend categoryId (number) or 'all'. Legacy slug strings are tolerated
+  // for older sessions stored before the dynamic-category migration.
+  activePointCategory: PointCategory | 'all' | number
   center: GeoPoint
   locale: SupportedLocale
   browserLocale: string
