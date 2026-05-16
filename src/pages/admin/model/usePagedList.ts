@@ -50,19 +50,24 @@ export function usePagedList<T>(fetcher: PagedFetcher<T>): UsePagedListResult<T>
   useEffect(() => {
     if (lastSearchRef.current !== debouncedSearch) {
       lastSearchRef.current = debouncedSearch
-      setPage(0)
+      queueMicrotask(() => setPage(0))
     }
   }, [debouncedSearch])
 
   // Keep latest fetcher in a ref so changing the fetcher reference doesn't
   // cancel the in-flight request via the useEffect dep array.
   const fetcherRef = useRef(fetcher)
-  fetcherRef.current = fetcher
+  useEffect(() => {
+    fetcherRef.current = fetcher
+  }, [fetcher])
 
   useEffect(() => {
     let active = true
-    setIsLoading(true)
-    setError(null)
+    queueMicrotask(() => {
+      if (!active) return
+      setIsLoading(true)
+      setError(null)
+    })
     fetcherRef.current({ page, size, search: debouncedSearch || undefined })
       .then((response) => {
         if (!active) return

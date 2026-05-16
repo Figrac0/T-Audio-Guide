@@ -27,6 +27,27 @@ import '@/features/route-map/ui/map-marker-skin.css'
 import '@/features/route-map/ui/leaflet-popup-close.css'
 import './RouteBuilderMap.css'
 
+let activePopupAudio: HTMLAudioElement | null = null
+
+function togglePopupAudio(audioUrl: string): void {
+  if (activePopupAudio?.src === audioUrl && !activePopupAudio.paused) {
+    activePopupAudio.pause()
+    return
+  }
+
+  activePopupAudio?.pause()
+  activePopupAudio = new Audio(audioUrl)
+  activePopupAudio.addEventListener('ended', () => {
+    activePopupAudio = null
+  }, { once: true })
+  activePopupAudio.addEventListener('error', () => {
+    activePopupAudio = null
+  }, { once: true })
+  void activePopupAudio.play().catch(() => {
+    activePopupAudio = null
+  })
+}
+
 export interface RouteBuilderMapHandle {
   closePopup: () => void
 }
@@ -90,6 +111,13 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
   useImperativeHandle(ref, () => ({
     closePopup: () => { mapRef.current?.closePopup() },
   }), [])
+
+  useEffect(() => {
+    return () => {
+      activePopupAudio?.pause()
+      activePopupAudio = null
+    }
+  }, [])
 
   const onAddPointRef = useRef(onAddPoint)
   const onRemovePointRef = useRef(onRemovePoint)
@@ -413,6 +441,9 @@ function buildPopupEl(
   onShowDetail: () => void,
 ): HTMLElement {
   const placeholder = buildPlacePlaceholderImage(point.category)
+  const detailDataPromise = !point.imageUrl || !point.audioGuideUrl
+    ? fetchPointDetailData(point.id)
+    : null
 
   const root = document.createElement('div')
   root.className = 'rbm-popup'
@@ -430,7 +461,7 @@ function buildPopupEl(
   // Search results carry no photo — backfill the real uploaded image from
   // /points/{id} (cached) once the popup is shown.
   if (!point.imageUrl) {
-    void fetchPointDetailData(point.id).then((data) => {
+    void detailDataPromise?.then((data) => {
       if (data?.imageUrl) image.src = data.imageUrl
     })
   }
@@ -543,10 +574,19 @@ function buildPopupEl(
   audioBtn.type = 'button'
   audioBtn.className = `rbm-popup__btn rbm-popup__btn--audio${point.audioGuideUrl ? '' : ' rbm-popup__btn--audio-disabled'}`
   audioBtn.disabled = !point.audioGuideUrl
+  const attachAudioGuide = (audioUrl: string) => {
+    audioBtn.className = 'rbm-popup__btn rbm-popup__btn--audio'
+    audioBtn.disabled = false
+    audioBtn.addEventListener('click', () => {
+      togglePopupAudio(audioUrl)
+    })
+  }
   audioBtn.textContent = '🎧 Прослушать аудиогид'
   if (point.audioGuideUrl) {
-    audioBtn.addEventListener('click', () => {
-      // TODO: open audio player when backend provides audioGuideUrl
+    attachAudioGuide(point.audioGuideUrl)
+  } else {
+    void detailDataPromise?.then((data) => {
+      if (data?.audioUrl) attachAudioGuide(data.audioUrl)
     })
   }
   btnGroup.appendChild(audioBtn)

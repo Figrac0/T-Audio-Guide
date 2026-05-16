@@ -62,8 +62,15 @@ export function usePointDetail(
   const lastFetchedRef = useRef<string | null>(cached?.id ?? null)
 
   useEffect(() => {
+    let active = true
+    const setDetailAsync = (next: PointDetail | null) => {
+      queueMicrotask(() => {
+        if (active) setDetail(next)
+      })
+    }
+
     if (!pointId) {
-      setDetail(null)
+      setDetailAsync(null)
       lastFetchedRef.current = null
       return
     }
@@ -71,18 +78,17 @@ export function usePointDetail(
     // Cache hit — surface immediately, no network call.
     const fromCache = detailCache.get(pointId)
     if (fromCache) {
-      setDetail(fromCache)
+      setDetailAsync(fromCache)
       lastFetchedRef.current = pointId
       return
     }
 
     // Cache miss — clear stale detail, fetch fresh.
     if (lastFetchedRef.current !== pointId) {
-      setDetail(null)
+      setDetailAsync(null)
       lastFetchedRef.current = pointId
     }
 
-    let active = true
     const numericId = Number(pointId)
     if (!Number.isFinite(numericId)) return
 

@@ -626,6 +626,7 @@ export function ExcursionsPage() {
       imageUrl: data.imageUrl || base.imageUrl,
       addressLabel: base.addressLabel || data.address || undefined,
       scheduleLabel: base.scheduleLabel || data.workingHours,
+      audioGuideUrl: data.audioUrl || base.audioGuideUrl,
     }
   }, [state.detailPoint, pointDetailsMap])
 
@@ -1200,6 +1201,43 @@ function PointDetailPanel({
     'ep-detail__action-btn',
     'ep-detail__action-btn--route',
   ].join(' ')
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [playingAudioUrl, setPlayingAudioUrl] = useState<string | null>(null)
+  const hasAudioGuide = Boolean(point.audioGuideUrl)
+  const isAudioPlaying = playingAudioUrl === point.audioGuideUrl
+
+  useEffect(() => {
+    return () => {
+      audioRef.current?.pause()
+      audioRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    audioRef.current?.pause()
+    audioRef.current = null
+  }, [point.audioGuideUrl])
+
+  function handleToggleAudioGuide() {
+    if (!point.audioGuideUrl) return
+
+    if (!audioRef.current) {
+      const audio = new Audio(point.audioGuideUrl)
+      audio.addEventListener('ended', () => setPlayingAudioUrl(null))
+      audio.addEventListener('error', () => setPlayingAudioUrl(null))
+      audioRef.current = audio
+    }
+
+    if (isAudioPlaying) {
+      audioRef.current.pause()
+      setPlayingAudioUrl(null)
+      return
+    }
+
+    void audioRef.current.play()
+      .then(() => setPlayingAudioUrl(point.audioGuideUrl))
+      .catch(() => setPlayingAudioUrl(null))
+  }
 
   return (
     <div className="ep-detail">
@@ -1243,6 +1281,25 @@ function PointDetailPanel({
             ))}
           </section>
         )}
+
+        <section
+          className={`ep-detail__audio${hasAudioGuide ? ' ep-detail__audio--ready' : ''}`}
+          aria-label="Аудиогид точки"
+        >
+          <button
+            className="ep-detail__audio-btn"
+            disabled={!hasAudioGuide}
+            onClick={handleToggleAudioGuide}
+            type="button"
+          >
+            {isAudioPlaying ? 'Пауза аудиогида' : 'Прослушать аудиогид'}
+          </button>
+          <p className="ep-detail__audio-note">
+            {hasAudioGuide
+              ? 'Для этой точки доступно аудиосопровождение.'
+              : 'Сейчас для этой точки доступно только текстовое описание.'}
+          </p>
+        </section>
 
         <div className="ep-detail__actions" aria-label="Действия с точкой">
           <button

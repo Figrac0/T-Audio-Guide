@@ -2163,6 +2163,66 @@ body.app-body--routes-page {
     font-weight: 900;
 }
 
+.ep-detail__audio {
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    width: 100%;
+    margin-top: 2px;
+    padding: 14px;
+    border: 1px solid rgba(31, 138, 112, 0.14);
+    border-radius: 18px;
+    background: rgba(247, 250, 248, 0.8);
+}
+
+.ep-detail__audio--ready {
+    border-color: rgba(31, 138, 112, 0.22);
+    background:
+        radial-gradient(circle at 20% 0%, rgba(255, 226, 92, 0.16), transparent 34%),
+        rgba(247, 250, 248, 0.88);
+}
+
+.ep-detail__audio-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    max-width: 100%;
+    min-height: 40px;
+    padding: 0 18px;
+    border: 1.5px solid rgba(31, 138, 112, 0.28);
+    border-radius: var(--radius-pill);
+    background: var(--color-brand-soft);
+    color: var(--color-brand-strong);
+    font: inherit;
+    font-size: 0.86rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition:
+        transform 0.16s ease,
+        border-color 0.16s ease,
+        background 0.16s ease;
+}
+
+.ep-detail__audio-btn:not(:disabled):hover {
+    transform: translateY(-1px);
+    border-color: rgba(31, 138, 112, 0.45);
+    background: rgba(222, 246, 238, 0.96);
+}
+
+.ep-detail__audio-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.56;
+}
+
+.ep-detail__audio-note {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: 0.78rem;
+    line-height: 1.45;
+    text-align: center;
+}
+
 .ep-detail__actions {
     display: grid;
     justify-items: center;

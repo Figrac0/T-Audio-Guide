@@ -66,8 +66,11 @@ export function useCategories(): { categories: ApiCategory[]; isLoading: boolean
     let active = true
     if (cachedCategoriesValue != null) {
       // Already cached — no work needed
-      setCategories(cachedCategoriesValue)
-      setIsLoading(false)
+      queueMicrotask(() => {
+        if (!active || cachedCategoriesValue == null) return
+        setCategories(cachedCategoriesValue)
+        setIsLoading(false)
+      })
     } else {
       void loadCategoriesOnce()
         .then((list) => {

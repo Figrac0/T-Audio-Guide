@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
 
 import {
   adminService,
@@ -12,13 +12,53 @@ interface PointMediaPanelProps {
   onChanged: () => void
 }
 
+function getUsedSortOrders(media: AdminPointMediaItem[]): Set<number> {
+  return new Set(
+    media
+      .map((item) => Number(item.sortOrder))
+      .filter((value) => Number.isInteger(value) && value >= 0),
+  )
+}
+
+function getNextAvailableSortOrder(media: AdminPointMediaItem[]): number {
+  const usedSortOrders = getUsedSortOrders(media)
+  let nextSortOrder = 0
+
+  while (usedSortOrders.has(nextSortOrder)) {
+    nextSortOrder += 1
+  }
+
+  return nextSortOrder
+}
+
+function resolveUploadSortOrder(
+  value: string,
+  media: AdminPointMediaItem[],
+  fallbackSortOrder: number,
+): number {
+  const parsedSortOrder = Number.parseInt(value, 10)
+
+  if (!Number.isInteger(parsedSortOrder) || parsedSortOrder < 0) {
+    return fallbackSortOrder
+  }
+
+  return getUsedSortOrders(media).has(parsedSortOrder)
+    ? fallbackSortOrder
+    : parsedSortOrder
+}
+
 export function PointMediaPanel({ pointId, media, onChanged }: PointMediaPanelProps) {
+  const nextAvailableSortOrder = useMemo(() => getNextAvailableSortOrder(media), [media])
   const [file, setFile] = useState<File | null>(null)
   const [type, setType] = useState<MediaType>('PHOTO')
-  const [sortOrder, setSortOrder] = useState('0')
+  const [sortOrder, setSortOrder] = useState(() => String(nextAvailableSortOrder))
   const [transcript, setTranscript] = useState('')
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setSortOrder(String(nextAvailableSortOrder))
+  }, [nextAvailableSortOrder, pointId])
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const next = event.target.files?.[0] ?? null
@@ -30,14 +70,22 @@ export function PointMediaPanel({ pointId, media, onChanged }: PointMediaPanelPr
     if (!file) return
     setError(null)
     setIsUploading(true)
+    const uploadSortOrder = resolveUploadSortOrder(
+      sortOrder,
+      media,
+      nextAvailableSortOrder,
+    )
     try {
       await adminService.uploadPointMedia(pointId, file, {
         type,
-        sortOrder: Number(sortOrder) || 0,
+        sortOrder: uploadSortOrder,
         transcript: transcript.trim() || undefined,
       })
       setFile(null)
-      setSortOrder('0')
+      setSortOrder(String(getNextAvailableSortOrder([
+        ...media,
+        { sortOrder: uploadSortOrder } as AdminPointMediaItem,
+      ])))
       setTranscript('')
       // Reset file input by recreating it via key — simpler than refs here
       const input = document.getElementById('mp-file') as HTMLInputElement | null
@@ -98,6 +146,10 @@ export function PointMediaPanel({ pointId, media, onChanged }: PointMediaPanelPr
               type="number"
               value={sortOrder}
             />
+            <p className="admin-form__hint">
+              Свободный порядок: {nextAvailableSortOrder}. Если указан занятый номер,
+              будет использован ближайший свободный.
+            </p>
           </div>
         </div>
         <div className="admin-form__row">

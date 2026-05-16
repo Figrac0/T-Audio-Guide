@@ -25,8 +25,11 @@ export function PointsPicker({ selectedIds, onChange }: PointsPickerProps) {
 
   useEffect(() => {
     let active = true
-    setIsLoading(true)
-    setError(null)
+    queueMicrotask(() => {
+      if (!active) return
+      setIsLoading(true)
+      setError(null)
+    })
     adminService
       // Big page — admin won't have thousands here, and we need full list so
       // already-selected points (which may not match `search`) still display

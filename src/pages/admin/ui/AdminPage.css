@@ -299,6 +299,13 @@
   letter-spacing: 0.005em;
 }
 
+.admin-form__hint {
+  margin: 6px 0 0;
+  color: var(--color-text-tertiary);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
 .admin-form__input,
 .admin-form__textarea,
 .admin-form__select {
