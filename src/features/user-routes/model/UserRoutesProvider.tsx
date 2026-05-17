@@ -20,6 +20,7 @@ import { generatePersonalRouteName } from '@/features/user-routes/lib/personal-r
 import { UserRoutesContext } from '@/features/user-routes/model/user-routes-context'
 import { appApi } from '@/shared/api/client'
 import { appRoutes } from '@/shared/config/routes'
+import { getDifficultyByDistance } from '@/shared/lib/excursion-difficulty'
 
 const maxDraftStops = 10
 const storageKeyPrefix = 't-guide:user-routes'
@@ -444,7 +445,7 @@ function createPersonalRoute(stops: RouteStop[]): Excursion {
     coverImageUrl: stops[0]?.imageUrl ?? '',
     createdAt: new Date(now).toISOString(),
     description: 'Маршрут собран из выбранных мест рядом.',
-    difficulty: stops.length > 4 ? 'hard' : stops.length > 2 ? 'medium' : 'easy',
+    difficulty: getDifficultyByDistance(distanceKm),
     distanceKm,
     district: 'Личная подборка',
     durationMinutes: visitMinutes + transitMinutes,

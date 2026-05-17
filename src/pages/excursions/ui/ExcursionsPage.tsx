@@ -1,4 +1,13 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react'
 import { Link } from 'react-router-dom'
 
 import type { Excursion, NearbyPoint, RouteStop } from '@/entities/excursion/model/types'
@@ -20,6 +29,7 @@ import {
   getPointCategoryLabel,
 } from '@/shared/lib/format'
 import { buildPlacePlaceholderImage, buildRoutePlaceholderImage } from '@/shared/lib/placeholder-images'
+import { useAnimatedItems } from '@/shared/lib/useAnimatedItems'
 import { useManualPosition } from '@/shared/lib/ManualPositionContext'
 import { FooterFeatureIcon } from '@/shared/ui/FooterFeatureIcon'
 import { ResilientImage } from '@/shared/ui/ResilientImage'
@@ -34,6 +44,7 @@ const SHEET_SNAP_EASING = 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
 const SHEET_SNAP_DURATION_MS = 480
 const SHEET_SNAP_FAST_DURATION_MS = 300
 const SHEET_SNAP_MEDIUM_DURATION_MS = 400
+const getExcursionKey = (excursion: Excursion) => excursion.slug
 
 function getCatalogInitial(): number {
   if (typeof window === 'undefined') return 6
@@ -77,6 +88,19 @@ export function ExcursionsPage() {
   const [showAll, setShowAll] = useState(false)
   const finalEffectiveUserPosition = effectiveUserPosition ?? state.userPosition
   const catalogInitial = useCatalogInitial()
+  const catalogContentRef = useRef<HTMLDivElement>(null)
+  const [catalogContentHeight, setCatalogContentHeight] = useState<number | null>(null)
+  const catalogSignature = useMemo(() => {
+    if (state.excursions.length) {
+      return `items:${state.excursions.map((excursion) => excursion.slug).join('|')}`
+    }
+
+    return `status:${state.discoveryError ? 'error' : 'empty'}`
+  }, [state.discoveryError, state.excursions])
+  const { items: catalogExcursions, phase: catalogPhase } = useAnimatedItems(state.excursions, {
+    getKey: getExcursionKey,
+    signature: catalogSignature,
+  })
   const draftPointOrders = useMemo(
     () =>
       new Map(
@@ -87,6 +111,26 @@ export function ExcursionsPage() {
       ),
     [state.draftStops],
   )
+
+  useLayoutEffect(() => {
+    const node = catalogContentRef.current
+    if (!node) return undefined
+
+    const updateHeight = () => {
+      setCatalogContentHeight(Math.ceil(node.getBoundingClientRect().height))
+    }
+
+    updateHeight()
+
+    if (typeof ResizeObserver === 'undefined') {
+      return undefined
+    }
+
+    const observer = new ResizeObserver(updateHeight)
+    observer.observe(node)
+
+    return () => observer.disconnect()
+  }, [catalogExcursions, catalogPhase, state.discoveryError])
 
   const hasDraftStops = state.draftStops.length > 0
   const lastDraftStop = hasDraftStops ? state.draftStops[state.draftStops.length - 1] : null
@@ -604,7 +648,11 @@ export function ExcursionsPage() {
     animateSheetPosition(snaps[bestIdx], durationMs)
   }, [animateSheetPosition])
 
-  const hasMoreExcursions = state.excursions.length > catalogInitial
+  const hasMoreExcursions = catalogExcursions.length > catalogInitial
+  const catalogShellStyle =
+    catalogContentHeight === null
+      ? undefined
+      : ({ '--ep-catalog-min-height': `${catalogContentHeight}px` } as CSSProperties)
 
   // Search results carry no photos or full description — backfill from
   // /points/{id} so the nearby strip and detail panel show real data.
@@ -945,48 +993,57 @@ export function ExcursionsPage() {
 
               {state.isLoading && state.excursions.length === 0 ? (
                 <ExcursionsSkeleton />
-              ) : state.excursions.length === 0 ? (
-                <section className={`status-card${state.discoveryError ? ' status-card--error' : ''}`}>
-                  <h3 className="status-card__title">
-                    {state.discoveryError ? 'Ошибка загрузки' : 'Нет маршрутов'}
-                  </h3>
-                  <p className="status-card__text">
-                    {state.discoveryError
-                      ? 'Сервис временно недоступен. Попробуйте перезагрузить страницу.'
-                      : 'Попробуйте другой фильтр'}
-                  </p>
-                </section>
               ) : (
-                <>
-                  <div className="ep-catalog__grid">
-                    {state.excursions.slice(0, catalogInitial).map((excursion) => (
-                      <ExcursionCard excursion={excursion} key={excursion.id} />
-                    ))}
-                  </div>
-
-                  {hasMoreExcursions ? (
-                    <>
-                      <div className={`ep-catalog__extra${showAll ? ' ep-catalog__extra--open' : ''}`}>
-                        <div className="ep-catalog__extra-inner">
-                          <div className="ep-catalog__grid">
-                            {state.excursions.slice(catalogInitial).map((excursion) => (
-                              <ExcursionCard excursion={excursion} key={excursion.id} />
-                            ))}
-                          </div>
+                <div
+                  className={`ep-catalog-shell ep-catalog-shell--${catalogPhase}`}
+                  style={catalogShellStyle}
+                >
+                  <div className="ep-catalog-shell__content" ref={catalogContentRef}>
+                    {catalogExcursions.length === 0 ? (
+                      <section className={`status-card${state.discoveryError ? ' status-card--error' : ''}`}>
+                        <h3 className="status-card__title">
+                          {state.discoveryError ? 'Ошибка загрузки' : 'Нет маршрутов'}
+                        </h3>
+                        <p className="status-card__text">
+                          {state.discoveryError
+                            ? 'Сервис временно недоступен. Попробуйте перезагрузить страницу.'
+                            : 'Попробуйте другой фильтр'}
+                        </p>
+                      </section>
+                    ) : (
+                      <>
+                        <div className="ep-catalog__grid">
+                          {catalogExcursions.slice(0, catalogInitial).map((excursion) => (
+                            <ExcursionCard excursion={excursion} key={excursion.id} />
+                          ))}
                         </div>
-                      </div>
-                      <div className="ep-catalog__toggle-wrap">
-                        <button
-                          className={`ep-catalog__toggle${showAll ? ' ep-catalog__toggle--open' : ''}`}
-                          onClick={() => setShowAll((v) => !v)}
-                          type="button"
-                        >
-                          {showAll ? 'Скрыть' : `Показать все (${state.excursions.length})`}
-                        </button>
-                      </div>
-                    </>
-                  ) : null}
-                </>
+
+                        {hasMoreExcursions ? (
+                          <>
+                            <div className={`ep-catalog__extra${showAll ? ' ep-catalog__extra--open' : ''}`}>
+                              <div className="ep-catalog__extra-inner">
+                                <div className="ep-catalog__grid">
+                                  {catalogExcursions.slice(catalogInitial).map((excursion) => (
+                                    <ExcursionCard excursion={excursion} key={excursion.id} />
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="ep-catalog__toggle-wrap">
+                              <button
+                                className={`ep-catalog__toggle${showAll ? ' ep-catalog__toggle--open' : ''}`}
+                                onClick={() => setShowAll((v) => !v)}
+                                type="button"
+                              >
+                                {showAll ? 'Скрыть' : `Показать все (${catalogExcursions.length})`}
+                              </button>
+                            </div>
+                          </>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                </div>
               )}
             </section>
           )}

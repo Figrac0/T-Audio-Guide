@@ -1,4 +1,5 @@
 import type { Excursion, SupportedLocale } from '@/entities/excursion/model/types'
+import { filterRoutesByStopRadius } from '@/entities/excursion/lib/route-radius'
 import { authService } from '@/shared/api/authService'
 import { getCategoryIdsForSlug } from '@/shared/api/categoriesStore'
 import type {
@@ -157,11 +158,17 @@ const httpApi: FrontendApi = {
       })
     }
 
+    const excursions = filterRoutesByStopRadius(
+      await hydrateExcursions(rawExcursions, payload.locale),
+      payload.center,
+      payload.radiusMeters,
+    )
+
     return {
       appliedCategory: payload.category,
       appliedRadiusMeters: payload.radiusMeters,
       center: payload.center,
-      excursions: await hydrateExcursions(rawExcursions, payload.locale),
+      excursions,
       nearbyPoints,
     }
   },
@@ -199,7 +206,8 @@ const httpApi: FrontendApi = {
       location: { latitude: payload.center.lat, longitude: payload.center.lng },
       radiusKilometers: radiusKm,
     })
-    return hydrateExcursions(rawExcursions, payload.locale)
+    const excursions = await hydrateExcursions(rawExcursions, payload.locale)
+    return filterRoutesByStopRadius(excursions, payload.center, payload.radiusMeters)
   },
 
   getSession() {

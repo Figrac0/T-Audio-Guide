@@ -1292,11 +1292,46 @@ body.app-body--routes-page {
 
 /* ── Catalog grid ─────────────────────────────────────────────────────────── */
 
+.ep-catalog-shell {
+    min-height: var(--ep-catalog-min-height, auto);
+    transition: min-height 0.28s ease;
+}
+
+.ep-catalog-shell__content {
+    transition:
+        opacity 0.18s ease,
+        transform 0.18s ease,
+        filter 0.18s ease;
+}
+
+.ep-catalog-shell--leaving .ep-catalog-shell__content {
+    opacity: 0.36;
+    transform: translateY(8px) scale(0.995);
+    filter: blur(0.4px);
+    pointer-events: none;
+}
+
+.ep-catalog-shell--entering .ep-catalog-shell__content {
+    animation: ep-catalog-content-enter 0.24s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
 .ep-catalog__grid,
 .ep-catalog__skeleton {
     display: grid;
     grid-template-columns: 1fr;
     gap: 12px;
+}
+
+@keyframes ep-catalog-content-enter {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.99);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 /* ── Pagination collapse animation ───────────────────────────────────────── */
@@ -2602,6 +2637,8 @@ body.app-body--routes-page {
     .ep-sheet__locate,
     .ep-nearby-card,
     .ep-nearby-nav__btn,
+    .ep-catalog-shell,
+    .ep-catalog-shell__content,
     .ep-catalog__extra,
     .ep-card-skeleton__cover,
     .ep-skeleton-line {
@@ -2611,5 +2648,11 @@ body.app-body--routes-page {
 
     .ep-draft__badge--bump {
         animation: none;
+    }
+
+    .ep-catalog-shell--leaving .ep-catalog-shell__content {
+        opacity: 1;
+        transform: none;
+        filter: none;
     }
 }

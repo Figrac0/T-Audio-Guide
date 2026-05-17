@@ -9,6 +9,7 @@ import { buildRoutePlaceholderImage } from '@/shared/lib/placeholder-images'
 import {
   formatDistance,
   formatDuration,
+  formatDifficulty,
   formatStopCount,
   formatTheme,
 } from '@/shared/lib/format'
@@ -35,6 +36,7 @@ export function ExcursionCard({ excursion }: ExcursionCardProps) {
     excursion.coverImageUrl && !excursion.coverImageUrl.startsWith('/illustrations/')
       ? excursion.coverImageUrl
       : routePlaceholder
+  const isFallbackCover = coverSrc === routePlaceholder
 
   return (
     <article className="card">
@@ -44,7 +46,7 @@ export function ExcursionCard({ excursion }: ExcursionCardProps) {
         to={routeUrl}
       >
         <div
-          className="card__cover card__cover--gradient"
+          className={`card__cover card__cover--gradient${isFallbackCover ? ' card__cover--fallback' : ''}`}
           style={{ '--route-accent': excursion.routeColor } as CSSProperties}
         >
           <ResilientImage
@@ -78,6 +80,9 @@ export function ExcursionCard({ excursion }: ExcursionCardProps) {
             <span className="card__stat-badge">{formatDistance(excursion.distanceKm)}</span>
             <span className="card__stat-badge">
               {formatStopCount(excursion.stops.length || excursion.pointsCount || 0)}
+            </span>
+            <span className="card__stat-badge card__stat-badge--difficulty">
+              {formatDifficulty(excursion.difficulty)}
             </span>
           </div>
           <div className="card__stat-duration">{formatDuration(excursion.durationMinutes)}</div>

@@ -1,7 +1,6 @@
 ﻿import type {
     AudioStory,
     Excursion,
-    ExcursionDifficulty,
     ExcursionTheme,
     GeoPoint,
     NearbyPoint,
@@ -9,6 +8,7 @@
     RouteStop,
     SupportedLocale,
 } from "@/entities/excursion/model/types";
+import { getDifficultyByDistance } from "@/shared/lib/excursion-difficulty";
 
 interface CreateDiscoveryRoutesParams {
     activePointCategory: PointCategory | "all";
@@ -23,7 +23,6 @@ interface GeneratedRouteDraft {
     coverImageUrl: string;
     createdAt: string;
     description: string;
-    difficulty: ExcursionDifficulty;
     district: string;
     routeColor: string;
     slug: string;
@@ -223,7 +222,6 @@ function buildCategoryRouteDraft(
             stops.length,
             locale,
         ),
-        difficulty: getDifficultyByStops(stops),
         district: `${categoryLabel} · ${radiusLabel}`,
         routeColor: themeColors[theme],
         slug: createRouteSlug(theme, stops, `${category}-${variantIndex + 1}`),
@@ -250,7 +248,6 @@ function buildMixedRouteDraft(
             routeCreatedAtBase - 10 * 60000 - stops.length * 1000,
         ).toISOString(),
         description: buildMixedDescription(blueprint.key, radiusLabel, locale),
-        difficulty: getDifficultyByStops(stops),
         district:
             locale === "ru"
                 ? `Смешанный маршрут · ${radiusLabel}`
@@ -279,7 +276,6 @@ function buildFallbackRouteDraft(
             locale === "ru"
                 ? `Быстрый маршрут из ближайших доступных точек внутри ${radiusLabel}.`
                 : `A quick route built from the closest available places within ${radiusLabel}.`,
-        difficulty: getDifficultyByStops(stops),
         district:
             locale === "ru"
                 ? `Ближайшие точки · ${radiusLabel}`
@@ -342,7 +338,7 @@ function createExcursionFromDraft({
             routeStops.at(-1)?.title ?? (locale === "ru" ? "Финиш" : "Finish"),
         coverImageUrl: draft.coverImageUrl,
         routeColor: draft.routeColor,
-        difficulty: draft.difficulty,
+        difficulty: getDifficultyByDistance(routeDistanceKm),
         audienceLabel: draft.audienceLabel,
         stops: routeStops,
     };
@@ -733,23 +729,6 @@ function hasRealPhoto(value: string) {
         !value.includes("/illustrations/") &&
         !value.startsWith("data:image/svg+xml"),
     );
-}
-
-function getDifficultyByStops(stops: NearbyPoint[]): ExcursionDifficulty {
-    const totalVisitMinutes = stops.reduce(
-        (minutes, stop) => minutes + stop.expectedVisitMinutes,
-        0,
-    );
-
-    if (stops.length <= 2 && totalVisitMinutes <= 50) {
-        return "easy";
-    }
-
-    if (stops.length <= 4 && totalVisitMinutes <= 95) {
-        return "medium";
-    }
-
-    return "hard";
 }
 
 function createRouteSlug(

@@ -1,12 +1,12 @@
 import type {
   Excursion,
-  ExcursionDifficulty,
   ExcursionTheme,
   NearbyPoint,
   PointCategory,
   RouteStop,
   SupportedLocale,
 } from '@/entities/excursion/model/types'
+import { getDifficultyByDistance } from '@/shared/lib/excursion-difficulty'
 import { deriveExcursionTheme } from '@/shared/lib/excursion-theme'
 
 // ── Swagger-accurate backend types ───────────────────────────────────────────
@@ -373,12 +373,6 @@ export function mapRouteStopFromApiPoint(
 // ── Excursion mappers ────────────────────────────────────────────────────────
 
 // Difficulty by route length: 0–2 km — Легко, 2–4 km — Средне, 4+ km — Сложно.
-function difficultyFromDistance(distanceKm: number): ExcursionDifficulty {
-  if (distanceKm < 2) return 'easy'
-  if (distanceKm < 4) return 'medium'
-  return 'hard'
-}
-
 export function mapExcursionFromShort(exc: ApiExcursionShort): Excursion {
   const theme = inferTheme(exc.title, exc.description ?? exc.shortDescription ?? '')
   const distanceKm = (exc.distance ?? 0) / 1000
@@ -398,7 +392,7 @@ export function mapExcursionFromShort(exc: ApiExcursionShort): Excursion {
     finishLabel: '',
     coverImageUrl: '',
     routeColor: '#0f766e',
-    difficulty: difficultyFromDistance(distanceKm),
+    difficulty: getDifficultyByDistance(distanceKm),
     audienceLabel: 'Все',
     stops: [],
   }

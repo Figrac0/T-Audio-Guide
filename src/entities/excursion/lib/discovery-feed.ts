@@ -1,7 +1,6 @@
 ﻿import type {
   AudioStory,
   Excursion,
-  ExcursionDifficulty,
   ExcursionTheme,
   GeoPoint,
   NearbyPoint,
@@ -10,6 +9,7 @@
   SupportedLocale,
 } from '@/entities/excursion/model/types'
 import { appMapConfig } from '@/shared/config/map'
+import { getDifficultyByDistance } from '@/shared/lib/excursion-difficulty'
 
 interface DiscoveryFeed {
   excursions: Excursion[]
@@ -35,7 +35,6 @@ interface RouteTemplate {
   slug: string
   theme: ExcursionTheme
   routeColor: string
-  difficulty: ExcursionDifficulty
   stopIds: string[]
   createdAt: string
   coverImageUrl: string
@@ -631,7 +630,6 @@ const routeTemplates: RouteTemplate[] = [
     slug: 'first-steps-nearby',
     theme: 'walk',
     routeColor: '#0f766e',
-    difficulty: 'easy',
     stopIds: ['viewpoint-plaza', 'city-museum', 'history-square', 'central-park'],
     createdAt: '2026-03-29T18:00:00.000Z',
     coverImageUrl: '/illustrations/volga-route.svg',
@@ -657,7 +655,6 @@ const routeTemplates: RouteTemplate[] = [
     slug: 'local-flavor-loop',
     theme: 'food',
     routeColor: '#d97706',
-    difficulty: 'easy',
     stopIds: ['food-market', 'street-bistro', 'dessert-lab', 'viewpoint-plaza'],
     createdAt: '2026-03-28T13:00:00.000Z',
     coverImageUrl: '/illustrations/landmark-card.svg',
@@ -683,7 +680,6 @@ const routeTemplates: RouteTemplate[] = [
     slug: 'green-reset-route',
     theme: 'nature',
     routeColor: '#4f772d',
-    difficulty: 'medium',
     stopIds: ['central-park', 'botanical-yard', 'viewpoint-plaza'],
     createdAt: '2026-03-27T11:30:00.000Z',
     coverImageUrl: '/illustrations/volga-route.svg',
@@ -709,7 +705,6 @@ const routeTemplates: RouteTemplate[] = [
     slug: 'afterwork-fun-trail',
     theme: 'fun',
     routeColor: '#7c3aed',
-    difficulty: 'medium',
     stopIds: ['maker-gallery', 'art-club', 'street-bistro', 'history-square'],
     createdAt: '2026-03-26T19:00:00.000Z',
     coverImageUrl: '/illustrations/landmark-card.svg',
@@ -735,7 +730,6 @@ const routeTemplates: RouteTemplate[] = [
     slug: 'neighborhood-mix',
     theme: 'mixed',
     routeColor: '#0f4c81',
-    difficulty: 'hard',
     stopIds: ['city-museum', 'food-market', 'central-park', 'maker-gallery'],
     createdAt: '2026-03-25T09:00:00.000Z',
     coverImageUrl: '/illustrations/volga-route.svg',
@@ -853,7 +847,7 @@ function createExcursion(
       stops.at(-1)?.title ?? localizeText({ ru: 'Финиш', en: 'Finish' }, locale),
     coverImageUrl: template.coverImageUrl,
     routeColor: template.routeColor,
-    difficulty: template.difficulty,
+    difficulty: getDifficultyByDistance(routeDistanceKm),
     audienceLabel: localizeText(template.audienceLabel, locale),
     stops,
   }

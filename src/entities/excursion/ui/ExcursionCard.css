@@ -43,8 +43,17 @@
   transition: transform 0.45s ease;
 }
 
+.card__cover--fallback img {
+  object-fit: contain;
+  transform: none;
+}
+
 .card:hover .card__cover img {
   transform: scale(1.07);
+}
+
+.card:hover .card__cover--fallback img {
+  transform: none;
 }
 
 .card__cover--gradient::after {
@@ -172,6 +181,7 @@
 
 .card__stats-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -191,6 +201,10 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.card__stat-badge--difficulty {
+  color: var(--color-brand-strong);
 }
 
 .card__stat-duration {
