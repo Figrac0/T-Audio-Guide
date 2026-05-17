@@ -186,7 +186,8 @@
 
 .profile-routes--saved.profile-routes--scrollable {
     overflow-y: auto;
-    overscroll-behavior: contain;
+    overscroll-behavior-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .profile-routes--saved::-webkit-scrollbar {

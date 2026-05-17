@@ -28,23 +28,75 @@ import '@/features/route-map/ui/leaflet-popup-close.css'
 import './RouteBuilderMap.css'
 
 let activePopupAudio: HTMLAudioElement | null = null
+let activePopupAudioButton: HTMLButtonElement | null = null
+let activePopupAudioUrl: string | null = null
 
-function togglePopupAudio(audioUrl: string): void {
-  if (activePopupAudio?.src === audioUrl && !activePopupAudio.paused) {
+const popupAudioLabels = {
+  pause: '⏸ Поставить на паузу',
+  play: '🎧 Прослушать аудиогид',
+  resume: '▶ Продолжить',
+}
+
+function setPopupAudioButtonState(
+  button: HTMLButtonElement | null,
+  state: keyof typeof popupAudioLabels,
+) {
+  if (!button) return
+  button.textContent = popupAudioLabels[state]
+  button.dataset.audioState = state
+}
+
+function resetPopupAudio(): void {
+  activePopupAudio?.pause()
+  setPopupAudioButtonState(activePopupAudioButton, 'play')
+  activePopupAudio = null
+  activePopupAudioButton = null
+  activePopupAudioUrl = null
+}
+
+function finishPopupAudio(audio: HTMLAudioElement, button: HTMLButtonElement): void {
+  if (activePopupAudio !== audio) return
+  setPopupAudioButtonState(button, 'play')
+  activePopupAudio = null
+  activePopupAudioButton = null
+  activePopupAudioUrl = null
+}
+
+function togglePopupAudio(audioUrl: string, button: HTMLButtonElement): void {
+  if (
+    activePopupAudio &&
+    activePopupAudioUrl === audioUrl &&
+    activePopupAudioButton === button
+  ) {
+    if (activePopupAudio.paused) {
+      const audio = activePopupAudio
+      void audio.play()
+        .then(() => setPopupAudioButtonState(button, 'pause'))
+        .catch(() => finishPopupAudio(audio, button))
+      return
+    }
+
     activePopupAudio.pause()
+    setPopupAudioButtonState(button, 'resume')
     return
   }
 
-  activePopupAudio?.pause()
-  activePopupAudio = new Audio(audioUrl)
-  activePopupAudio.addEventListener('ended', () => {
-    activePopupAudio = null
+  resetPopupAudio()
+
+  const audio = new Audio(audioUrl)
+  activePopupAudio = audio
+  activePopupAudioButton = button
+  activePopupAudioUrl = audioUrl
+  setPopupAudioButtonState(button, 'pause')
+
+  audio.addEventListener('ended', () => {
+    finishPopupAudio(audio, button)
   }, { once: true })
-  activePopupAudio.addEventListener('error', () => {
-    activePopupAudio = null
+  audio.addEventListener('error', () => {
+    finishPopupAudio(audio, button)
   }, { once: true })
-  void activePopupAudio.play().catch(() => {
-    activePopupAudio = null
+  void audio.play().catch(() => {
+    finishPopupAudio(audio, button)
   })
 }
 
@@ -114,8 +166,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
 
   useEffect(() => {
     return () => {
-      activePopupAudio?.pause()
-      activePopupAudio = null
+      resetPopupAudio()
     }
   }, [])
 
@@ -171,7 +222,10 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
         }, 200)
       })
 
-      map.on('popupclose', () => onPopupCloseRef.current())
+      map.on('popupclose', () => {
+        resetPopupAudio()
+        onPopupCloseRef.current()
+      })
 
       map.on('click', (event: L.LeafletMouseEvent) => {
         onMapClickRef.current?.({
@@ -575,13 +629,14 @@ function buildPopupEl(
   audioBtn.className = `rbm-popup__btn rbm-popup__btn--audio${point.audioGuideUrl ? '' : ' rbm-popup__btn--audio-disabled'}`
   audioBtn.disabled = !point.audioGuideUrl
   const attachAudioGuide = (audioUrl: string) => {
+    if (audioBtn.dataset.audioUrl === audioUrl) return
+    audioBtn.dataset.audioUrl = audioUrl
     audioBtn.className = 'rbm-popup__btn rbm-popup__btn--audio'
     audioBtn.disabled = false
-    audioBtn.addEventListener('click', () => {
-      togglePopupAudio(audioUrl)
-    })
+    setPopupAudioButtonState(audioBtn, 'play')
+    audioBtn.onclick = () => togglePopupAudio(audioUrl, audioBtn)
   }
-  audioBtn.textContent = '🎧 Прослушать аудиогид'
+  setPopupAudioButtonState(audioBtn, 'play')
   if (point.audioGuideUrl) {
     attachAudioGuide(point.audioGuideUrl)
   } else {

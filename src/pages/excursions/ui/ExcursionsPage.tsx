@@ -86,6 +86,7 @@ export function ExcursionsPage() {
   const effectiveUserPosition = isOverrideActive ? manualPosition : null
   const state = useExcursionsPageState(effectiveUserPosition, effectiveUserPosition)
   const [showAll, setShowAll] = useState(false)
+  const [dismissedGeoError, setDismissedGeoError] = useState<string | null>(null)
   const finalEffectiveUserPosition = effectiveUserPosition ?? state.userPosition
   const catalogInitial = useCatalogInitial()
   const catalogContentRef = useRef<HTMLDivElement>(null)
@@ -653,6 +654,12 @@ export function ExcursionsPage() {
     catalogContentHeight === null
       ? undefined
       : ({ '--ep-catalog-min-height': `${catalogContentHeight}px` } as CSSProperties)
+  const shouldShowGeoError =
+    Boolean(state.geolocationError) &&
+    state.geolocationError !== dismissedGeoError &&
+    !state.userPosition &&
+    !isOverrideActive &&
+    !isFullyOpen
 
   // Search results carry no photos or full description — backfill from
   // /points/{id} so the nearby strip and detail panel show real data.
@@ -675,6 +682,7 @@ export function ExcursionsPage() {
       addressLabel: base.addressLabel || data.address || undefined,
       scheduleLabel: base.scheduleLabel || data.workingHours,
       audioGuideUrl: data.audioUrl || base.audioGuideUrl,
+      audioTranscript: data.audioTranscript ?? base.audioTranscript ?? null,
     }
   }, [state.detailPoint, pointDetailsMap])
 
@@ -714,7 +722,19 @@ export function ExcursionsPage() {
         </div>
       )}
 
-      {state.geolocationError ? <p className="ep__geo-error">{state.geolocationError}</p> : null}
+      {shouldShowGeoError ? (
+        <div className="ep__geo-error" role="status">
+          <span className="ep__geo-error-text">{state.geolocationError}</span>
+          <button
+            aria-label="Скрыть уведомление о геолокации"
+            className="ep__geo-error-close"
+            onClick={() => setDismissedGeoError(state.geolocationError)}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
 
       <div className="ep-sheet" ref={sheetRef}>
         {/* ── Drag handle bar ── */}
@@ -1259,9 +1279,20 @@ function PointDetailPanel({
     'ep-detail__action-btn--route',
   ].join(' ')
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const transcriptRef = useRef<HTMLDivElement>(null)
   const [playingAudioUrl, setPlayingAudioUrl] = useState<string | null>(null)
+  const [isTranscriptOpen, setIsTranscriptOpen] = useState(false)
+  const [transcriptHeight, setTranscriptHeight] = useState(0)
   const hasAudioGuide = Boolean(point.audioGuideUrl)
   const isAudioPlaying = playingAudioUrl === point.audioGuideUrl
+  const hasTranscript = Boolean(point.audioTranscript)
+
+  function handleTranscriptToggle() {
+    if (!isTranscriptOpen && transcriptRef.current) {
+      setTranscriptHeight(transcriptRef.current.scrollHeight)
+    }
+    setIsTranscriptOpen((v) => !v)
+  }
 
   useEffect(() => {
     return () => {
@@ -1273,7 +1304,9 @@ function PointDetailPanel({
   useEffect(() => {
     audioRef.current?.pause()
     audioRef.current = null
-  }, [point.audioGuideUrl])
+    setPlayingAudioUrl(null)
+    setIsTranscriptOpen(false)
+  }, [point.id])
 
   function handleToggleAudioGuide() {
     if (!point.audioGuideUrl) return
@@ -1356,6 +1389,29 @@ function PointDetailPanel({
               ? 'Для этой точки доступно аудиосопровождение.'
               : 'Сейчас для этой точки доступно только текстовое описание.'}
           </p>
+          {hasAudioGuide && hasTranscript ? (
+            <button
+              className="ep-detail__audio-btn"
+              onClick={handleTranscriptToggle}
+              type="button"
+            >
+              {isTranscriptOpen ? 'Скрыть' : 'Прочитать'}
+            </button>
+          ) : null}
+          {hasTranscript ? (
+            <div
+              aria-hidden={!isTranscriptOpen}
+              style={{
+                maxHeight: isTranscriptOpen ? `${transcriptHeight}px` : '0px',
+                overflow: 'hidden',
+                transition: 'max-height 0.42s cubic-bezier(0.4, 0, 0.2, 1)',
+              }}
+            >
+              <div ref={transcriptRef}>
+                <p className="ep-detail__audio-transcript">{point.audioTranscript}</p>
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <div className="ep-detail__actions" aria-label="Действия с точкой">

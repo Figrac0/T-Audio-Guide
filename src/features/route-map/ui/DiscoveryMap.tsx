@@ -719,16 +719,18 @@ export function DiscoveryMap({
           prevIconState.active !== isActive ||
           prevIconState.draftOrder !== draftOrder
         ) {
-          existing.setIcon(createPoiIcon(point, isActive, draftOrder))
+          existing.setIcon(createPoiIcon(point, isActive, draftOrder, true))
           markerIconStateRef.current.set(point.id, { active: isActive, draftOrder })
         }
+        existing.setZIndexOffset(isActive ? 1000 : 0)
         existing.setPopupContent(popupContent)
         return
       }
 
       const newMarker = L.marker([point.coordinates.lat, point.coordinates.lng], {
-        icon: createPoiIcon(point, isActive, draftOrder),
+        icon: createPoiIcon(point, isActive, draftOrder, true),
         title: buildMarkerTitle(point),
+        zIndexOffset: isActive ? 1000 : 0,
       })
         .bindPopup(popupContent, {
           // autoPan animates once on popup open so the user sees it; that's
@@ -809,8 +811,9 @@ export function DiscoveryMap({
       const isActive = point.id === selectedPointId
       const draftOrder = visibleDraftOrderMap.get(point.id) ?? null
       const prev = markerIconStateRef.current.get(point.id)
+      marker.setZIndexOffset(isActive ? 1000 : 0)
       if (prev && prev.active === isActive && prev.draftOrder === draftOrder) return
-      marker.setIcon(createPoiIcon(point, isActive, draftOrder))
+      marker.setIcon(createPoiIcon(point, isActive, draftOrder, true))
       markerIconStateRef.current.set(point.id, { active: isActive, draftOrder })
     })
   }, [nearbyPoints, selectedPointId, visibleDraftOrderMap])

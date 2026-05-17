@@ -5,10 +5,30 @@ import { getAudioGuideUrl, hasAudioGuideAvailable } from '@/entities/excursion/l
 export function useAudioGuide(currentStop: RouteStop, currentStopIndex: number) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [playingStopIndex, setPlayingStopIndex] = useState<number | null>(null)
+  const [loadedDurationSeconds, setLoadedDurationSeconds] = useState<number | null>(null)
 
   const audioUrl = getAudioGuideUrl(currentStop.audio)
   const isAudioAvailable = hasAudioGuideAvailable(currentStop.audio)
   const isAudioPlaying = playingStopIndex === currentStopIndex
+
+  // Preload audio metadata to get real duration without downloading the full file.
+  useEffect(() => {
+    setLoadedDurationSeconds(null)
+    if (!audioUrl) return
+    const meta = new Audio()
+    meta.preload = 'metadata'
+    meta.src = audioUrl
+    const handleLoaded = () => {
+      if (isFinite(meta.duration) && meta.duration > 0) {
+        setLoadedDurationSeconds(meta.duration)
+      }
+    }
+    meta.addEventListener('loadedmetadata', handleLoaded)
+    return () => {
+      meta.removeEventListener('loadedmetadata', handleLoaded)
+      meta.src = ''
+    }
+  }, [audioUrl])
 
   // Pause and release audio when the active stop changes
   useEffect(() => {
@@ -33,6 +53,11 @@ export function useAudioGuide(currentStop: RouteStop, currentStopIndex: number) 
       const audio = new Audio(audioUrl)
       audio.addEventListener('ended', () => setPlayingStopIndex(null))
       audio.addEventListener('error', () => setPlayingStopIndex(null))
+      audio.addEventListener('loadedmetadata', () => {
+        if (isFinite(audio.duration) && audio.duration > 0) {
+          setLoadedDurationSeconds(audio.duration)
+        }
+      })
       audioRef.current = audio
     }
     if (isAudioPlaying) {
@@ -49,5 +74,6 @@ export function useAudioGuide(currentStop: RouteStop, currentStopIndex: number) 
     isAudioPlaying,
     isAudioAvailable,
     toggleAudio,
+    loadedDurationSeconds,
   }
 }

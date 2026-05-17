@@ -18,6 +18,8 @@ export interface DiscoveryContext {
 }
 
 const discoveryContextKey = 't-guide:discovery-context'
+const legacyMoscowCenter: GeoPoint = { lat: 55.751244, lng: 37.618423 }
+const legacyCenterTolerance = 0.00001
 
 export function detectSupportedLocale(localeCandidate?: string): SupportedLocale {
   const normalizedLocale = (localeCandidate ?? '').toLowerCase()
@@ -72,12 +74,14 @@ export function getStoredDiscoveryContext(): DiscoveryContext {
   try {
     const parsedValue = JSON.parse(serializedValue) as Partial<DiscoveryContext>
 
+    const parsedCenter =
+      parsedValue.center?.lat !== undefined && parsedValue.center?.lng !== undefined
+        ? parsedValue.center
+        : defaultContext.center
+
     return {
       activePointCategory: parsedValue.activePointCategory ?? defaultContext.activePointCategory,
-      center:
-        parsedValue.center?.lat !== undefined && parsedValue.center?.lng !== undefined
-          ? parsedValue.center
-          : defaultContext.center,
+      center: isLegacyMoscowCenter(parsedCenter) ? defaultContext.center : parsedCenter,
       locale: parsedValue.locale ?? defaultContext.locale,
       browserLocale: parsedValue.browserLocale ?? defaultContext.browserLocale,
       radiusMeters:
@@ -89,6 +93,13 @@ export function getStoredDiscoveryContext(): DiscoveryContext {
   } catch {
     return defaultContext
   }
+}
+
+function isLegacyMoscowCenter(center: GeoPoint) {
+  return (
+    Math.abs(center.lat - legacyMoscowCenter.lat) <= legacyCenterTolerance &&
+    Math.abs(center.lng - legacyMoscowCenter.lng) <= legacyCenterTolerance
+  )
 }
 
 export function saveDiscoveryContext(context: DiscoveryContext) {

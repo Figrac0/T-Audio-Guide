@@ -748,6 +748,7 @@ body.app-body--excursion-nav {
 }
 
 .ep-nav__audio-btn--playing {
+    padding-left: 0;
     background: var(--color-brand);
     border-color: var(--color-brand);
     color: #fff;
@@ -1090,6 +1091,22 @@ body.app-body--excursion-nav {
     line-height: 1.55;
 }
 
+.ep-nav__audio-transcript {
+    margin: 0;
+    padding-top: 4px;
+    color: var(--color-text-secondary);
+    font-size: 0.84rem;
+    line-height: 1.72;
+    white-space: pre-wrap;
+    text-wrap: pretty;
+}
+
+@media (min-width: 640px) {
+    .ep-nav__audio-play-btn {
+        justify-self: center;
+    }
+}
+
 .ep-nav__stop-actions {
     display: flex;
     flex-direction: column;
@@ -1108,6 +1125,7 @@ body.app-body--excursion-nav {
 .ep-nav__stop-nav-btn {
     display: inline-flex;
     min-height: 46px;
+    min-width: 0;
     flex: 1 1 260px;
     max-width: 420px;
     align-items: center;
@@ -1128,6 +1146,10 @@ body.app-body--excursion-nav {
 .ep-nav__stop-nav-btn:hover {
     transform: translateY(-1px);
     box-shadow: 0 12px 22px rgba(31, 37, 51, 0.1);
+}
+
+.ep-nav__stop-nav-btn svg {
+    flex: 0 0 auto;
 }
 
 .ep-nav__stop-nav-btn--prev {
@@ -1151,6 +1173,9 @@ body.app-body--excursion-nav {
 }
 
 .ep-nav__stop-nav-label {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

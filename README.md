@@ -10,7 +10,7 @@
   </a>
 </div>
 
-T-Guide - SPA для поиска мест рядом, просмотра готовых аудиоэкскурсий, сборки личного маршрута и работы с профилем пользователя.
+T-Guide — SPA для поиска мест рядом, просмотра готовых аудиоэкскурсий, сборки личного маршрута и работы с профилем пользователя.
 
 ---
 
@@ -28,35 +28,33 @@ T-Guide - SPA для поиска мест рядом, просмотра гот
 10. [Контекст пользовательских маршрутов](#10-контекст-пользовательских-маршрутов)
 11. [Хуки](#11-хуки)
 12. [Карта (Leaflet)](#12-карта-leaflet)
-13. [Виджеты](#13-виджеты)
-14. [Утилиты](#14-утилиты)
-15. [CSS — переменные и глобальные классы](#15-css)
-16. [Хранилища (localStorage / sessionStorage)](#16-хранилища)
-17. [Переменные окружения](#17-переменные-окружения)
-18. [Потоки данных — пошагово](#18-потоки-данных)
-19. [Что сейчас не работает (проблемы бэка)](#19-известные-проблемы)
+13. [Утилиты](#13-утилиты)
+14. [CSS — переменные и глобальные классы](#14-css)
+15. [Хранилища (localStorage / sessionStorage)](#15-хранилища)
+16. [Переменные окружения](#16-переменные-окружения)
+17. [Потоки данных — пошагово](#17-потоки-данных)
+18. [Что сейчас не работает (проблемы бэка)](#18-известные-проблемы)
 
 ---
 
 ## 1. Стек и структура
 
-| Технология                   | Зачем               |
-| ---------------------------- | ------------------- |
-| React 18                     | UI                  |
-| TypeScript                   | Типобезопасность    |
-| Vite                         | Сборка              |
-| Leaflet                      | Интерактивные карты |
-| React Router v6              | Навигация           |
-| CSS Modules + глобальный CSS | Стили               |
+| Технология        | Версия   | Зачем                   |
+| ----------------- | -------- | ----------------------- |
+| React             | 19.2     | UI                      |
+| TypeScript        | 5.9      | Типобезопасность        |
+| Vite              | 8.0      | Сборка                  |
+| Leaflet           | 1.9      | Интерактивные карты     |
+| React Router      | 7.13     | Навигация               |
+| CSS (глобальный)  | —        | Стили без CSS-in-JS     |
 
 ### Архитектура: Feature-Sliced Design (FSD)
 
 ```
 src/
 ├── app/            ← корень: роутер, провайдеры, глобальные стили
-├── pages/          ← страницы (HomePage, ExcursionsPage, ...)
-├── widgets/        ← крупные переиспользуемые блоки (ExcursionCatalog, RouteOverview)
-├── features/       ← функциональные модули (карта, геолокация, маршруты)
+├── pages/          ← страницы (HomePage, ExcursionsPage, ExcursionPage, ProfilePage, ...)
+├── features/       ← функциональные модули (карта, геолокация, пользовательские маршруты)
 ├── entities/       ← доменные модели + хуки данных (Excursion, NearbyPoint, ...)
 └── shared/         ← API, утилиты, конфиги, константы
 ```
@@ -76,16 +74,13 @@ src/
 
 ```
 BrowserRouter
-  └── AuthProvider          ← управляет сессией (токены, пользователь)
+  └── AuthProvider              ← управляет сессией (токены, пользователь)
         └── UserRoutesBoundary  ← следит за изменением userId, перемонтирует UserRoutesProvider
-              └── UserRoutesProvider  ← управляет черновиком и сохранёнными маршрутами
+              └── UserRoutesProvider  ← черновик и сохранённые маршруты
                     └── AppFrame      ← шапка + <main> + AppRouter
 ```
 
-### `src/app/App.tsx` → `AppFrame`
-
-Рендерит:
-
+`AppFrame` рендерит:
 - `<header>` с логотипом `T-GUIDE`, кнопкой меню, навигационными ссылками
 - `<main>` с `<AppRouter />`
 
@@ -133,7 +128,6 @@ export const appRoutes = {
 ### `src/app/providers/AuthProvider.tsx`
 
 **Что делает:**
-
 - При монтировании вызывает `appApi.getSession()` → пробует загрузить профиль
 - Хранит `session: SessionDto | null` и `isLoading: boolean`
 - Предоставляет через контекст: `signIn`, `register`, `signOut`, `updateProfile`, `changePassword`, `requestPasswordReset`
@@ -151,7 +145,7 @@ export const appRoutes = {
 
 ```typescript
 {
-  id: string           // backend присылает number, мы конвертируем в string
+  id: string           // backend присылает number, конвертируем в string
   username?: string
   name: string
   email: string
@@ -161,26 +155,14 @@ export const appRoutes = {
 }
 ```
 
-### `src/app/providers/auth-context.ts`
-
-Определяет интерфейс `AuthContextValue` — то, что возвращает `useAuth()`.
-
-### `src/app/providers/useAuth.ts`
-
-```typescript
-export function useAuth(): AuthContextValue;
-// Бросает ошибку если вызвать вне AuthProvider
-```
-
 ### Как хранятся токены
 
 Файл: `src/shared/api/http.ts`
 
 После логина бэк присылает `{ tokens: { accessToken, refreshToken } }`.
-Мы сохраняем в localStorage под ключом `t-guide:auth:tokens`.
+Сохраняем в localStorage под ключом `t-guide:auth:tokens`.
 
 При каждом запросе:
-
 1. Читаем токены из localStorage
 2. Добавляем заголовок `Authorization: Bearer <accessToken>`
 3. Если ответ 401 → вызываем `POST /auth/refresh` с refreshToken
@@ -188,7 +170,6 @@ export function useAuth(): AuthContextValue;
 5. Если refresh провалился → чистим токены, пользователь становится гостем
 
 **Пути без авторизации** (токен НЕ добавляется):
-
 - `/auth/login`
 - `/auth/registration`
 - `/auth/refresh`
@@ -202,41 +183,21 @@ export function useAuth(): AuthContextValue;
 **Путь:** `/`
 
 **Что показывает:**
-
 - Карта на весь экран (`DiscoveryMap`)
 - Шторка снизу в трёх состояниях: закрыта / peek / раскрыта (drag-to-snap)
 
 **Шторка содержит:**
 
-_Фильтры точек:_
-`Все | Музеи | Развлечения | История | Еда | Природа`
+_Фильтры точек:_ `Все | Музеи | Развлечения | История | Еда | Природа`
 → меняют `activePointCategory` → триггерят `useDiscoveryRoutes`
 
-_Карточки точек "Рядом с вами":_
+_Карточки точек "Рядом с вами":_ горизонтальный скролл, клик → маркер на карте
 
-- Горизонтальный скролл
-- Клик на карточку → маркер на карте + детали точки
+_Фильтры маршрутов:_ по теме и времени, фильтрация на фронте
 
-_Фильтры маршрутов:_
-По теме: `Все | Прогулка | Еда | Природа | Развлечения | Разное`
-По времени: `Любое | До 30 мин | До 60 мин | До 90 мин | До 120 мин`
-→ фильтрация **на фронте** из уже загруженного массива
+_Готовые маршруты:_ показывает максимум 4, ссылка "Смотреть все" → `/excursions`
 
-_Готовые маршруты:_
-
-- `ExcursionCatalog` — показывает максимум 4
-- Ссылка "Смотреть все" → `/excursions`
-
-**Хуки которые использует:**
-
-```typescript
-useDiscoveryRoutes(); // ← главные данные: nearbyPoints + excursions
-useUserGeolocation(); // ← позиция пользователя на карте
-useUserRoutes(); // ← черновик маршрута
-useAuth(); // ← проверка авторизации
-```
-
-**Состояние хранится** в sessionStorage: `t-guide:discovery-context`
+**Состояние** хранится в sessionStorage: `t-guide:discovery-context`
 (центр карты, радиус, категория, локаль)
 
 ---
@@ -246,10 +207,19 @@ useAuth(); // ← проверка авторизации
 **Путь:** `/excursions` (защищённая)
 
 **Что показывает:**
-
-- Карта + шторка (аналогично Home)
+- Карта + шторка с drag-to-snap (три позиции: закрыта / peek / раскрыта)
 - Конструктор маршрута: добавляй точки → нажми "Сохранить"
 - Каталог готовых маршрутов с фильтрами
+- Панель подробностей точки (`PointDetailPanel`)
+
+**Панель подробностей точки** (`PointDetailPanel`):
+- Изображение, метрики (расстояние, время ходьбы, рейтинг)
+- Полное описание (разбито на параграфы)
+- Кнопка "Прослушать аудиогид" — воспроизводит аудио через HTML5 Audio API
+- Кнопка "Прочитать" — раскрывает полный текст транскрипта с плавной анимацией
+- Кнопки "Добавить в маршрут" / "Убрать из маршрута"
+
+Данные точки обогащаются через `/points/{id}` — добавляется полное описание, фото, URL аудио и транскрипт.
 
 **Состояние** вынесено в `src/pages/excursions/model/useExcursionsPageState.ts`
 
@@ -261,14 +231,32 @@ useAuth(); // ← проверка авторизации
 
 **Три фазы:**
 
-1. **InfoPhase** — обзор маршрута, список остановок, кнопки "Начать", "Сохранить", "Поделиться"
-2. **NavigationPhase** — пошаговая навигация, аудиогид, геолокация
-3. **CompleteScreen** — экран завершения, оценка
+**1. InfoPhase** — обзор маршрута
+- Обложка, заголовок, сложность, тема
+- Статистика: время, точки, длина, формат
+- Текстовое описание маршрута
+- Список карточек остановок с индикатором наличия аудиогида
+- Кнопки "Начать маршрут", "Сохранить", "Поделиться"
 
-**Загрузка данных:** `useRouteBySlug({ slug })` → `appApi.getRouteBySlug()` → `GET /excursions/{id}`
+**2. NavigationPhase** — пошаговая навигация
+- Карта на весь экран с текущей остановкой и маркером пользователя
+- Перетаскиваемая шторка (drag-to-snap: закрыта / peek / раскрыта)
+- Карточка текущей остановки: фото, название, рейтинг, расписание, описание
+- **Блок аудиогида:**
+  - Заголовок с длительностью (загружается из файла через `preload="metadata"`) и языком
+  - Кнопка "Прослушать" / "Пауза" — воспроизводит аудио
+  - Кнопка "Прочитать" / "Скрыть" — раскрывает транскрипт с плавной анимацией
+- Навигация между точками: "Предыдущая" / "Следующая" / "Завершить"
+- Кнопка геолокации
 
-Slug имеет формат `excursion-{id}`, например `excursion-42`.
-Мы парсим id из slug и запрашиваем бэк.
+**3. CompleteScreen** — экран завершения
+- Конфетти, статистика пройденного маршрута
+- Форма отзыва (звёзды + текст)
+- Кнопки "Сохранить маршрут", "Поделиться", "Все маршруты"
+
+**Загрузка данных:**
+`useRouteBySlug({ slug })` → `GET /excursions/{id}` → маппинг в `Excursion`.
+Затем каждая остановка обогащается через `usePointDetailsMap` — добавляется полное описание, фото, URL аудио и полный текст транскрипта.
 
 ---
 
@@ -277,16 +265,12 @@ Slug имеет формат `excursion-{id}`, например `excursion-42`.
 **Путь:** `/profile` (защищённая)
 
 **Что показывает:**
-
 - Форма профиля (имя, email, язык)
 - Форма смены пароля
 - Сохранённые маршруты (из избранного)
 - Созданные маршруты (личные)
-- История посещений
 
-**Автовыход при ошибке авторизации:**
-Если `GET /profile` возвращает 401 → `useEffect` определяет ошибку авторизации →
-вызывает `signOut()` → редирект на `/auth/sign-in`.
+**Автовыход:** если `/profile` возвращает 401 → `signOut()` → редирект на `/auth/sign-in`.
 
 ---
 
@@ -295,7 +279,6 @@ Slug имеет формат `excursion-{id}`, например `excursion-42`.
 **Путь:** `/auth/sign-in` (публичная)
 
 **Три режима** в одном компоненте:
-
 - `sign-in` — email + пароль → `appApi.signIn()`
 - `register` — email + имя + пароль + язык → `appApi.register()`
 - `reset` — email → `appApi.requestPasswordReset()`
@@ -332,19 +315,19 @@ export const appApi: FrontendApi = useMockApi ? mockApi : httpApi;
 
 **Методы `httpApi`:**
 
-| Метод                          | Что делает                                                             |
-| ------------------------------ | ---------------------------------------------------------------------- |
-| `getDiscoveryFeed(payload)`    | Параллельно: `/points/search` + `/excursions/search`, маппит результат |
-| `getProfileOverview()`         | Параллельно: `/profile` + `/excursions/my` + `/excursions/favorites`   |
-| `getRouteBySlug(payload)`      | Парсит id из slug → `/excursions/{id}`                                 |
-| `getRoutesCatalog(payload)`    | `/excursions/search` по текущей локации                                |
-| `getSession()`                 | `/profile` → `{isAuthenticated, profile}`                              |
-| `signIn(payload)`              | `authService.login()`                                                  |
-| `register(payload)`            | `authService.register()`                                               |
-| `signOut()`                    | `authService.logout()`                                                 |
-| `createPersonalRoute(payload)` | `POST /excursions` с массивом точек                                    |
-| `updateProfile(payload)`       | `profileService.updateProfile()`                                       |
-| `changePassword(payload)`      | `authService.changePassword()`                                         |
+| Метод                          | Что делает                                                              |
+| ------------------------------ | ----------------------------------------------------------------------- |
+| `getDiscoveryFeed(payload)`    | Параллельно: `/points/search` + `/excursions/search`, маппит результат  |
+| `getProfileOverview()`         | Параллельно: `/profile` + `/excursions/my` + `/excursions/favorites`    |
+| `getRouteBySlug(payload)`      | Парсит id из slug → `/excursions/{id}`                                  |
+| `getRoutesCatalog(payload)`    | `/excursions/search` по текущей локации                                 |
+| `getSession()`                 | `/profile` → `{isAuthenticated, profile}`                               |
+| `signIn(payload)`              | `authService.login()`                                                   |
+| `register(payload)`            | `authService.register()`                                                |
+| `signOut()`                    | `authService.logout()`                                                  |
+| `createPersonalRoute(payload)` | `POST /excursions` с массивом точек                                     |
+| `updateProfile(payload)`       | `profileService.updateProfile()`                                        |
+| `changePassword(payload)`      | `authService.changePassword()`                                          |
 
 ### `src/shared/api/http.ts` — HTTP-клиент
 
@@ -358,19 +341,6 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T>;
 - Парсит ошибку из JSON-тела (`body.message || body.error`)
 - При 204 или пустом ответе возвращает `undefined`
 
-**Управление токенами:**
-
-```typescript
-readAuthTokens(): AuthTokensDto | null   // читает из localStorage
-writeAuthTokens(tokens): void            // пишет в localStorage
-clearAuthTokens(): void                  // удаляет из localStorage
-```
-
-Токен считается невалидным и удаляется если:
-
-- длина < 16 символов
-- равен строке `'mocked_access_token'`
-
 ---
 
 ## 7. Сервисы
@@ -379,21 +349,13 @@ clearAuthTokens(): void                  // удаляет из localStorage
 
 ```typescript
 authService.login({ login, password });
-// POST /auth/login
-// body: { username: login, password }
-// response: { tokens: { accessToken, refreshToken }, user: {...} }
-// → сохраняет токены, возвращает SessionDto
+// POST /auth/login → { tokens, user } → сохраняет токены, возвращает SessionDto
 
 authService.register({ name, email, password, language });
-// POST /auth/registration
-// body: { username (из email), email, name, password, lang: "RU" }
-// response: { tokens: {...}, user: {...} }
-// → сохраняет токены, возвращает SessionDto
+// POST /auth/registration → { tokens, user } → сохраняет токены, возвращает SessionDto
 
 authService.logout();
-// POST /auth/logout
-// body: { refreshToken } — только если токен есть!
-// → чистит токены, возвращает гостевую сессию
+// POST /auth/logout { refreshToken } → чистит токены, возвращает гостевую сессию
 
 authService.changePassword({ oldPassword, newPassword });
 // POST /profile/change-password
@@ -403,67 +365,43 @@ authService.changePassword({ oldPassword, newPassword });
 
 ```typescript
 profileService.getProfile();
-// GET /profile
-// response: UserResponse { id, username, email, name, lang, role }
-// → нормализует: id в string, lang в lowercase
+// GET /profile → UserResponse → нормализует: id в string, lang в lowercase
 
 profileService.updateProfile({ name, email, language });
-// PATCH /profile
-// body: { name, email, lang: language.toUpperCase() }
+// PATCH /profile { name, email, lang: language.toUpperCase() }
 ```
 
 ### `src/shared/api/excursionsService.ts`
 
 ```typescript
 excursionsService.searchExcursions({ location, radiusKilometers });
-// POST /excursions/search
-// body: { location: {latitude, longitude}, radiusKilometers }
-// radiusKilometers — целое число [1, 15]
-// response: { excursions: ExcursionShortItem[] }
+// POST /excursions/search → { excursions: ExcursionShortItem[] }
 
 excursionsService.getExcursionById(id);
-// GET /excursions/{id}
-// response: ExcursionDetailResponse { ..., points: { points: PointShortItem[] } }
+// GET /excursions/{id} → ExcursionDetailResponse { ..., points: { points: PointShortItem[] } }
 
 excursionsService.createExcursion({ title, description, points });
-// POST /excursions
-// body: { title, description, points: [{pointId, order}] }
+// POST /excursions { title, description, points: [{pointId, order}] }
 
-excursionsService.getMyExcursions();
-// GET /excursions/my
-// (скоро: ?page=0&size=25)
-
-excursionsService.getFavoriteExcursions();
-// GET /excursions/favorites
-// (скоро: ?page=0&size=25)
-
-excursionsService.addFavorite(id);
-// POST /excursions/{id}/favorite
-
-excursionsService.removeFavorite(id);
-// POST /excursions/{id}/unfavorite
-
-excursionsService.deleteExcursion(id);
-// DELETE /excursions/{id}
+excursionsService.getMyExcursions();   // GET /excursions/my
+excursionsService.getFavoriteExcursions(); // GET /excursions/favorites
+excursionsService.addFavorite(id);     // POST /excursions/{id}/favorite
+excursionsService.removeFavorite(id);  // POST /excursions/{id}/unfavorite
+excursionsService.deleteExcursion(id); // DELETE /excursions/{id}
 ```
 
 ### `src/shared/api/pointsService.ts`
 
 ```typescript
-pointsService.searchPoints({ location, radiusKilometers, categorySlugs, visitTime? })
-// POST /points/search
-// body: { location: {latitude, longitude}, radiusKilometers, categorySlugs: [] }
-// categorySlugs: [] — пустой массив если нет фильтра (НЕ undefined — иначе 500)
-// radiusKilometers — целое число [1, 15]
-// response: { points: PointShortItem[] }
+pointsService.searchPoints({ location, radiusKilometers, categorySlugs })
+// POST /points/search → { points: PointShortItem[] }
+// categorySlugs: [] если нет фильтра (НЕ undefined — иначе 500)
 
 pointsService.getPointDetail(id)
-// GET /points/{id}
-// response: PointDetailResponse { ..., media: [{url, type, sortOrder}] }
+// GET /points/{id} → PointDetailResponse { ..., media: [{url, type, sortOrder, transcript?}] }
 
 pointsService.getCategories()
-// GET /points/categories
-// response: { categories: [{id, name, slug}] }
+// GET /points/categories → { categories: [{id, name, slug}] }
 ```
 
 ---
@@ -472,109 +410,63 @@ pointsService.getCategories()
 
 ### `src/shared/api/mappers.ts`
 
-Бэк и фронт используют разные форматы. Маппинг происходит здесь.
-
-### Backend-типы (как приходит от бэка)
+**Backend-типы:**
 
 ```typescript
-// Краткая точка (из /points/search)
-ApiPointShort {
-  id: number
-  title: string
-  shortDescription?: string | null   // ← swagger добавил
-  categoryId: number
-  categoryName: string               // напр. "Музей", "museum", "restaurant"
-  coordinates: { latitude, longitude }
-  visitTime?: number | null          // минуты
+ApiPointMedia {
+  url: string
+  type: string          // 'IMAGE', 'VIDEO', 'AUDIO'
+  sortOrder: number
+  transcript?: string | null  // текст для AUDIO-медиа (транскрипт)
 }
 
-// Детальная точка (из /points/{id})
-ApiPointDetail extends ApiPointShort {
+ApiPointDetail {
+  id: number
+  title: string
   description?: string | null
   shortDescription?: string | null
   address?: string | null
   workingHours?: string | null
-  media?: ApiPointMedia[]            // фото/видео/аудио
+  media?: ApiPointMedia[]
 }
 
-ApiPointMedia {
-  url: string
-  type: string    // 'IMAGE', 'VIDEO', 'AUDIO'
-  sortOrder: number
-}
-
-// Краткая экскурсия (из /excursions/search)
-ApiExcursionShort {
+ApiExcursionDetail {
   id: number
   title: string
   description?: string
-  shortDescription?: string
-  distance?: number          // метры!
-  durationMin?: number       // минуты
+  distance?: number         // метры
+  durationMin?: number      // минуты
   pointsCount?: number
-  coordinates?: { latitude, longitude }
-  categoryIds?: number[]
-  owner?: boolean
-  routeType?: string         // 'PREBUILT' | 'CUSTOM'
-  visibility?: string        // 'PUBLIC' | 'PRIVATE'
-}
-
-// Детальная экскурсия (из /excursions/{id})
-ApiExcursionDetail extends ApiExcursionShort {
-  duration?: number          // альтернативное поле (используем если нет durationMin)
-  points?: { points: ApiExcursionPoint[] }  // двойная вложенность!
-}
-
-// Точка внутри экскурсии (PointShortItem)
-ApiExcursionPoint extends ApiPointShort {
-  order?: number
+  points?: { points: ApiExcursionPoint[] }
 }
 ```
 
-### Функции маппинга
+**Функции маппинга:**
 
 ```typescript
 mapNearbyPointFromShort(point, centerLat, centerLng): NearbyPoint
 // ApiPointShort → NearbyPoint
-// shortDescription: point.shortDescription ?? ''
-// imageUrl: ''  (нет медиа в кратком ответе)
-// distanceMeters: haversineDistance(center, point.coordinates)
+// imageUrl: '' (нет медиа в кратком ответе), audioGuideUrl: null
 
 mapNearbyPointFromDetail(point, centerLat, centerLng): NearbyPoint
 // ApiPointDetail → NearbyPoint
-// shortDescription: point.shortDescription ?? point.description ?? ''
-// imageUrl: getImageUrl(point.media)  ← ищет type=IMAGE*, сортирует по sortOrder
-// audioGuideUrl: getAudioUrl(point.media)  ← ищет type=AUDIO*
+// imageUrl: первое медиа с type=IMAGE*, audioGuideUrl: первое медиа с type=AUDIO*
 
 mapRouteStopFromApiPoint(point, index, locale): RouteStop
 // ApiExcursionPoint → RouteStop
-// shortDescription: point.shortDescription ?? ''
-// imageUrl: ''  (нет медиа в PointShortItem)
-// audio.url: null  (нет медиа, нужен отдельный GET /points/{id})
+// imageUrl: '' (нет медиа), audio.hasAudioGuide: false (бэк отдаёт только PointShortItem)
+// Аудио обогащается отдельно через usePointDetailsMap
 
 mapExcursionFromShort(exc): Excursion
-// ApiExcursionShort → Excursion
-// tagline: exc.shortDescription ?? ''
-// durationMinutes: exc.durationMin ?? 60
-// distanceKm: (exc.distance ?? 0) / 1000  ← конвертируем метры в км
-// theme: inferTheme(title, description)  ← угадываем по ключевым словам
-// coverImageUrl: ''  ← пока пустой (бэк не отдаёт)
-// difficulty: 'easy'  ← заглушка
-
 mapExcursionFromDetail(exc, locale): Excursion
-// то же что выше + парсит stops из exc.points.points[]
-// startLabel: stops[0].title
-// finishLabel: stops[stops.length-1].title
 
-mapCategoryName(name: string): PointCategory
-// "Музей" | "museum" | "gallery" → 'museum'
-// "Ресторан" | "cafe" | "food" → 'food'
-// "Парк" | "природа" | "nature" → 'park'
-// "Развлечения" | "театр" | "cinema" → 'entertainment'
-// всё остальное → 'landmark'
+extractPointDetailData(detail: ApiPointDetail): PointDetailData
+// Извлекает описание, фото, URL аудио и транскрипт из detail-ответа
+// audioUrl: первое AUDIO-медиа по sortOrder
+// audioTranscript: audio?.transcript ?? null
 
 haversineDistance(lat1, lng1, lat2, lng2): number
-// Вычисляет расстояние в метрах между двумя точками по сферической формуле
+// Расстояние в метрах по сферической формуле Хаверсина
 ```
 
 ---
@@ -584,29 +476,33 @@ haversineDistance(lat1, lng1, lat2, lng2): number
 ### `src/entities/excursion/model/types.ts`
 
 ```typescript
-// Фронтовый тип точки интереса (с дистанцией)
+// Точка интереса (с дистанцией)
 NearbyPoint {
-  id: string             // String(backendId)
+  id: string
   title: string
-  category: PointCategory
+  category: PointCategory       // 'museum' | 'food' | 'park' | 'entertainment' | 'landmark'
+  categoryName?: string         // оригинальное название категории с бэка
   shortDescription: string
   description: string
-  coordinates: GeoPoint  // { lat, lng }
+  coordinates: GeoPoint         // { lat, lng }
   imageUrl: string
   expectedVisitMinutes: number
-  rating: number         // всегда 0 (бэк не отдаёт пока)
-  scheduleLabel: string  // workingHours
+  rating: number
+  scheduleLabel: string
   distanceMeters: number
   addressLabel?: string
+  googleMapsUrl?: string
   audioGuideUrl: string | null
+  audioTranscript?: string | null  // полный текст аудиогида (из /points/{id})
 }
 
-// Фронтовый тип остановки маршрута
+// Остановка маршрута
 RouteStop {
   id: string
   order: number
   title: string
   category: PointCategory
+  categoryName?: string
   shortDescription: string
   description: string
   coordinates: GeoPoint
@@ -617,36 +513,37 @@ RouteStop {
   audio: AudioStory
 }
 
+// Аудиогид остановки
 AudioStory {
   id: string
   hasAudioGuide: boolean
-  audioGuideUrl: string | null
-  audioDuration: number        // секунды
+  audioGuideUrl: string | null   // основной URL
+  audioDuration: number          // секунды (из бэка, обычно 0; реальное время грузится через HTML5 Audio)
   audioLanguage: SupportedLocale
-  url: string | null           // то же что audioGuideUrl
-  durationSeconds: number
+  url: string | null             // запасной URL
+  durationSeconds: number        // запасная длительность
   language: SupportedLocale
-  transcriptPreview: string    // пока всегда ''
+  transcriptPreview: string      // полный текст транскрипта (backfill из /points/{id})
 }
 
-// Фронтовый тип маршрута/экскурсии
+// Маршрут/экскурсия
 Excursion {
   id: number
-  slug: string           // формат: "excursion-{id}"
-  createdAt: string      // ISO 8601 (заглушка: new Date().toISOString())
+  slug: string                   // формат: "excursion-{id}"
   title: string
-  tagline: string        // = shortDescription
+  tagline: string
   description: string
-  theme: ExcursionTheme  // 'walk' | 'food' | 'nature' | 'fun' | 'mixed'
-  district: string       // пока '' (бэк не отдаёт)
+  theme: ExcursionTheme          // 'walk' | 'food' | 'nature' | 'fun' | 'mixed'
+  district: string
   durationMinutes: number
   distanceKm: number
-  startLabel: string     // title первой остановки
-  finishLabel: string    // title последней остановки
-  coverImageUrl: string  // пока '' (бэк не отдаёт)
-  routeColor: string     // '#0f766e'
-  difficulty: ExcursionDifficulty   // пока всегда 'easy'
-  audienceLabel: string  // пока всегда 'Все'
+  pointsCount?: number
+  startLabel: string
+  finishLabel: string
+  coverImageUrl: string
+  routeColor: string
+  difficulty: ExcursionDifficulty  // 'easy' | 'medium' | 'hard'
+  audienceLabel: string
   stops: RouteStop[]
 }
 ```
@@ -660,50 +557,32 @@ Excursion {
 **Хранит:**
 
 ```typescript
-draftStops: RouteStop[]     // черновик (макс 6 остановок)
+draftStops: RouteStop[]     // черновик (макс 10 остановок)
 savedRoutes: Excursion[]    // избранные маршруты
 personalRoutes: Excursion[] // созданные пользователем
 ```
 
 **Ключ localStorage:** `t-guide:user-routes:{userId}`
-(при смене пользователя весь контекст пересоздаётся)
 
 **Методы:**
 
 ```typescript
 addPointToDraft(point: NearbyPoint): void
-// Конвертирует NearbyPoint → RouteStop, добавляет в draftStops
-// Ничего не делает если уже 6 остановок или точка уже добавлена
+// NearbyPoint → RouteStop, добавляет если ещё нет и < 10 остановок
 
 removeDraftStop(stopId: string): void
-// Удаляет остановку, пересчитывает order
-
+reorderDraftStop(fromIndex: number, toIndex: number): void
 clearDraftRoute(): void
-// Очищает весь черновик
 
 saveDraftRoute(): SaveDraftRouteResult
-// Создаёт Excursion из draftStops:
-//   - distance: сумма расстояний между точками (Haversine)
-//   - duration: 8 мин базово + 12 мин/км + сумма visitTime
-//   - difficulty: easy (<3 точек) | medium (3-4) | hard (>4)
-//   - theme: 'mixed'
-//   - slug: 'custom-route-{uuid}'
-// → вызывает appApi.createPersonalRoute({ route })
-// → добавляет в personalRoutes
+// Вычисляет distance, duration, difficulty из stops
+// → POST /excursions → personalRoutes.push(excursion)
 
 toggleSavedRoute(route: Excursion): void
-// Если маршрут уже в savedRoutes → removeSavedRoute
-// Иначе → appApi.saveRoute({ route })
+shareRoute(route: Excursion): Promise<void>
 
 isPointInDraft(pointId: string): boolean
 isRouteSaved(slug: string): boolean
-```
-
-### `src/features/user-routes/model/useUserRoutes.ts`
-
-```typescript
-export function useUserRoutes(): UserRoutesContextValue;
-// Бросает ошибку если вне UserRoutesProvider
 ```
 
 ---
@@ -714,12 +593,11 @@ export function useUserRoutes(): UserRoutesContextValue;
 
 ```typescript
 function useDiscoveryRoutes(params: {
-    activePointCategory: PointCategory | "all";
+    activePointCategory: PointCategory | 'all';
     center: GeoPoint;
-    enabled?: boolean; // default: true
+    enabled?: boolean;
     locale: SupportedLocale;
     radiusMeters: number;
-    search?: string;
 }): {
     error: string | null;
     excursions: Excursion[];
@@ -728,15 +606,9 @@ function useDiscoveryRoutes(params: {
 };
 ```
 
-**Как работает:**
+Параллельно запрашивает `/points/search` + `/excursions/search` с debounce 300ms.
 
-1. При изменении любого параметра — запускает таймер 300ms (debounce)
-2. После 300ms вызывает `appApi.getDiscoveryFeed(params)`
-3. `getDiscoveryFeed` параллельно делает:
-    - `POST /points/search` (с `categorySlugs`)
-    - `POST /excursions/search` (без категорий)
-4. Результат маппится и кладётся в `nearbyPoints` + `excursions`
-5. При новом запросе до завершения предыдущего — предыдущий игнорируется (`isActive` флаг)
+---
 
 ### `useRouteBySlug` — `src/entities/excursion/model/useRouteBySlug.ts`
 
@@ -754,18 +626,66 @@ function useRouteBySlug(params: {
 
 Парсит `id` из `slug` → `GET /excursions/{id}` → маппит в `Excursion`.
 
+---
+
+### `usePointDetailsMap` — `src/entities/excursion/model/usePointDetailsMap.ts`
+
+```typescript
+function usePointDetailsMap(ids: string[]): Map<string, PointDetailData>
+
+interface PointDetailData {
+  description: string
+  shortDescription: string
+  imageUrl: string
+  audioUrl: string | null       // URL аудиофайла
+  audioTranscript: string | null  // полный текст транскрипта
+  address: string
+  workingHours: string
+}
+```
+
+Загружает полные данные точек через `GET /points/{id}` параллельно.
+Результаты кешируются на уровне сессии (Map на уровне модуля).
+Используется для обогащения остановок маршрута в `ExcursionPage` и точек в `ExcursionsPage`.
+
+---
+
+### `useAudioGuide` — `src/pages/excursion/model/useAudioGuide.ts`
+
+```typescript
+function useAudioGuide(
+    currentStop: RouteStop,
+    currentStopIndex: number
+): {
+    isAudioPlaying: boolean;
+    isAudioAvailable: boolean;
+    toggleAudio: () => void;
+    loadedDurationSeconds: number | null;  // реальная длина из HTML5 Audio метаданных
+};
+```
+
+**Как работает:**
+- При наличии `audioUrl` создаёт скрытый `Audio` с `preload="metadata"` → получает реальную длину трека без загрузки всего файла
+- При воспроизведении создаёт основной `Audio` и запускает его
+- При смене `currentStopIndex` автоматически останавливает и освобождает аудио
+- `loadedDurationSeconds` — точная длительность в секундах, обновляется по событию `loadedmetadata`
+
+---
+
 ### `useUserGeolocation` — `src/features/route-map/model/useUserGeolocation.ts`
 
 ```typescript
 function useUserGeolocation(): {
     error: string | null;
     requestLocation: () => void;
-    status: "idle" | "loading" | "tracking" | "blocked" | "unsupported";
+    status: 'idle' | 'loading' | 'tracking' | 'blocked' | 'unsupported';
     userPosition: GeoPoint | null;
 };
 ```
 
 Использует `navigator.geolocation.watchPosition()` для непрерывного отслеживания.
+
+---
 
 ### `useProfileOverview` — `src/shared/api/useProfileOverview.ts`
 
@@ -777,8 +697,9 @@ function useProfileOverview(enabled: boolean): {
 };
 ```
 
-Параллельно загружает: `/profile` + `/excursions/my` + `/excursions/favorites`.
-Используется только на ProfilePage, только для авторизованных.
+Параллельно загружает `/profile` + `/excursions/my` + `/excursions/favorites`.
+
+---
 
 ### `useAuth` — `src/app/providers/useAuth.ts`
 
@@ -799,52 +720,37 @@ function useAuth(): {
 
 ## 12. Карта (Leaflet)
 
+### `src/features/route-map/ui/RouteMap.tsx` + `LeafletRouteMap.tsx`
+
+Оборачивает Leaflet. В режиме навигации показывает только текущую остановку.
+
 ### `src/features/route-map/ui/DiscoveryMap.tsx`
 
-**Props:**
+Карта для режима открытия: маркеры всех ближних точек, радиус поиска, черновик маршрута.
 
-```typescript
-{
-  activeCategory: PointCategory | 'all'
-  nearbyPoints: NearbyPoint[]
-  selectedPointId: string
-  userPosition: GeoPoint | null
-  radiusMeters: number
-  draftStops?: RouteStop[]          // черновик маршрута
-  onSelectPoint(id: string): void
-  onSelectCategory(cat): void
-  onChangeRadius(meters: number): void
-  onLocateUser(): void
-  onBuildRoute(): void
-  onAddPointToDraft?(point: NearbyPoint): void
-  onClearDraftRoute?(): void
-  onSaveDraftRoute?(): void
-}
-```
+### `src/features/route-map/ui/RouteBuilderMap.tsx`
+
+Карта для ExcursionsPage: поддерживает выбор точек, popup с краткими данными, кнопку "Подробнее".
 
 ### `src/features/route-map/lib/leaflet-map.ts`
 
-Низкоуровневые функции для работы с Leaflet:
-
+Низкоуровневые функции:
 ```typescript
-createLeafletMap(container, options); // создаёт L.Map
-createUserIcon(); // маркер синего цвета (позиция юзера)
-createPoiIcon(category, isSelected); // маркер POI с иконкой категории
-createDiscoveryRadiusCircle(map, center, radiusMeters); // круг поиска
-createGuidePolyline(map, points, color); // линия маршрута
+createLeafletMap(container, options)
+createUserIcon()
+createPoiIcon(category, isSelected)
+createDiscoveryRadiusCircle(map, center, radiusMeters)
+createGuidePolyline(map, points, color)
 ```
 
 ### `src/features/route-map/lib/route-geometry.ts`
 
 ```typescript
 getDistanceMetersBetween(p1: GeoPoint, p2: GeoPoint): number
-buildOsmWalkingRouteGeometryFromPoints(stops): Promise<Geometry>
-getBoundsFromPoints(points): LatLngBounds
 formatMeters(meters: number): string  // "150 м" или "1.2 км"
 ```
 
 **Центр карты по умолчанию** (`src/shared/config/map.ts`):
-
 ```typescript
 defaultCenter: { lat: 55.751244, lng: 37.618423 }  // Москва
 defaultZoom: 14
@@ -853,31 +759,7 @@ discoveryRadiusMeters: 1200
 
 ---
 
-## 13. Виджеты
-
-### `src/widgets/excursion-catalog/ui/ExcursionCatalog.tsx`
-
-```typescript
-Props {
-  excursions: Excursion[]
-  emptyTitle?: string           // default: 'Маршруты пока не найдены'
-  emptyDescription?: string
-  isError?: boolean             // default: false
-}
-```
-
-- Рендерит сетку карточек `ExcursionCard`
-- При `excursions.length === 0 && !isError` → пустое состояние с текстом
-- При `isError === true` → ошибочное состояние с красной рамкой
-
-### `src/widgets/route-overview/ui/RouteOverview.tsx`
-
-Объединяет `RouteMap` (карта) + `RouteStopList` (список остановок).
-Используется на странице ExcursionPage.
-
----
-
-## 14. Утилиты
+## 13. Утилиты
 
 ### `src/shared/lib/format.ts`
 
@@ -894,62 +776,71 @@ formatMeters(meters: number): string
 formatStopCount(count: number): string
 // 1 → "1 точка", 3 → "3 точки", 5 → "5 точек"
 
-formatPointCategory(category: PointCategory): string
-// 'museum' → "Музей", 'food' → "Еда", 'park' → "Природа"
-// 'entertainment' → "Развлечения", 'landmark' → "История"
-
-formatTheme(theme: ExcursionTheme): string
-// 'walk' → "Прогулка", 'food' → "Еда", 'nature' → "Природа"
-// 'fun' → "Развлечения", 'mixed' → "Разное"
+formatLocaleLabel(locale: SupportedLocale): string
+// 'ru' → "Русский", 'en' → "English", 'de' → "Deutsch"
 
 formatDifficulty(difficulty: ExcursionDifficulty): string
 // 'easy' → "Легко", 'medium' → "Средне", 'hard' → "Насыщенно"
 
-formatLocaleLabel(locale: SupportedLocale): string
-// 'ru' → "Русский", 'en' → "English", 'de' → "Deutsch"
-// 'fr' → "Français", 'es' → "Español"
+formatTheme(theme: ExcursionTheme): string
+// 'walk' → "Прогулка", 'food' → "Еда", 'nature' → "Природа"
 ```
 
 ### `src/shared/lib/discovery-context.ts`
 
 ```typescript
-interface DiscoveryContext {
-  activePointCategory: PointCategory | 'all'
-  center: GeoPoint
-  locale: SupportedLocale
-  radiusMeters: number
-}
-
 getDefaultDiscoveryContext(): DiscoveryContext
-// { center: Москва, radiusMeters: 1200, locale: 'ru', category: 'all' }
-
-getStoredDiscoveryContext(): DiscoveryContext
-// Читает из sessionStorage['t-guide:discovery-context']
-// При ошибке возвращает default
-
+getStoredDiscoveryContext(): DiscoveryContext  // читает из sessionStorage, при ошибке → default
 saveDiscoveryContext(ctx: DiscoveryContext): void
-// Записывает в sessionStorage
-
 detectSupportedLocale(candidate?: string): SupportedLocale
-// 'ru-RU' → 'ru', 'de-DE' → 'de', всё остальное → 'ru'
+```
+
+### `src/entities/excursion/lib/audio-guide.ts`
+
+```typescript
+getAudioGuideUrl(audio: AudioStory): string | null
+// Возвращает audioGuideUrl ?? url ?? null
+
+getAudioGuideDuration(audio: AudioStory): number
+// Возвращает audioDuration ?? durationSeconds
+
+getAudioGuideLanguage(audio: AudioStory): SupportedLocale
+// Возвращает audioLanguage ?? language
+
+hasAudioGuideAvailable(audio: AudioStory): boolean
+// true если hasAudioGuide && getAudioGuideUrl !== null
 ```
 
 ---
 
-## 15. CSS
+## 14. CSS
 
 ### Переменные — `src/app/styles/tokens.css`
 
 ```css
 /* Цвета */
---color-bg: #f4f6fb --color-bg-elevated: #ffffff --color-bg-soft: #f7f8fc
-    --color-text: #1f2533 --color-text-secondary: #5d6679 --color-line: #e6e9f0
-    --color-brand: #1f8a70 /* основной зелёный */ --color-brand-strong: #0f766e
-    --color-brand-soft: #e8faf4 --color-accent: #ffdd2d /* жёлтый T-банка */
-    --color-accent-strong: #fcc521 --color-danger: #c2514b /* Скругления */
-    --radius-pill: 999px --radius-2xl: 32px --radius-xl: 28px --radius-lg: 22px
-    --radius-md: 16px /* Тени */ --shadow-card: 0 8px 24px
-    rgba(31, 37, 51, 0.07) --shadow-pill: 0 4px 12px rgba(31, 37, 51, 0.1);
+--color-bg: #f4f6fb
+--color-bg-elevated: #ffffff
+--color-text: #1f2533
+--color-text-secondary: #5d6679
+--color-text-tertiary: ...
+--color-line: #e6e9f0
+--color-brand: #1f8a70          /* основной зелёный */
+--color-brand-strong: #0f766e
+--color-brand-soft: #e8faf4
+--color-accent: #ffdd2d         /* жёлтый */
+--color-danger: #c2514b
+
+/* Скругления */
+--radius-pill: 999px
+--radius-2xl: 32px
+--radius-xl: 28px
+--radius-lg: 22px
+--radius-md: 16px
+
+/* Тени */
+--shadow-card: 0 8px 24px rgba(31, 37, 51, 0.07)
+--shadow-pill: 0 4px 12px rgba(31, 37, 51, 0.1)
 ```
 
 ### Глобальные классы — `src/app/styles/global.css`
@@ -964,42 +855,47 @@ detectSupportedLocale(candidate?: string): SupportedLocale
 .button--wide        /* width: 100% */
 
 /* Чипы */
-.chip                /* маленький бейдж */
-.chip--accent        /* зелёный */
+.chip
+.chip--accent
 
 /* Фильтры */
-.filter-pill         /* кнопка-таблетка */
-.filter-pill--active /* активное состояние */
+.filter-pill
+.filter-pill--active
 
 /* Поля формы */
-.field               /* обёртка: label + input */
-.field__label
-.field__input        /* с focus-ring */
+.field / .field__label / .field__input
 
 /* Карточки состояний */
-.status-card         /* центрированная карточка с анимацией появления */
-.status-card--error  /* красная рамка */
+.status-card
+.status-card--error
 
 /* Секции */
-.section-surface     /* белый блок с тенью */
-.section-title
-.page-title
-.eyebrow             /* маленькая заглавная метка */
+.section-surface / .section-title / .page-title / .eyebrow
 ```
+
+### Стили по страницам
+
+| CSS-файл | Компонент | Ключевые классы |
+| --- | --- | --- |
+| `ExcursionPage.css` | ExcursionPage | `.ep-info__*`, `.ep-nav__*`, `.ep-complete__*`, `.ep-stop-card__*` |
+| `ExcursionsPage.css` | ExcursionsPage | `.ep__*`, `.ep-sheet__*`, `.ep-detail__*`, `.ep-draft__*`, `.ep-card__*` |
+| `ProfilePage.css` | ProfilePage | `.profile__*` |
+| `map-marker-skin.css` | LeafletRouteMap | маркеры и оверлеи карты |
 
 ---
 
-## 16. Хранилища
+## 15. Хранилища
 
 | Ключ                           | Тип хранилища  | Что хранит                                    |
 | ------------------------------ | -------------- | --------------------------------------------- |
 | `t-guide:auth:tokens`          | localStorage   | `{ accessToken, refreshToken }`               |
 | `t-guide:user-routes:{userId}` | localStorage   | `{ draftStops, savedRoutes, personalRoutes }` |
 | `t-guide:discovery-context`    | sessionStorage | `{ center, radiusMeters, category, locale }`  |
+| `t-guide:last-route`           | localStorage   | прогресс текущего прохождения маршрута        |
 
 ---
 
-## 17. Переменные окружения
+## 16. Переменные окружения
 
 Файл: `.env.local` (не коммитится в git)
 
@@ -1009,11 +905,11 @@ VITE_USE_MOCK_API=false
 ```
 
 Если `VITE_USE_MOCK_API=false` и `VITE_API_URL` задан → используется реальный бэк.
-Иначе → `mockApi` (статические тестовые данные из `src/shared/api/mock/`).
+Иначе → `mockApi` (статические тестовые данные).
 
 ---
 
-## 18. Потоки данных
+## 17. Потоки данных
 
 ### Загрузка главной страницы
 
@@ -1028,60 +924,46 @@ HomePage монтируется
     ])
   → mapNearbyPointFromShort() × N точек
   → mapExcursionFromShort() × M маршрутов
-  → nearbyPoints + excursions → рендер карточек и маркеров на карте
+  → nearbyPoints + excursions → рендер
 ```
 
-### Смена категории фильтра
+### Прохождение экскурсии с аудиогидом
 
 ```
-Пользователь нажимает "Музеи"
-  → setActivePointCategory('museum')
-  → useDiscoveryRoutes получает новый параметр
-  → debounce 300ms
-  → appApi.getDiscoveryFeed({ category: 'museum' })
-  → POST /points/search { categorySlugs: ['museum'] }
-  → новые nearbyPoints → карточки "Музеи" + секция меняется без перемонтирования
-    (opacity transition пока грузится)
+ExcursionPage монтируется (/excursions/:slug)
+  → useRouteBySlug → GET /excursions/{id} → Excursion с stops[]
+  → usePointDetailsMap(stopIds) → GET /points/{id} × N (параллельно, с кешем)
+  → Каждая остановка обогащается:
+      description, imageUrl, audioUrl, audioTranscript
+
+Пользователь нажимает "Начать маршрут" → NavigationPhase
+  → useAudioGuide(currentStop, currentStopIndex)
+      → создаёт Audio(preload='metadata') → loadedmetadata → loadedDurationSeconds
+  → Чип длительности показывает реальное время из аудиофайла
+
+Пользователь нажимает "Прослушать"
+  → toggleAudio() → new Audio(audioUrl).play()
+  → кнопка меняется на "Пауза"
+
+Пользователь нажимает "Прочитать"
+  → измеряется scrollHeight контейнера транскрипта
+  → maxHeight анимируется 0 → scrollHeight (cubic-bezier)
+  → кнопка меняется на "Скрыть"
+
+Пользователь переходит на следующую остановку
+  → useAudioGuide останавливает и освобождает предыдущее аудио
+  → isTranscriptOpen сбрасывается в false
 ```
 
-### Вход в систему
+### Обогащение точки данными (PointDetailPanel)
 
 ```
-Пользователь вводит email + пароль → нажимает "Войти"
-  → useAuth().signIn({ login: email, password })
-  → authService.login()
-  → POST /auth/login { username: email, password }
-  → { tokens: { accessToken, refreshToken }, user: {...} }
-  → writeAuthTokens(tokens) → localStorage['t-guide:auth:tokens']
-  → session обновляется в AuthProvider
-  → ProtectedRoute разблокирует все защищённые роуты
-  → редирект на '/' или на страницу откуда пришли
-```
-
-### Добавление точки в черновик маршрута
-
-```
-Пользователь кликает "Добавить в маршрут" на карточке точки
-  → useUserRoutes().addPointToDraft(point: NearbyPoint)
-  → NearbyPoint конвертируется в RouteStop
-  → draftStops.push(stop) [max 6]
-  → UserRoutesProvider сохраняет в localStorage
-  → DiscoveryMap показывает точку с отметкой
-  → Шторка показывает кнопку "Сохранить маршрут"
-```
-
-### Сохранение маршрута
-
-```
-Пользователь нажимает "Сохранить маршрут"
-  → useUserRoutes().saveDraftRoute()
-  → вычисляет distanceKm, durationMinutes, difficulty из stops
-  → appApi.createPersonalRoute({ route })
-  → POST /excursions { title, description, points: [{pointId, order}] }
-  → response: ExcursionDetailResponse
-  → mapExcursionFromDetail(response)
-  → personalRoutes.push(excursion)
-  → маршрут появляется в ProfilePage
+Пользователь кликает на маркер → state.handleShowDetail(point)
+  → detailPoint = base NearbyPoint (краткие данные)
+  → usePointDetailsMap([point.id]) → GET /points/{id} (с кешем)
+  → detailPoint обогащается: description, imageUrl, audioGuideUrl, audioTranscript
+  → PointDetailPanel рендерится с полными данными
+  → Кнопка "Прочитать аудиогид" появляется если audioTranscript !== null
 ```
 
 ### Автообновление токена
@@ -1096,16 +978,16 @@ HomePage монтируется
 
 ---
 
-## 19. Известные проблемы
+## 18. Известные проблемы
 
-| Проблема                                          | Статус                                                              |
-| ------------------------------------------------- | ------------------------------------------------------------------- |
-| `POST /excursions/search` → 500                   | Ошибка на бэке, запрос правильный                                   |
-| `GET /profile` → 401 после логина                 | Возможно бэк не принимает свои же токены                            |
-| `GET /excursions/my` и `/favorites` без пагинации | Бэк добавит `?page=0&size=25`                                       |
-| `coverImageUrl` у маршрутов всегда пустой         | Ждём от бэка или будем брать из первой точки                        |
-| `rating` у точек всегда 0                         | Ждём эндпоинт отзывов (обсуждение на созвоне)                       |
-| `difficulty` маршрута всегда `'easy'`             | Бэк не присылает, заглушка                                          |
-| Аудиогид у остановок маршрута всегда null         | `PointShortItem` не имеет медиа, нужен отдельный `GET /points/{id}` |
+| Проблема                                               | Статус                                                                |
+| ------------------------------------------------------ | --------------------------------------------------------------------- |
+| `POST /excursions/search` → 500 на некоторых запросах  | Ошибка на бэке, запрос правильный                                     |
+| `GET /profile` → 401 после логина                      | Возможно бэк не принимает свои же токены                              |
+| `GET /excursions/my` и `/favorites` без пагинации      | Бэк добавит `?page=0&size=25`                                         |
+| `coverImageUrl` у маршрутов часто пустой               | Ждём от бэка или берём из первой точки маршрута                       |
+| `rating` у точек всегда 0                              | Ждём эндпоинт отзывов                                                 |
+| `difficulty` маршрута всегда `'easy'`                  | Бэк не присылает, заглушка                                            |
+| `audioDuration` у остановок всегда 0                   | Бэк не отдаёт длину; реальная длина загружается из аудиофайла на клиенте |
 
 ---

@@ -64,16 +64,53 @@ body.app-body--routes-page {
     left: 50%;
     z-index: 400;
     transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
     max-width: min(320px, calc(100% - 32px));
     margin: 0;
-    padding: 8px 14px;
+    padding: 8px 8px 8px 14px;
     border-radius: 12px;
     background: rgba(255, 240, 238, 0.96);
     color: var(--color-danger);
     font-size: 0.82rem;
     font-weight: 700;
-    pointer-events: none;
+    pointer-events: auto;
     text-align: center;
+    box-shadow: 0 12px 28px rgba(31, 37, 51, 0.12);
+}
+
+.ep__geo-error-text {
+    min-width: 0;
+}
+
+.ep__geo-error-close {
+    display: inline-flex;
+    width: 28px;
+    height: 28px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(215, 71, 64, 0.18);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.68);
+    color: var(--color-danger);
+    font-size: 1rem;
+    font-weight: 900;
+    line-height: 1;
+    transition:
+        background-color 0.16s ease,
+        border-color 0.16s ease,
+        transform 0.16s ease;
+}
+
+.ep__geo-error-close:hover {
+    border-color: rgba(215, 71, 64, 0.34);
+    background: #ffffff;
+}
+
+.ep__geo-error-close:active {
+    transform: scale(0.94);
 }
 
 /* ── Saving spinner ───────────────────────────────────────────────────────── */
@@ -2256,6 +2293,18 @@ body.app-body--routes-page {
     font-size: 0.78rem;
     line-height: 1.45;
     text-align: center;
+}
+
+.ep-detail__audio-transcript {
+    margin: 0;
+    padding-top: 4px;
+    width: 100%;
+    color: var(--color-text-secondary);
+    font-size: 0.82rem;
+    line-height: 1.72;
+    text-align: left;
+    white-space: pre-wrap;
+    text-wrap: pretty;
 }
 
 .ep-detail__actions {

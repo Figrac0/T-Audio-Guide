@@ -61,6 +61,7 @@ export interface NearbyPoint {
   addressLabel?: string
   googleMapsUrl?: string
   audioGuideUrl: string | null
+  audioTranscript?: string | null
 }
 
 export interface Excursion {

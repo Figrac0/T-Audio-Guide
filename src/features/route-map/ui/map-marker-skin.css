@@ -37,6 +37,8 @@
    properties on mobile GPUs) and the redundant `filter: drop-shadow` — the
    box-shadow already provides depth at a fraction of the cost. */
 .poi-marker__glyph {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -49,6 +51,16 @@
   box-shadow:
     0 2px 8px rgba(15, 23, 42, 0.22),
     0 0 0 1.5px rgba(255, 255, 255, 0.6);
+}
+
+.poi-marker--pulse::before {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
+  background: rgba(31, 138, 112, 0.18);
+  pointer-events: none;
+  animation: map-marker-pulse 1.55s ease-out infinite;
 }
 
 .poi-marker__order {
@@ -97,7 +109,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .user-marker__pulse {
+  .user-marker__pulse,
+  .poi-marker--pulse::before {
     animation: none;
   }
 }

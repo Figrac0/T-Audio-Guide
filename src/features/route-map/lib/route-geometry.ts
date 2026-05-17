@@ -1,4 +1,5 @@
 ﻿import type { GeoPoint, RouteStop } from '@/entities/excursion/model/types'
+import { appMapConfig } from '@/shared/config/map'
 
 export type LngLat = [number, number]
 export type LngLatBounds = [LngLat, LngLat]
@@ -48,8 +49,8 @@ interface OsrmRouteResponse {
 }
 
 const fallbackBounds: LngLatBounds = [
-  [37.608423, 55.741244],
-  [37.628423, 55.761244],
+  [appMapConfig.defaultCenter.lng - 0.01, appMapConfig.defaultCenter.lat - 0.01],
+  [appMapConfig.defaultCenter.lng + 0.01, appMapConfig.defaultCenter.lat + 0.01],
 ]
 const singlePointPadding = 0.006
 const osrmWalkingEndpoint = 'https://router.project-osrm.org/route/v1/foot'

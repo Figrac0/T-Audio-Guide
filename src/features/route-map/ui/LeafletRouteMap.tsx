@@ -24,12 +24,12 @@ import {
   createUserIcon,
 } from '@/features/route-map/lib/leaflet-map'
 import type { RouteMapProps } from '@/features/route-map/model/types'
+import { appMapConfig } from '@/shared/config/map'
 import './LeafletRouteMap.css'
 
 const routePadding: [number, number, number, number] = [44, 44, 44, 44]
 const pointZoom = 16
 const userZoom = 15.4
-const defaultCenter = { lat: 55.751244, lng: 37.618423 }
 
 export function LeafletRouteMap({
   onLocateUser,
@@ -42,7 +42,7 @@ export function LeafletRouteMap({
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const overlayRef = useRef<L.LayerGroup | null>(null)
-  const initialCenterRef = useRef(stops[0]?.coordinates ?? defaultCenter)
+  const initialCenterRef = useRef(stops[0]?.coordinates ?? appMapConfig.defaultCenter)
   const skipSelectionFocusRef = useRef(true)
   const hasInitialFitRef = useRef(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -431,7 +431,6 @@ export function LeafletRouteMap({
     </section>
   )
 }
-
 
 
 

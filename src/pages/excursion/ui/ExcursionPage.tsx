@@ -494,7 +494,12 @@ function NavigationPhase({
 
   const [sheetState, setSheetState] = useState<SheetState>('closed')
   const [initialUserPosition] = useState(userPosition)
-  const { isAudioPlaying, isAudioAvailable, toggleAudio } = useAudioGuide(currentStop, currentStopIndex)
+  const [isTranscriptOpen, setIsTranscriptOpen] = useState(false)
+  const [transcriptHeight, setTranscriptHeight] = useState(0)
+  const transcriptRef = useRef<HTMLDivElement>(null)
+  const { isAudioPlaying, isAudioAvailable, toggleAudio, loadedDurationSeconds } = useAudioGuide(currentStop, currentStopIndex)
+
+  useEffect(() => { setIsTranscriptOpen(false); setTranscriptHeight(0) }, [currentStopIndex])
   const sheetStateRef = useRef<SheetState>('closed')
   const sheetRef = useRef<HTMLDivElement>(null)
   const navRowRef = useRef<HTMLDivElement>(null)
@@ -865,14 +870,17 @@ function NavigationPhase({
                 <h3 className="ep-nav__audio-title">Аудиогид</h3>
                 <div className="ep-nav__audio-chips">
                   <span className="ep-nav__audio-chip">
-                    {formatDuration(Math.ceil(getAudioGuideDuration(currentAudio) / 60))}
+                    {loadedDurationSeconds != null
+                      ? formatDuration(Math.max(1, Math.round(loadedDurationSeconds / 60)))
+                      : getAudioGuideDuration(currentAudio) > 0
+                        ? formatDuration(Math.ceil(getAudioGuideDuration(currentAudio) / 60))
+                        : '…'}
                   </span>
                   <span className="ep-nav__audio-chip">
                     {formatLocaleLabel(getAudioGuideLanguage(currentAudio))}
                   </span>
                 </div>
               </div>
-              <p className="ep-nav__audio-preview">{currentAudio.transcriptPreview}</p>
               <div className="ep-nav__audio-actions">
                 <button
                   className="ep-nav__audio-play-btn"
@@ -897,6 +905,32 @@ function NavigationPhase({
                     </>
                   )}
                 </button>
+                {isAudioAvailable && currentAudio.transcriptPreview ? (
+                  <button
+                    className="ep-nav__audio-play-btn"
+                    onClick={() => {
+                      if (!isTranscriptOpen && transcriptRef.current) {
+                        setTranscriptHeight(transcriptRef.current.scrollHeight)
+                      }
+                      setIsTranscriptOpen((v) => !v)
+                    }}
+                    type="button"
+                  >
+                    {isTranscriptOpen ? 'Скрыть' : 'Прочитать'}
+                  </button>
+                ) : null}
+                <div
+                  aria-hidden={!isTranscriptOpen}
+                  style={{
+                    maxHeight: isTranscriptOpen ? `${transcriptHeight}px` : '0px',
+                    overflow: 'hidden',
+                    transition: 'max-height 0.42s cubic-bezier(0.4, 0, 0.2, 1)',
+                  }}
+                >
+                  <div ref={transcriptRef}>
+                    <p className="ep-nav__audio-transcript">{currentAudio.transcriptPreview}</p>
+                  </div>
+                </div>
                 {!isAudioAvailable ? (
                   <p className="ep-nav__audio-placeholder">Сейчас для этой точки доступно только текстовое описание.</p>
                 ) : null}
