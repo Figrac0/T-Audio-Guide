@@ -78,6 +78,7 @@ interface DiscoveryMapProps {
   onSelectNextPoint: () => void
   onSelectPoint: (pointId: string) => void
   onSelectPreviousPoint: () => void
+  panOnlyId?: string
   radiusMeters: number
   radiusOptions?: DiscoveryRadiusOption[]
   recenterTrigger?: number
@@ -137,6 +138,7 @@ export function DiscoveryMap({
   onSelectNextPoint,
   onSelectPoint,
   onSelectPreviousPoint,
+  panOnlyId = '',
   radiusMeters,
   radiusOptions = [],
   recenterTrigger = 0,
@@ -171,6 +173,8 @@ export function DiscoveryMap({
   const onChangeRadiusRef = useRef(onChangeRadius)
   const onMapClickRef = useRef(onMapClick)
   const selectedPointIdRef = useRef(selectedPointId)
+  const panOnlyIdRef = useRef(panOnlyId)
+  const nearbyPointsRef = useRef(nearbyPoints)
   const popupPointIdRef = useRef<string | null>(null)
   const suppressPopupCloseRef = useRef(false)
   const userClosedPopupRef = useRef(false)
@@ -250,6 +254,8 @@ export function DiscoveryMap({
   onChangeRadiusRef.current = onChangeRadius
   onMapClickRef.current = onMapClick
   selectedPointIdRef.current = selectedPointId
+  panOnlyIdRef.current = panOnlyId
+  nearbyPointsRef.current = nearbyPoints
   const guideGeometry =
     guideRoute.signature === guideSignature && guideRoute.geometry
       ? guideRoute.geometry
@@ -818,8 +824,28 @@ export function DiscoveryMap({
     })
   }, [nearbyPoints, selectedPointId, visibleDraftOrderMap])
 
+  // Pan-only: triggered by a nearby card click. Closes any open popup, pans to
+  // the point at the current zoom level, and does NOT open the popup.
+  useEffect(() => {
+    if (!panOnlyId) return
+    const map = mapRef.current
+    const point = nearbyPointsRef.current.find((p) => p.id === panOnlyId)
+    if (!map || !point) return
+    map.closePopup()
+    popupPointIdRef.current = null
+    userClosedPopupRef.current = true
+    map.panTo([point.coordinates.lat, point.coordinates.lng], { animate: true })
+  }, [panOnlyId])
+
   useEffect(() => {
     if (!selectedPointId) return
+
+    // Pan-only selection: was triggered by a nearby card click.
+    // The panOnlyId effect already panned the map; don't open a popup here.
+    if (selectedPointId === panOnlyIdRef.current) {
+      lastNonEmptySelectedIdRef.current = selectedPointId
+      return
+    }
 
     // If the same point is re-emerging after temporarily leaving nearbyPoints
     // (radius shrunk then grew), don't snap the camera back

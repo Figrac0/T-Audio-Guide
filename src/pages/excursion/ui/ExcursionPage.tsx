@@ -870,11 +870,13 @@ function NavigationPhase({
                 <h3 className="ep-nav__audio-title">Аудиогид</h3>
                 <div className="ep-nav__audio-chips">
                   <span className="ep-nav__audio-chip">
-                    {loadedDurationSeconds != null
-                      ? formatDuration(Math.max(1, Math.round(loadedDurationSeconds / 60)))
-                      : getAudioGuideDuration(currentAudio) > 0
-                        ? formatDuration(Math.ceil(getAudioGuideDuration(currentAudio) / 60))
-                        : '…'}
+                    {!isAudioAvailable
+                      ? '0 мин'
+                      : loadedDurationSeconds != null
+                        ? formatDuration(Math.max(1, Math.round(loadedDurationSeconds / 60)))
+                        : getAudioGuideDuration(currentAudio) > 0
+                          ? formatDuration(Math.ceil(getAudioGuideDuration(currentAudio) / 60))
+                          : '…'}
                   </span>
                   <span className="ep-nav__audio-chip">
                     {formatLocaleLabel(getAudioGuideLanguage(currentAudio))}

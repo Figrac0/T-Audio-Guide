@@ -220,6 +220,7 @@ export function HomePage() {
         null,
     );
     const [selectedPointId, setSelectedPointId] = useState<string>("");
+    const [panOnlyId, setPanOnlyId] = useState<string>("");
     const [routeTargetId, setRouteTargetId] = useState<string | null>(null);
     const [savedDraftPreviewStops, setSavedDraftPreviewStops] = useState<
         RouteStop[]
@@ -512,11 +513,15 @@ export function HomePage() {
     }, [userPosition, requestLocation]);
 
     const handleNearbyCardClick = useCallback((pointId: string) => {
+        const isDeselecting = selectedPointIdRef.current === pointId;
         setSelectedPointId((prev) => {
             if (prev === pointId) return "";
             shouldScrollNearbyListRef.current = true;
             return pointId;
         });
+        if (!isDeselecting) {
+            setPanOnlyId(pointId);
+        }
     }, []);
 
     const handleMapPointSelect = useCallback((pointId: string) => {
@@ -987,6 +992,7 @@ export function HomePage() {
                     onSelectNextPoint={handleSelectNextPoint}
                     onSelectPoint={handleMapPointSelect}
                     onSelectPreviousPoint={handleSelectPreviousPoint}
+                    panOnlyId={panOnlyId}
                     radiusMeters={radiusMeters}
                     recenterTrigger={recenterTrigger}
                     routeTargetId={effectiveRouteTargetId}

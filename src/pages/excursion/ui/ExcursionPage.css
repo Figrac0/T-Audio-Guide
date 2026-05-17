@@ -1089,6 +1089,7 @@ body.app-body--excursion-nav {
     color: var(--color-text-tertiary);
     font-size: 0.82rem;
     line-height: 1.55;
+    text-align: center;
 }
 
 .ep-nav__audio-transcript {
