@@ -505,12 +505,13 @@ export function HomePage() {
     }, [clearDraftRoute, saveDraftRoute, setDraftRouteNotice]);
 
     const handleCenterUser = useCallback(() => {
-        if (!userPosition) {
+        // Use the effective position (manual or GPS) — if neither is set, ask for GPS.
+        if (!effectiveUserPosition) {
             requestLocation();
             return;
         }
         setRecenterTrigger((n) => n + 1);
-    }, [userPosition, requestLocation]);
+    }, [effectiveUserPosition, requestLocation]);
 
     const handleNearbyCardClick = useCallback((pointId: string) => {
         const isDeselecting = selectedPointIdRef.current === pointId;

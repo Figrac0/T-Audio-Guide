@@ -32,7 +32,9 @@ const pointZoom = 16
 const userZoom = 15.4
 
 export function LeafletRouteMap({
+  isMapLocked,
   onLocateUser,
+  onMapClick,
   onSelect,
   routeColor,
   selectedStopId,
@@ -42,6 +44,8 @@ export function LeafletRouteMap({
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const overlayRef = useRef<L.LayerGroup | null>(null)
+  const onMapClickRef = useRef(onMapClick)
+  useEffect(() => { onMapClickRef.current = onMapClick }, [onMapClick])
   const initialCenterRef = useRef(stops[0]?.coordinates ?? appMapConfig.defaultCenter)
   const skipSelectionFocusRef = useRef(true)
   const hasInitialFitRef = useRef(false)
@@ -119,6 +123,10 @@ export function LeafletRouteMap({
     try {
       const map = createLeafletMap(container, initialCenterRef.current, 14)
       const overlay = L.layerGroup().addTo(map)
+
+      map.on('click', (e: L.LeafletMouseEvent) => {
+        onMapClickRef.current?.({ lat: e.latlng.lat, lng: e.latlng.lng })
+      })
 
       mapRef.current = map
       overlayRef.current = overlay
@@ -383,7 +391,7 @@ export function LeafletRouteMap({
         <h2 className="map-card__title">Карта маршрута</h2>
       </div>
 
-      <div className="map-card__canvas map-card__canvas--interactive">
+      <div className={`map-card__canvas map-card__canvas--interactive${isMapLocked ? ' map-card__canvas--locked' : ''}`}>
         <div className="map-card__map-root" ref={mapContainerRef}></div>
       </div>
 

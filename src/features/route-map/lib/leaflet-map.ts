@@ -151,7 +151,9 @@ export function createRouteStopIcon(
 
 export function createUserIcon() {
   return L.divIcon({
-    className: emptyDivIconClassName,
+    // Intentionally NOT emptyDivIconClassName — the clustering CSS hides
+    // .leaflet-div-icon--clean, but the user position marker must always show.
+    className: 'leaflet-div-icon leaflet-div-icon--user',
     html: '<div class="user-marker"><span class="user-marker__pulse" aria-hidden="true"></span><span class="user-marker__dot"></span></div>',
     iconSize: [30, 30],
     iconAnchor: [15, 15],
@@ -171,13 +173,14 @@ export function createDiscoveryRadiusCircle(center: GeoPoint, radiusMeters: numb
 
 export function createRoutePolyline(geometry: RouteGeometry, routeColor: string) {
   const segments = toLeafletPolylineSegments(geometry)
+  const renderer = L.canvas({ padding: 0.5 })
 
   const shadow = L.polyline(segments, {
     color: 'rgba(15, 118, 110, 0.18)',
     lineCap: 'round',
     lineJoin: 'round',
     opacity: 1,
-    renderer: L.canvas(),
+    renderer,
     weight: 12,
   })
 
@@ -186,7 +189,7 @@ export function createRoutePolyline(geometry: RouteGeometry, routeColor: string)
     lineCap: 'round',
     lineJoin: 'round',
     opacity: 0.9,
-    renderer: L.canvas(),
+    renderer,
     weight: 6,
   })
 
@@ -195,7 +198,7 @@ export function createRoutePolyline(geometry: RouteGeometry, routeColor: string)
     lineCap: 'round',
     lineJoin: 'round',
     opacity: 0.8,
-    renderer: L.canvas(),
+    renderer,
     weight: 2,
   })
 
@@ -250,6 +253,8 @@ export function createPlannerRoutePolyline(
   const segmentPalette = ['#0f4c81', '#1f8a70', '#7c3aed', '#d97706', '#4f772d', '#c2514b']
   const hasLeadSegment = Boolean(options?.hasLeadSegment)
 
+  const renderer = L.canvas({ padding: 0.5 })
+
   const layers = segments.flatMap((segment, index) => {
     const path = segment.map(toLeafletLatLngFromLngLat)
     const isLeadSegment = hasLeadSegment && index === 0
@@ -260,7 +265,7 @@ export function createPlannerRoutePolyline(
       lineCap: 'round',
       lineJoin: 'round',
       opacity: 1,
-      renderer: L.canvas(),
+      renderer,
       weight: isLeadSegment ? 10 : 12,
     })
 
@@ -270,7 +275,7 @@ export function createPlannerRoutePolyline(
       lineCap: 'round',
       lineJoin: 'round',
       opacity: isLeadSegment ? 0.88 : 0.94,
-      renderer: L.canvas(),
+      renderer,
       weight: isLeadSegment ? 5 : 6,
     })
 
@@ -280,7 +285,7 @@ export function createPlannerRoutePolyline(
       lineCap: 'round',
       lineJoin: 'round',
       opacity: 0.76,
-      renderer: L.canvas(),
+      renderer,
       weight: 2,
     })
 
@@ -361,4 +366,18 @@ function toLeafletDuration(duration?: number) {
 
 function getCategoryIcon(category: NearbyPoint['category']) {
   return getPointCategoryIcon(category)
+}
+
+export function createClusterIcon(count: number) {
+  // Grow 2px per extra point above 2, cap at 58px.
+  // count=2→44px, count=5→50px, count=9+→58px
+  const size = Math.min(58, 44 + (count - 2) * 2)
+  const half = Math.floor(size / 2)
+  const fontSize = Math.round(size * 0.32)
+  return L.divIcon({
+    className: 'leaflet-div-icon leaflet-div-icon--cluster',
+    html: `<div class="cluster-marker" style="width:${size}px;height:${size}px;font-size:${fontSize}px">${count}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [half, half],
+  })
 }

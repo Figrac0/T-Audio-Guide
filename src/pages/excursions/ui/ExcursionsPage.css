@@ -61,14 +61,15 @@ body.app-body--routes-page {
 .ep__geo-error {
     position: absolute;
     bottom: calc(52px + 14px);
-    left: 50%;
+    left: 0;
+    right: 0;
     z-index: 400;
-    transform: translateX(-50%);
     display: inline-flex;
     align-items: center;
     gap: 10px;
-    max-width: min(320px, calc(100% - 32px));
-    margin: 0;
+    width: fit-content;
+    max-width: min(520px, calc(100% - 32px));
+    margin: 0 auto;
     padding: 8px 8px 8px 14px;
     border-radius: 12px;
     background: rgba(255, 240, 238, 0.96);
@@ -76,7 +77,7 @@ body.app-body--routes-page {
     font-size: 0.82rem;
     font-weight: 700;
     pointer-events: auto;
-    text-align: center;
+    text-align: left;
     box-shadow: 0 12px 28px rgba(31, 37, 51, 0.12);
 }
 
@@ -770,7 +771,7 @@ body.app-body--routes-page {
     align-items: center;
     gap: 10px;
     /* Compact padding: reduced from 14px to save vertical space */
-    padding: 9px 12px 0px 0;
+    padding: 9px 12px 8px 0;
     border: none;
     outline: none;
     background: transparent;
@@ -894,10 +895,22 @@ body.app-body--routes-page {
     text-align: center;
 }
 
+@media (max-width: 767px) {
+    .ep-stop__desc {
+        text-align: left;
+    }
+
+    .ep-stop__desc::first-letter {
+        color: var(--color-brand-strong);
+        font-weight: 900;
+    }
+}
+
 .ep-stop__meta {
     display: flex;
     flex-wrap: wrap;
     gap: 5px;
+    justify-content: center;
 }
 
 .ep-stop__chip {
@@ -913,11 +926,18 @@ body.app-body--routes-page {
     font-weight: 800;
 }
 
+.ep-stop__chip--audio {
+    padding: 0 8px;
+    color: var(--color-text-tertiary);
+}
+
+.ep-stop__chip--audio-active {
+    border-color: rgba(31, 138, 112, 0.28);
+    color: var(--color-brand);
+}
+
 .ep-stop__remove {
     justify-self: center;
-    /* compensate for asymmetric parent padding (72px left, 12px right) so the
-     button appears centered in the full card width, not just the content area */
-    margin-left: -30px;
     display: inline-flex;
     min-height: 30px;
     align-items: center;
@@ -1599,6 +1619,14 @@ body.app-body--routes-page {
 
 .ep-card__detail strong {
     color: var(--color-text);
+}
+
+.ep-card__detail--muted {
+    color: var(--color-text-tertiary);
+}
+
+.ep-card__star {
+    color: #f6bf16;
 }
 
 /* Старт/Финиш — single line; the place name truncates with an ellipsis

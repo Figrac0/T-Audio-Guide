@@ -9,6 +9,8 @@
   width: 100%;
   height: 100%;
   background: #e8edf4;
+  /* CSS containment: layout changes inside the map don't propagate outward */
+  contain: layout;
 }
 
 .rbm__container .leaflet-container {

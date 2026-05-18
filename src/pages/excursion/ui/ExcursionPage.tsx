@@ -29,8 +29,10 @@ import { useUserGeolocation } from '@/features/route-map/model/useUserGeolocatio
 import { useAudioGuide } from '@/pages/excursion/model/useAudioGuide'
 import { RouteMap } from '@/features/route-map/ui/RouteMap'
 import { useUserRoutes } from '@/features/user-routes/model/useUserRoutes'
+import { excursionsService } from '@/shared/api/excursionsService'
 import { appRoutes } from '@/shared/config/routes'
 import { getStoredDiscoveryContext } from '@/shared/lib/discovery-context'
+import { useManualPosition } from '@/shared/lib/ManualPositionContext'
 import { buildRoutePlaceholderImage } from '@/shared/lib/placeholder-images'
 import {
   formatDifficulty,
@@ -189,6 +191,7 @@ export function ExcursionPage() {
     return (
       <CompleteScreen
         excursion={displayExcursion}
+        excursionId={displayExcursion.id}
         isSaved={isSaved}
         onSave={() => toggleSavedRoute(displayExcursion)}
         onShare={() => void shareRoute(displayExcursion)}
@@ -479,6 +482,9 @@ interface NavigationPhaseProps {
 function NavigationPhase({
   currentStopIndex, excursion, onComplete, onStopChange, requestLocation, userPosition,
 }: NavigationPhaseProps) {
+  const { isOverrideActive, manualPosition, mode: overrideMode, setManualPosition, toggleOverride } = useManualPosition()
+  const effectiveUserPosition = isOverrideActive ? manualPosition : userPosition
+
   const currentStop = excursion.stops[currentStopIndex] ?? excursion.stops[0]
   const isLastStop = currentStopIndex >= excursion.stops.length - 1
   const currentAudio = currentStop.audio
@@ -493,7 +499,6 @@ function NavigationPhase({
     : []
 
   const [sheetState, setSheetState] = useState<SheetState>('closed')
-  const [initialUserPosition] = useState(userPosition)
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(false)
   const [transcriptHeight, setTranscriptHeight] = useState(0)
   const transcriptRef = useRef<HTMLDivElement>(null)
@@ -730,10 +735,18 @@ function NavigationPhase({
   }
 
   const distanceToStop = useMemo(
-    () => userPosition ? getDistanceMetersBetween(userPosition, currentStop.coordinates) : null,
-    [userPosition, currentStop.coordinates],
+    () => effectiveUserPosition ? getDistanceMetersBetween(effectiveUserPosition, currentStop.coordinates) : null,
+    [effectiveUserPosition, currentStop.coordinates],
   )
-  const guideRouteUserPosition = initialUserPosition
+  const guideRouteUserPosition = effectiveUserPosition
+
+  const handleManualPositionToggle = useCallback(() => { toggleOverride() }, [toggleOverride])
+
+  const handleNavMapClick = useCallback((coords: { lat: number; lng: number }) => {
+    if (overrideMode === 'waiting') {
+      setManualPosition(coords)
+    }
+  }, [overrideMode, setManualPosition])
 
   // Stable references for RouteMap props — passing inline `[currentStop]` /
   // `() => setSheetState('full')` would create new array/function references
@@ -747,7 +760,9 @@ function NavigationPhase({
     <div className="ep-nav">
       <div className="ep-nav__map">
         <RouteMap
+          isMapLocked={overrideMode === 'waiting'}
           onLocateUser={requestLocation}
+          onMapClick={handleNavMapClick}
           onSelect={handleNavMarkerSelect}
           routeColor={excursion.routeColor}
           selectedStopId={currentStop.id}
@@ -817,10 +832,23 @@ function NavigationPhase({
           {/* Nav row — compact one-line strip, hidden when sheet is fully open */}
           <div className="ep-nav__nav-row" ref={navRowRef}>
             <span className="ep-nav__progress-count">{currentStopIndex + 1}/{excursion.stops.length}</span>
-            <p className="ep-nav__progress-title">{currentStop.title}</p>
-            {distanceToStop !== null ? (
-              <span className="ep-nav__progress-dist">{formatMeters(distanceToStop)}</span>
-            ) : null}
+            <p className="ep-nav__progress-title">
+              {currentStop.title}
+              {distanceToStop !== null ? <span className="ep-nav__progress-dist"> · {formatMeters(distanceToStop)}</span> : null}
+            </p>
+            <button
+              aria-label={overrideMode !== 'off' ? 'Вернуться к реальной геопозиции' : 'Установить позицию вручную'}
+              className={`ep-nav__manual-pos${overrideMode === 'active' ? ' ep-nav__manual-pos--active' : overrideMode === 'waiting' ? ' ep-nav__manual-pos--waiting' : ''}`}
+              onClick={handleManualPositionToggle}
+              onPointerDown={(e) => e.stopPropagation()}
+              title={overrideMode === 'waiting' ? 'Кликните на карту чтобы установить позицию' : overrideMode === 'active' ? 'Нажмите чтобы вернуться к GPS' : 'Установить позицию вручную'}
+              type="button"
+            >
+              <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+                <circle cx="12" cy="12" r="3" fill="currentColor" />
+              </svg>
+            </button>
           </div>
 
           {/* Stop details — visible in full */}
@@ -989,16 +1017,40 @@ function NavigationPhase({
 
 interface CompleteScreenProps {
   excursion: Excursion
+  excursionId: number
   isSaved: boolean
   onSave: () => void
   onShare: () => void
 }
 
-function CompleteScreen({ excursion, isSaved, onSave, onShare }: CompleteScreenProps) {
+function CompleteScreen({ excursion, excursionId, isSaved, onSave, onShare }: CompleteScreenProps) {
   const [rating, setRating] = useState(0)
   const [hoverRating, setHoverRating] = useState(0)
   const [reviewText, setReviewText] = useState('')
   const [reviewSent, setReviewSent] = useState(false)
+  const [reviewError, setReviewError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  async function handleSubmitReview() {
+    if (!rating || isSubmitting) return
+    setIsSubmitting(true)
+    setReviewError(null)
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      await excursionsService.submitReview(excursionId, {
+        rating,
+        reviewText: reviewText.trim() || undefined,
+        visitDate: today,
+      })
+      setReviewSent(true)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : ''
+      // 409 = уже оставлял отзыв
+      setReviewError(msg.includes('409') || msg.toLowerCase().includes('уже') ? 'Вы уже оставляли отзыв на этот маршрут.' : 'Не удалось отправить отзыв. Попробуйте позже.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
     <div className="ep-complete">
@@ -1059,12 +1111,16 @@ function CompleteScreen({ excursion, isSaved, onSave, onShare }: CompleteScreenP
                     rows={3}
                     value={reviewText}
                   />
+                  {reviewError ? (
+                    <p className="ep-complete__review-error">{reviewError}</p>
+                  ) : null}
                   <button
                     className="button button--secondary"
-                    onClick={() => setReviewSent(true)}
+                    disabled={isSubmitting}
+                    onClick={() => void handleSubmitReview()}
                     type="button"
                   >
-                    Отправить отзыв
+                    {isSubmitting ? 'Отправляем…' : 'Отправить отзыв'}
                   </button>
                 </>
               ) : null}

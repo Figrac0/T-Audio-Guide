@@ -395,6 +395,8 @@ export function mapExcursionFromShort(exc: ApiExcursionShort): Excursion {
     difficulty: getDifficultyByDistance(distanceKm),
     audienceLabel: 'Все',
     stops: [],
+    rating: exc.rating ?? 0,
+    reviewsCount: exc.reviewsCount ?? 0,
   }
 }
 

@@ -408,6 +408,7 @@ function createRouteStopFromPoint(point: NearbyPoint, order: number): RouteStop 
     category: point.category,
     coordinates: point.coordinates,
     description: point.description,
+    distanceMeters: point.distanceMeters,
     expectedVisitMinutes: point.expectedVisitMinutes,
     id: `${point.id}-draft-stop`,
     imageUrl: point.imageUrl,

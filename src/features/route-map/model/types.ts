@@ -7,4 +7,6 @@ export interface RouteMapProps {
   onLocateUser?: () => void
   onSelect: (stopId: string) => void
   userPosition?: GeoPoint | null
+  onMapClick?: (coords: GeoPoint) => void
+  isMapLocked?: boolean
 }

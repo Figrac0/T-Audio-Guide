@@ -50,6 +50,12 @@
   height: 520px;
 }
 
+.map-card__canvas--locked,
+.map-card__canvas--locked .map-card__map-root,
+.map-card__canvas--locked .leaflet-container {
+  cursor: crosshair !important;
+}
+
 .map-card__map-root {
   width: 100%;
   height: 100%;

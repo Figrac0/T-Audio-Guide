@@ -28,6 +28,7 @@
   position: relative;
   width: auto;
   height: auto;
+  contain: layout style;
 }
 
 /* POI marker glyph — STATIC. The previous infinite "idle pulse" animation ran
@@ -48,9 +49,10 @@
   line-height: 1;
   border-radius: 50%;
   background: #ffffff;
-  box-shadow:
-    0 2px 8px rgba(15, 23, 42, 0.22),
-    0 0 0 1.5px rgba(255, 255, 255, 0.6);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.22);
+  transition:
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.2s ease;
 }
 
 .poi-marker--pulse::before {
@@ -82,10 +84,10 @@
 }
 
 .poi-marker--active .poi-marker__glyph {
-  transform: translateY(-3px) scale(1.18);
+  transform: translateY(-4px) scale(1.22);
   box-shadow:
-    0 4px 14px rgba(31, 138, 112, 0.35),
-    0 0 0 2px rgba(31, 138, 112, 0.3);
+    0 6px 18px rgba(31, 138, 112, 0.4),
+    0 0 0 3px #1f8a70;
 }
 
 .poi-marker--draft .poi-marker__glyph {
@@ -113,4 +115,59 @@
   .poi-marker--pulse::before {
     animation: none;
   }
+}
+
+/* ── Marker clustering ── */
+
+/* Smooth fade when clustering mode toggles on/off.
+   opacity is GPU-composited — no layout reflow on mobile. */
+.leaflet-div-icon--clean {
+  transition: opacity 0.22s ease;
+}
+
+/* When clustering is active the container gets dm--clustering.
+   All POI markers are hidden. Single-point clusters get dm--visible-in-cluster
+   to punch back through. */
+.dm--clustering .leaflet-div-icon--clean {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dm--clustering .leaflet-div-icon--clean.dm--visible-in-cluster {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Cluster bubble appear animation */
+@keyframes cluster-pop {
+  0%   { transform: scale(0.45); opacity: 0; }
+  65%  { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Cluster bubble rendered by createClusterIcon().
+   width/height/font-size are set via inline style — scaled by point count. */
+.cluster-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1f8a70 0%, #0f766e 100%);
+  border: 3px solid #ffffff;
+  box-shadow:
+    0 2px 10px rgba(31, 138, 112, 0.45),
+    0 0 0 1px rgba(31, 138, 112, 0.18);
+  color: #ffffff;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  animation: cluster-pop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+
+.cluster-marker:hover {
+  transform: scale(1.1);
+  box-shadow:
+    0 4px 16px rgba(31, 138, 112, 0.55),
+    0 0 0 2px rgba(31, 138, 112, 0.28);
 }

@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import * as L from 'leaflet'
 
 import type { GeoPoint, NearbyPoint } from '@/entities/excursion/model/types'
@@ -7,12 +7,14 @@ import type { PlannerRouteState } from '@/pages/excursions/model/useExcursionsPa
 import {
   applyLeafletLocation,
   buildMarkerTitle,
+  createClusterIcon,
   createDiscoveryRadiusCircle,
   createGuidePolyline,
   createLeafletMap,
   createPoiIcon,
   createSegmentedRoutePolyline,
   createUserIcon,
+  getPointCategoryIcon,
 } from '@/features/route-map/lib/leaflet-map'
 import { routeMapPopupClassName } from '@/features/route-map/lib/popup-skin'
 import {
@@ -157,8 +159,16 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
   const markerIconStateRef = useRef(
     new Map<string, { selected: boolean; draftOrder: number | null }>(),
   )
+  const clusterLayerRef = useRef<L.LayerGroup | null>(null)
+  const clusterMarkersRef = useRef<Map<string, L.Marker>>(new Map())
+  const clustersRef = useRef<Array<{ ids: string[]; key: string; lat: number; lng: number }>>([])
+  const prevSelectedClusterKeyRef = useRef<string | null>(null)
+  const prevUserPositionRef = useRef<GeoPoint | null>(null)
+  const setClusterVersionRef = useRef<((fn: (n: number) => number) => void) | null>(null)
   const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const initialCenterRef = useRef(initialCenter ?? userPosition ?? appMapConfig.defaultCenter)
+  const [clusterVersion, setClusterVersion] = useState(0)
+  setClusterVersionRef.current = setClusterVersion
 
   useImperativeHandle(ref, () => ({
     closePopup: () => { mapRef.current?.closePopup() },
@@ -204,12 +214,14 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
     const map = createLeafletMap(container, initialCenterRef.current, appMapConfig.defaultZoom)
     const routeLayer = L.layerGroup().addTo(map)
     const markersLayer = L.layerGroup().addTo(map)
+    const clusterLayer = L.layerGroup().addTo(map)
     const userLayer = L.layerGroup().addTo(map)
     const markerMap = markerRefsMap.current
 
     mapRef.current = map
     routeLayerRef.current = routeLayer
     markersLayerRef.current = markersLayer
+    clusterLayerRef.current = clusterLayer
     userLayerRef.current = userLayer
 
       map.on('zoomend', () => {
@@ -220,6 +232,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
         zoomDebounceRef.current = setTimeout(() => {
           onChangeRadiusRef.current(getDiscoveryRadiusForZoom(map.getZoom()))
         }, 200)
+        setClusterVersionRef.current?.((v) => v + 1)
       })
 
       map.on('popupclose', () => {
@@ -252,9 +265,11 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
 
       routeLayerRef.current?.clearLayers()
       markersLayerRef.current?.clearLayers()
+      clusterLayerRef.current?.clearLayers()
       userLayerRef.current?.clearLayers()
       routeLayerRef.current = null
       markersLayerRef.current = null
+      clusterLayerRef.current = null
       userLayerRef.current = null
       markerMap.clear()
       mapRef.current?.remove()
@@ -280,14 +295,27 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
   }, [isMapLocked])
 
   useEffect(() => {
+    if (!userPosition) {
+      prevUserPositionRef.current = null
+      return
+    }
     const map = mapRef.current
-    if (!map || !userPosition) return
+    if (!map) return
 
-    applyLeafletLocation(map, {
-      center: toLngLat(userPosition),
-      zoom: 15.5,
-      duration: 600,
-    })
+    const prev = prevUserPositionRef.current
+    prevUserPositionRef.current = userPosition
+
+    if (!prev) {
+      applyLeafletLocation(map, { center: toLngLat(userPosition), zoom: 15.5, duration: 600 })
+      return
+    }
+
+    // Only re-center if position jumped more than 50m — manual set vs GPS micro-drift.
+    const dlat = (userPosition.lat - prev.lat) * 111320
+    const dlng = (userPosition.lng - prev.lng) * 111320 * Math.cos(userPosition.lat * (Math.PI / 180))
+    if (dlat * dlat + dlng * dlng > 50 * 50) {
+      applyLeafletLocation(map, { center: toLngLat(userPosition), zoom: 15.5, duration: 600 })
+    }
   }, [userPosition])
 
   useEffect(() => {
@@ -402,6 +430,15 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
         if (!prev || prev.selected !== isSelected || prev.draftOrder !== draftOrder) {
           existing.setIcon(createPoiIcon(point, isSelected, draftOrder))
           markerIconStateRef.current.set(point.id, { selected: isSelected, draftOrder })
+          if (containerRef.current?.classList.contains('dm--clustering')) {
+            const isInMultiCluster = clustersRef.current.some(
+              (c) => c.ids.length > 1 && c.ids.includes(point.id),
+            )
+            if (!isInMultiCluster) {
+              const el = existing.getElement()
+              if (el) el.classList.add('dm--visible-in-cluster')
+            }
+          }
         }
         return
       }
@@ -445,6 +482,162 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
     })
   }, [draftPointOrders, nearbyPoints])
 
+  // Marker clustering — diff-based: reuse existing L.Marker instances for
+  // unchanged clusters so the cluster-pop animation only fires when clusters
+  // genuinely form/merge, not on every selection change or points refresh.
+  // selectedPointId is intentionally NOT a dep — handled by the separate
+  // selection-in-cluster effect below.
+  useEffect(() => {
+    const map = mapRef.current
+    const clusterLayer = clusterLayerRef.current
+    const container = containerRef.current
+    if (!map || !clusterLayer) return
+
+    const CLUSTER_RADIUS_PX = 40
+    const visited = new Set<string>()
+    const rawClusters: Array<{ ids: string[]; lat: number; lng: number }> = []
+
+    for (const point of nearbyPoints) {
+      if (visited.has(point.id)) continue
+      visited.add(point.id)
+
+      const centerPx = map.latLngToContainerPoint([point.coordinates.lat, point.coordinates.lng])
+      const ids = [point.id]
+      let sumLat = point.coordinates.lat
+      let sumLng = point.coordinates.lng
+
+      for (const other of nearbyPoints) {
+        if (visited.has(other.id)) continue
+        const otherPx = map.latLngToContainerPoint([other.coordinates.lat, other.coordinates.lng])
+        const dx = centerPx.x - otherPx.x
+        const dy = centerPx.y - otherPx.y
+        if (dx * dx + dy * dy <= CLUSTER_RADIUS_PX * CLUSTER_RADIUS_PX) {
+          visited.add(other.id)
+          ids.push(other.id)
+          sumLat += other.coordinates.lat
+          sumLng += other.coordinates.lng
+        }
+      }
+
+      rawClusters.push({ ids, lat: sumLat / ids.length, lng: sumLng / ids.length })
+    }
+
+    const hasClusters = rawClusters.some((c) => c.ids.length > 1)
+
+    if (!hasClusters) {
+      container.classList.remove('dm--clustering')
+      markerRefsMap.current.forEach((marker) => {
+        const el = marker.getElement()
+        if (el) el.classList.remove('dm--visible-in-cluster')
+      })
+      for (const marker of clusterMarkersRef.current.values()) {
+        clusterLayer.removeLayer(marker)
+      }
+      clusterMarkersRef.current.clear()
+      clustersRef.current = []
+      prevSelectedClusterKeyRef.current = null
+      return
+    }
+
+    container.classList.add('dm--clustering')
+
+    markerRefsMap.current.forEach((marker) => {
+      const el = marker.getElement()
+      if (el) el.classList.remove('dm--visible-in-cluster')
+    })
+
+    const nextClusterMap = new Map<string, L.Marker>()
+    const nextClusters: Array<{ ids: string[]; key: string; lat: number; lng: number }> = []
+
+    for (const cluster of rawClusters) {
+      const key = [...cluster.ids].sort().join(':')
+      nextClusters.push({ ...cluster, key })
+
+      if (cluster.ids.length === 1) {
+        const marker = markerRefsMap.current.get(cluster.ids[0])
+        if (marker) {
+          const el = marker.getElement()
+          if (el) el.classList.add('dm--visible-in-cluster')
+        }
+      } else {
+        const existing = clusterMarkersRef.current.get(key)
+        if (existing) {
+          nextClusterMap.set(key, existing)
+        } else {
+          const newMarker = L.marker([cluster.lat, cluster.lng], {
+            icon: createClusterIcon(cluster.ids.length),
+            zIndexOffset: 500,
+          })
+            .on('click', () => {
+              const bounds = L.latLngBounds(
+                cluster.ids.map((id) => {
+                  const p = nearbyPoints.find((pt) => pt.id === id)!
+                  return [p.coordinates.lat, p.coordinates.lng] as [number, number]
+                }),
+              )
+              map.flyToBounds(bounds, { padding: [60, 60], animate: true })
+            })
+            .addTo(clusterLayer)
+          nextClusterMap.set(key, newMarker)
+        }
+      }
+    }
+
+    for (const [key, marker] of clusterMarkersRef.current) {
+      if (!nextClusterMap.has(key)) {
+        clusterLayer.removeLayer(marker)
+        if (prevSelectedClusterKeyRef.current === key) {
+          prevSelectedClusterKeyRef.current = null
+        }
+      }
+    }
+
+    clusterMarkersRef.current = nextClusterMap
+    clustersRef.current = nextClusters
+  }, [clusterVersion, nearbyPoints])
+
+  // Selection-in-cluster: when the selected point is inside a multi-point cluster,
+  // replace the cluster count with its category icon via direct DOM update.
+  // No setIcon() call → no cluster-pop animation retrigger.
+  useEffect(() => {
+    const clusters = clustersRef.current
+    const clusterMarkers = clusterMarkersRef.current
+
+    const prevKey = prevSelectedClusterKeyRef.current
+    if (prevKey) {
+      const prevMarker = clusterMarkers.get(prevKey)
+      if (prevMarker) {
+        const prevCluster = clusters.find((c) => c.key === prevKey)
+        if (prevCluster) {
+          const el = prevMarker.getElement()
+          const inner = el?.querySelector('.cluster-marker')
+          if (inner) inner.textContent = String(prevCluster.ids.length)
+        }
+      }
+      prevSelectedClusterKeyRef.current = null
+    }
+
+    if (!selectedPointId) return
+
+    const selectedCluster = clusters.find(
+      (c) => c.ids.length > 1 && c.ids.includes(selectedPointId),
+    )
+    if (!selectedCluster) return
+
+    const marker = clusterMarkers.get(selectedCluster.key)
+    if (!marker) return
+
+    const selectedPoint = nearbyPoints.find((p) => p.id === selectedPointId)
+    if (!selectedPoint) return
+
+    const el = marker.getElement()
+    const inner = el?.querySelector('.cluster-marker')
+    if (inner) {
+      inner.textContent = getPointCategoryIcon(selectedPoint.category)
+      prevSelectedClusterKeyRef.current = selectedCluster.key
+    }
+  }, [selectedPointId, clusterVersion, nearbyPoints])
+
   // Update marker icons when selection changes (without touching nearbyPoints).
   useEffect(() => {
     nearbyPoints.forEach((point) => {
@@ -456,6 +649,15 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
       if (prev && prev.selected === isSelected && prev.draftOrder === draftOrder) return
       marker.setIcon(createPoiIcon(point, isSelected, draftOrder))
       markerIconStateRef.current.set(point.id, { selected: isSelected, draftOrder })
+      if (containerRef.current?.classList.contains('dm--clustering')) {
+        const isInMultiCluster = clustersRef.current.some(
+          (c) => c.ids.length > 1 && c.ids.includes(point.id),
+        )
+        if (!isInMultiCluster) {
+          const el = marker.getElement()
+          if (el) el.classList.add('dm--visible-in-cluster')
+        }
+      }
     })
   }, [draftPointOrders, nearbyPoints, selectedPointId])
 

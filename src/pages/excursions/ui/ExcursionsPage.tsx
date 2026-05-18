@@ -1114,10 +1114,7 @@ const DraftStopCard = memo(function DraftStopCard({
   stop,
 }: DraftStopCardProps) {
   const text = stop.description || stop.shortDescription
-  const preview = [
-    stop.expectedVisitMinutes > 0 && formatDuration(stop.expectedVisitMinutes),
-    stop.scheduleLabel,
-  ].filter(Boolean).join(' · ')
+  const preview = stop.scheduleLabel || null
 
   return (
     <div className={`ep-stop${isExpanded ? ' ep-stop--open' : ''}${isDragging ? ' ep-stop--dragging' : ''}${isLastAtLimit ? ' ep-stop--at-limit' : ''}`}>
@@ -1160,6 +1157,16 @@ const DraftStopCard = memo(function DraftStopCard({
             {stop.rating > 0 ? <span className="ep-stop__chip">★ {stop.rating.toFixed(1)}</span> : null}
             {stop.expectedVisitMinutes > 0 ? <span className="ep-stop__chip">{formatDuration(stop.expectedVisitMinutes)}</span> : null}
             {stop.scheduleLabel ? <span className="ep-stop__chip">{stop.scheduleLabel}</span> : null}
+            {stop.distanceMeters ? <span className="ep-stop__chip">{formatMeters(stop.distanceMeters)}</span> : null}
+            <span
+              aria-label={stop.audio.hasAudioGuide ? 'Есть аудиогид' : 'Нет аудиогида'}
+              className={`ep-stop__chip ep-stop__chip--audio${stop.audio.hasAudioGuide ? ' ep-stop__chip--audio-active' : ''}`}
+            >
+              <svg aria-hidden="true" fill="none" height="13" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" width="13">
+                <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+                <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+              </svg>
+            </span>
           </div>
           <button
             className="ep-stop__remove"
@@ -1215,6 +1222,12 @@ const ExcursionCard = memo(function ExcursionCard({ excursion }: ExcursionCardPr
 
         <div className="ep-card__details">
           <span className="ep-card__detail"><strong>Сложность:</strong> {formatDifficulty(excursion.difficulty)}</span>
+          <span className="ep-card__detail">
+            <strong>Рейтинг:</strong>{' '}
+            {excursion.rating && excursion.rating > 0
+              ? <><span className="ep-card__star">★</span> {excursion.rating.toFixed(1)}</>
+              : <span className="ep-card__detail--muted">нет оценок</span>}
+          </span>
           <span className="ep-card__detail"><strong>Для кого:</strong> {excursion.audienceLabel}</span>
           {excursion.startLabel ? (
             <span className="ep-card__detail ep-card__detail--line" title={excursion.startLabel}>

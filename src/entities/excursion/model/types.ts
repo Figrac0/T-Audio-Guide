@@ -41,6 +41,7 @@ export interface RouteStop {
   expectedVisitMinutes: number
   rating: number
   scheduleLabel: string
+  distanceMeters?: number
   audio: AudioStory
 }
 
@@ -85,4 +86,6 @@ export interface Excursion {
   difficulty: ExcursionDifficulty
   audienceLabel: string
   stops: RouteStop[]
+  rating?: number
+  reviewsCount?: number
 }

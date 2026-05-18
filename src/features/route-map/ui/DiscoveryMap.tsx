@@ -14,12 +14,12 @@ import {
   getBoundsFromGeometry,
   getBoundsFromPoints,
   toLngLat,
-  type LngLatBounds,
   type RouteGeometry,
 } from '@/features/route-map/lib/route-geometry'
 import {
   applyLeafletLocation,
   buildMarkerTitle,
+  createClusterIcon,
   createDiscoveryRadiusCircle,
   createGuidePolyline,
   createLeafletMap,
@@ -93,6 +93,8 @@ interface DiscoveryMapProps {
 const mapPadding: [number, number, number, number] = [56, 48, 48, 48]
 const selectedPointZoom = 16
 const locateZoom = 15.5
+// Cluster radius in px: markers are 34px circles, cluster when centers are within 40px
+const CLUSTER_RADIUS_PX = 40
 
 type SelectionSource = 'marker' | 'navigation' | 'route'
 
@@ -169,6 +171,12 @@ export function DiscoveryMap({
   // nearbyPoints refresh while the same route is active.
   const lastFittedRouteRef = useRef<string>('')
   const routeLayerRef = useRef<L.LayerGroup | null>(null)
+  const clusterLayerRef = useRef<L.LayerGroup | null>(null)
+  const clusterMarkersRef = useRef<Map<string, L.Marker>>(new Map())
+  const clustersRef = useRef<Array<{ ids: string[]; key: string; lat: number; lng: number }>>([])
+  const prevSelectedClusterKeyRef = useRef<string | null>(null)
+  const clusterZoomRef = useRef<number | null>(null)
+  const setClusterVersionRef = useRef<((fn: (n: number) => number) => void) | null>(null)
   const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const onChangeRadiusRef = useRef(onChangeRadius)
   const onMapClickRef = useRef(onMapClick)
@@ -182,6 +190,7 @@ export function DiscoveryMap({
   const displayRadiusRef = useRef(radiusMeters)
   const targetRadiusRef = useRef(radiusMeters)
   const radiusInterpolationRef = useRef<ReturnType<typeof requestAnimationFrame> | null>(null)
+  const [clusterVersion, setClusterVersion] = useState(0)
   const [mapLoadError, setMapLoadError] = useState<string | null>(null)
   const [openMenu, setOpenMenu] = useState<'category' | 'radius' | null>(null)
   const [displayRadius, setDisplayRadius] = useState(radiusMeters)
@@ -256,6 +265,7 @@ export function DiscoveryMap({
   selectedPointIdRef.current = selectedPointId
   panOnlyIdRef.current = panOnlyId
   nearbyPointsRef.current = nearbyPoints
+  setClusterVersionRef.current = setClusterVersion
   const guideGeometry =
     guideRoute.signature === guideSignature && guideRoute.geometry
       ? guideRoute.geometry
@@ -290,10 +300,13 @@ export function DiscoveryMap({
       // routeLayer (circle + polylines) rendered below markers layer
       const routeLayer = L.layerGroup().addTo(map)
       const overlay = L.layerGroup().addTo(map)
+      const clusterLayer = L.layerGroup().addTo(map)
 
       mapRef.current = map
       routeLayerRef.current = routeLayer
       overlayRef.current = overlay
+      clusterLayerRef.current = clusterLayer
+      clusterZoomRef.current = map.getZoom()
 
       map.on('popupclose', () => {
         if (suppressPopupCloseRef.current) {
@@ -349,6 +362,8 @@ export function DiscoveryMap({
           const newRadius = getDiscoveryRadiusForZoom(map.getZoom())
           updateTargetRadius(newRadius)
         }, 250)
+        clusterZoomRef.current = map.getZoom()
+        setClusterVersionRef.current?.((v) => v + 1)
       })
 
       map.on('click', (event: L.LeafletMouseEvent) => {
@@ -379,6 +394,8 @@ export function DiscoveryMap({
       if (radiusInterpolationRef.current !== null) cancelAnimationFrame(radiusInterpolationRef.current)
       routeLayerRef.current?.clearLayers()
       routeLayerRef.current = null
+      clusterLayerRef.current?.clearLayers()
+      clusterLayerRef.current = null
       overlayRef.current?.clearLayers()
       overlayRef.current = null
       markers.clear()
@@ -727,6 +744,17 @@ export function DiscoveryMap({
         ) {
           existing.setIcon(createPoiIcon(point, isActive, draftOrder, true))
           markerIconStateRef.current.set(point.id, { active: isActive, draftOrder })
+          // setIcon resets the element className, wiping dm--visible-in-cluster.
+          // Restore it so the selected marker stays visible in cluster mode.
+          if (mapContainerRef.current?.classList.contains('dm--clustering')) {
+            const isInMultiCluster = clustersRef.current.some(
+              (c) => c.ids.length > 1 && c.ids.includes(point.id),
+            )
+            if (!isInMultiCluster) {
+              const el = existing.getElement()
+              if (el) el.classList.add('dm--visible-in-cluster')
+            }
+          }
         }
         existing.setZIndexOffset(isActive ? 1000 : 0)
         existing.setPopupContent(popupContent)
@@ -782,7 +810,9 @@ export function DiscoveryMap({
     }
 
     const reopenTimeout = window.setTimeout(() => {
-      selectedMarker.openPopup()
+      if (!selectedMarker.isPopupOpen()) {
+        selectedMarker.openPopup()
+      }
     }, 0)
 
     return () => {
@@ -805,6 +835,171 @@ export function DiscoveryMap({
     circle.setRadius(displayRadius)
   }, [displayRadius])
 
+  // Marker clustering: group markers whose centres are within CLUSTER_RADIUS_PX
+  // of each other on screen. Runs on every zoom change and every points update.
+  // selectedPointId is intentionally NOT a dep — selection changes are handled
+  // by the separate selection-in-cluster effect below to avoid re-triggering
+  // the cluster-pop animation on every point selection.
+  useEffect(() => {
+    const map = mapRef.current
+    const clusterLayer = clusterLayerRef.current
+    const container = mapContainerRef.current
+    if (!map || !clusterLayer) return
+
+    // Greedy O(n²) pixel-distance clustering — fast enough for ≤100 markers
+    const visited = new Set<string>()
+    const rawClusters: Array<{ ids: string[]; lat: number; lng: number }> = []
+
+    for (const point of nearbyPoints) {
+      if (visited.has(point.id)) continue
+      visited.add(point.id)
+
+      const centerPx = map.latLngToContainerPoint([point.coordinates.lat, point.coordinates.lng])
+      const ids = [point.id]
+      let sumLat = point.coordinates.lat
+      let sumLng = point.coordinates.lng
+
+      for (const other of nearbyPoints) {
+        if (visited.has(other.id)) continue
+        const otherPx = map.latLngToContainerPoint([other.coordinates.lat, other.coordinates.lng])
+        const dx = centerPx.x - otherPx.x
+        const dy = centerPx.y - otherPx.y
+        if (dx * dx + dy * dy <= CLUSTER_RADIUS_PX * CLUSTER_RADIUS_PX) {
+          visited.add(other.id)
+          ids.push(other.id)
+          sumLat += other.coordinates.lat
+          sumLng += other.coordinates.lng
+        }
+      }
+
+      rawClusters.push({ ids, lat: sumLat / ids.length, lng: sumLng / ids.length })
+    }
+
+    const hasClusters = rawClusters.some((c) => c.ids.length > 1)
+
+    if (!hasClusters) {
+      container?.classList.remove('dm--clustering')
+      markerRefs.current.forEach((marker) => {
+        const el = marker.getElement()
+        if (el) el.classList.remove('dm--visible-in-cluster')
+      })
+      // Remove all existing cluster markers
+      for (const marker of clusterMarkersRef.current.values()) {
+        clusterLayer.removeLayer(marker)
+      }
+      clusterMarkersRef.current.clear()
+      clustersRef.current = []
+      prevSelectedClusterKeyRef.current = null
+      return
+    }
+
+    container?.classList.add('dm--clustering')
+
+    markerRefs.current.forEach((marker) => {
+      const el = marker.getElement()
+      if (el) el.classList.remove('dm--visible-in-cluster')
+    })
+
+    // Build keyed cluster list and diff against previous cluster markers.
+    // Reusing existing Leaflet marker instances for unchanged clusters prevents
+    // the cluster-pop animation from re-firing on selection changes.
+    const nextClusterMap = new Map<string, L.Marker>()
+    const nextClusters: Array<{ ids: string[]; key: string; lat: number; lng: number }> = []
+
+    for (const cluster of rawClusters) {
+      const key = [...cluster.ids].sort().join(':')
+      nextClusters.push({ ...cluster, key })
+
+      if (cluster.ids.length === 1) {
+        const marker = markerRefs.current.get(cluster.ids[0])
+        if (marker) {
+          const el = marker.getElement()
+          if (el) el.classList.add('dm--visible-in-cluster')
+        }
+      } else {
+        const existing = clusterMarkersRef.current.get(key)
+        if (existing) {
+          nextClusterMap.set(key, existing)
+        } else {
+          const newMarker = L.marker([cluster.lat, cluster.lng], {
+            icon: createClusterIcon(cluster.ids.length),
+            zIndexOffset: 500,
+          })
+            .on('click', () => {
+              const bounds = L.latLngBounds(
+                cluster.ids.map((id) => {
+                  const p = nearbyPoints.find((pt) => pt.id === id)!
+                  return [p.coordinates.lat, p.coordinates.lng] as [number, number]
+                }),
+              )
+              map.flyToBounds(bounds, { padding: [60, 60], animate: true })
+            })
+            .addTo(clusterLayer)
+          nextClusterMap.set(key, newMarker)
+        }
+      }
+    }
+
+    // Remove cluster markers that no longer exist
+    for (const [key, marker] of clusterMarkersRef.current) {
+      if (!nextClusterMap.has(key)) {
+        clusterLayer.removeLayer(marker)
+        // Clear prevSelected if its cluster was removed
+        if (prevSelectedClusterKeyRef.current === key) {
+          prevSelectedClusterKeyRef.current = null
+        }
+      }
+    }
+
+    clusterMarkersRef.current = nextClusterMap
+    clustersRef.current = nextClusters
+  }, [clusterVersion, nearbyPoints])
+
+  // Selection-in-cluster: when the selected point is inside a multi-point cluster,
+  // replace the cluster count with its category icon (no individual marker shown).
+  // Runs after the clustering effect to read the freshly-built cluster state.
+  useEffect(() => {
+    const clusters = clustersRef.current
+    const clusterMarkers = clusterMarkersRef.current
+
+    // Restore the previously selected cluster's icon back to count
+    const prevKey = prevSelectedClusterKeyRef.current
+    if (prevKey) {
+      const prevMarker = clusterMarkers.get(prevKey)
+      if (prevMarker) {
+        const prevCluster = clusters.find((c) => c.key === prevKey)
+        if (prevCluster) {
+          const el = prevMarker.getElement()
+          const inner = el?.querySelector('.cluster-marker')
+          if (inner) inner.textContent = String(prevCluster.ids.length)
+        }
+      }
+      prevSelectedClusterKeyRef.current = null
+    }
+
+    if (!selectedPointId) return
+
+    // Find the multi-point cluster containing the selected point
+    const selectedCluster = clusters.find(
+      (c) => c.ids.length > 1 && c.ids.includes(selectedPointId),
+    )
+    if (!selectedCluster) return
+
+    const marker = clusterMarkers.get(selectedCluster.key)
+    if (!marker) return
+
+    const selectedPoint = nearbyPoints.find((p) => p.id === selectedPointId)
+    if (!selectedPoint) return
+
+    // Swap count for category icon directly in the DOM — no setIcon(), no animation
+    const el = marker.getElement()
+    const inner = el?.querySelector('.cluster-marker')
+    if (inner) {
+      inner.textContent = getPointCategoryIcon(selectedPoint.category)
+      prevSelectedClusterKeyRef.current = selectedCluster.key
+    }
+  }, [selectedPointId, clusterVersion, nearbyPoints])
+
   // Selection-only icon update. The main marker diff effect uses
   // selectedPointIdRef and won't re-run when ONLY selection changes, so we
   // need this separate pass. Use the icon-state cache to avoid redundant
@@ -821,6 +1016,17 @@ export function DiscoveryMap({
       if (prev && prev.active === isActive && prev.draftOrder === draftOrder) return
       marker.setIcon(createPoiIcon(point, isActive, draftOrder, true))
       markerIconStateRef.current.set(point.id, { active: isActive, draftOrder })
+      // Restore dm--visible-in-cluster for ALL single-point cluster markers after
+      // setIcon() wipes the element className — not just the active one.
+      if (mapContainerRef.current?.classList.contains('dm--clustering')) {
+        const isInMultiCluster = clustersRef.current.some(
+          (c) => c.ids.length > 1 && c.ids.includes(point.id),
+        )
+        if (!isInMultiCluster) {
+          const el = marker.getElement()
+          if (el) el.classList.add('dm--visible-in-cluster')
+        }
+      }
     })
   }, [nearbyPoints, selectedPointId, visibleDraftOrderMap])
 
@@ -869,8 +1075,12 @@ export function DiscoveryMap({
     selectionSourceRef.current = null
 
     if (source === 'marker') {
-      popupPointIdRef.current = point.id
-      marker.openPopup()
+      // Popup already opened synchronously in the click handler — don't reopen
+      // it here, that would cause a close+open flash (autoPan fires twice).
+      if (!marker.isPopupOpen()) {
+        popupPointIdRef.current = point.id
+        marker.openPopup()
+      }
       return
     }
 
@@ -899,18 +1109,10 @@ export function DiscoveryMap({
     if (!recenterTrigger) return
     const map = mapRef.current
     if (!userPosition || !map) return
-    const { lat, lng } = userPosition
-    // Fixed 1 km view regardless of selected radius
-    const viewKm = 1.0
-    const latDelta = (viewKm * 1000) / 111320
-    const lngDelta = (viewKm * 1000) / (111320 * Math.cos((lat * Math.PI) / 180))
-    const bounds: LngLatBounds = [
-      [lng - lngDelta, lat - latDelta],
-      [lng + lngDelta, lat + latDelta],
-    ]
+    // Zoom to street level so the user can see their building and street name.
     applyLeafletLocation(map, {
-      bounds,
-      padding: [56, 20, 64, 20],
+      center: toLngLat(userPosition),
+      zoom: 17,
       duration: 700,
       easing: 'ease-in-out',
     })

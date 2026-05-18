@@ -80,6 +80,17 @@ export const excursionsService = {
     })
   },
 
+  /** POST /excursions/{excursionId}/review */
+  async submitReview(
+    id: number | string,
+    params: { rating: number; reviewText?: string; visitDate: string },
+  ): Promise<void> {
+    return request<void>(`/excursions/${id}/review`, {
+      body: JSON.stringify(params),
+      method: 'POST',
+    })
+  },
+
   /** DELETE /excursions/{excursionId} */
   async deleteExcursion(id: number | string): Promise<void> {
     return request<void>(`/excursions/${id}`, { method: 'DELETE' })
