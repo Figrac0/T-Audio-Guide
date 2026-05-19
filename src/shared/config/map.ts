@@ -6,5 +6,8 @@ export const appMapConfig = {
     lng: 50.1015,
   },
   defaultZoom: 14,
+  // Minimum selectable radius (used for API clamping / zoom mapping).
   discoveryRadiusMeters: 1200,
+  // Radius shown on first visit (before user changes it via the menu).
+  defaultDiscoveryRadiusMeters: 3000,
 } as const

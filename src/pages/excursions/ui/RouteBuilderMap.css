@@ -220,6 +220,7 @@
 }
 
 .rbm-popup__btn--audio {
+  gap: 6px;
   border-color: rgba(31, 138, 112, 0.2);
   background: var(--color-brand-soft);
   color: var(--color-brand-strong);

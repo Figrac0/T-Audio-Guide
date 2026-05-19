@@ -889,14 +889,26 @@ body.app-body--excursion-nav {
     overflow: hidden;
 }
 
+/* Outer container: centers the photo horizontally (portrait photos don't stretch) */
 .ep-nav__stop-img {
-    position: relative;
-    border-radius: 18px;
-    padding: 3px;
-    /* animated gradient border via ::before */
+    display: flex;
+    justify-content: center;
 }
 
-.ep-nav__stop-img::before {
+/* Inner wrapper: shrinks to fit the actual image — border follows photo outline */
+.ep-nav__stop-img-inner {
+    position: relative;
+    width: fit-content;
+    max-width: 100%;
+    border-radius: 18px;
+    padding: 3px;
+}
+
+.ep-nav__stop-img-inner--fallback {
+    width: 100%;
+}
+
+.ep-nav__stop-img-inner::before {
     content: '';
     position: absolute;
     inset: 0;
@@ -910,9 +922,10 @@ body.app-body--excursion-nav {
 .ep-nav__stop-img img {
     position: relative;
     display: block;
-    width: 100%;
+    width: auto;
+    max-width: 100%;
     height: auto;
-    max-height: 300px;
+    max-height: 294px; /* 300px - 2×3px padding */
     object-fit: contain;
     border-radius: 15px;
     background: #fff;
@@ -936,8 +949,8 @@ body.app-body--excursion-nav {
 
 .ep-nav__stop-cat {
     position: absolute;
-    bottom: 10px;
-    right: 10px;
+    bottom: 13px; /* 3px padding + 10px gap from photo edge */
+    right: 13px;
     z-index: 2;
     display: inline-flex;
     min-height: 24px;

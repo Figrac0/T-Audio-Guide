@@ -15,6 +15,7 @@ import type {
   NearbyPoint,
   RouteStop,
 } from '@/entities/excursion/model/types'
+import { fetchPointDetailData } from '@/entities/excursion/model/usePointDetailsMap'
 import { getDistanceMetersBetween } from '@/features/route-map/lib/route-geometry'
 import { generatePersonalRouteName } from '@/features/user-routes/lib/personal-route-names'
 import { UserRoutesContext } from '@/features/user-routes/model/user-routes-context'
@@ -134,6 +135,7 @@ export function UserRoutesProvider({ children }: UserRoutesProviderProps) {
   )
 
   const addPointToDraft = useCallback((point: NearbyPoint) => {
+    const draftStopId = `${point.id}-draft-stop`
     setDraftState((currentState) => {
       const currentStops =
         currentState.pathname === location.pathname ? currentState.stops : []
@@ -152,6 +154,25 @@ export function UserRoutesProvider({ children }: UserRoutesProviderProps) {
           createRouteStopFromPoint(point, currentStops.length + 1),
         ],
       }
+    })
+    void fetchPointDetailData(point.id).then((data) => {
+      if (!data?.audioUrl) return
+      setDraftState((currentState) => {
+        const idx = currentState.stops.findIndex((s) => s.id === draftStopId)
+        if (idx === -1) return currentState
+        const updated = [...currentState.stops]
+        updated[idx] = {
+          ...updated[idx],
+          audio: {
+            ...updated[idx].audio,
+            hasAudioGuide: true,
+            audioGuideUrl: data.audioUrl,
+            url: data.audioUrl,
+            transcriptPreview: data.audioTranscript ?? updated[idx].audio.transcriptPreview,
+          },
+        }
+        return { ...currentState, stops: updated }
+      })
     })
   }, [location.pathname])
 
@@ -421,16 +442,17 @@ function createRouteStopFromPoint(point: NearbyPoint, order: number): RouteStop 
 }
 
 function createDraftAudio(point: NearbyPoint): AudioStory {
+  const hasAudio = Boolean(point.audioGuideUrl)
   return {
-    hasAudioGuide: false,
-    audioGuideUrl: null,
+    hasAudioGuide: hasAudio,
+    audioGuideUrl: point.audioGuideUrl ?? null,
     audioDuration: 90,
     audioLanguage: 'ru',
     durationSeconds: 90,
     id: `${point.id}-draft-audio`,
     language: 'ru',
-    transcriptPreview: `Короткий рассказ о точке «${point.title}» будет доступен во время прогулки.`,
-    url: null,
+    transcriptPreview: point.audioTranscript ?? `Короткий рассказ о точке «${point.title}» будет доступен во время прогулки.`,
+    url: point.audioGuideUrl ?? null,
   }
 }
 

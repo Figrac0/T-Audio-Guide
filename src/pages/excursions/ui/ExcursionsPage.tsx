@@ -11,7 +11,7 @@ import {
 import { Link } from 'react-router-dom'
 
 import type { Excursion, NearbyPoint, RouteStop } from '@/entities/excursion/model/types'
-import { usePointDetailsMap } from '@/entities/excursion/model/usePointDetailsMap'
+import { toBackendPointId, usePointDetailsMap } from '@/entities/excursion/model/usePointDetailsMap'
 import {
   durationOptions,
   themeOptions,
@@ -711,7 +711,11 @@ export function ExcursionsPage() {
     () => state.nearbyPoints.map((point) => point.id),
     [state.nearbyPoints],
   )
-  const pointDetailsMap = usePointDetailsMap(nearbyPointIds)
+  const allPointIds = useMemo(
+    () => [...nearbyPointIds, ...state.draftStops.map((s) => s.id)],
+    [nearbyPointIds, state.draftStops],
+  )
+  const pointDetailsMap = usePointDetailsMap(allPointIds)
 
   const detailPoint = useMemo<NearbyPoint | null>(() => {
     const base = state.detailPoint
@@ -887,6 +891,10 @@ export function ExcursionsPage() {
               <div className="ep-draft__stops" ref={stopsContainerRef}>
                 {displayedStops.map((stop, idx) => (
                   <DraftStopCard
+                    hasAudioGuide={Boolean(
+                      stop.audio.hasAudioGuide ||
+                      pointDetailsMap.get(toBackendPointId(stop.id))?.audioUrl
+                    )}
                     isDragging={reorderState?.stopId === stop.id}
                     isExpanded={state.expandedStopId === stop.id}
                     isLastAtLimit={isDraftAtLimit && idx === displayedStops.length - 1}
@@ -1141,6 +1149,7 @@ export function ExcursionsPage() {
 // ── DraftStopCard ─────────────────────────────────────────────────────────────
 
 interface DraftStopCardProps {
+  hasAudioGuide: boolean
   isDragging: boolean
   isExpanded: boolean
   isLastAtLimit: boolean
@@ -1151,6 +1160,7 @@ interface DraftStopCardProps {
 }
 
 const DraftStopCard = memo(function DraftStopCard({
+  hasAudioGuide,
   isDragging,
   isExpanded,
   isLastAtLimit,
@@ -1205,8 +1215,8 @@ const DraftStopCard = memo(function DraftStopCard({
             {stop.scheduleLabel ? <span className="ep-stop__chip">{stop.scheduleLabel}</span> : null}
             {stop.distanceMeters ? <span className="ep-stop__chip">{formatMeters(stop.distanceMeters)}</span> : null}
             <span
-              aria-label={stop.audio.hasAudioGuide ? 'Есть аудиогид' : 'Нет аудиогида'}
-              className={`ep-stop__chip ep-stop__chip--audio${stop.audio.hasAudioGuide ? ' ep-stop__chip--audio-active' : ''}`}
+              aria-label={hasAudioGuide ? 'Есть аудиогид' : 'Нет аудиогида'}
+              className={`ep-stop__chip ep-stop__chip--audio${hasAudioGuide ? ' ep-stop__chip--audio-active' : ''}`}
             >
               <svg aria-hidden="true" fill="none" height="13" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" width="13">
                 <path d="M3 18v-6a9 9 0 0 1 18 0v6" />

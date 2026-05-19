@@ -567,7 +567,7 @@ body.app-body--routes-page {
 
 .ep-draft {
     position: relative;
-    margin: 14px 16px 0;
+    margin: auto 16px;
     padding: 16px;
     border: 1px solid rgba(216, 220, 229, 0.72);
     border-radius: 24px;
@@ -735,11 +735,10 @@ body.app-body--routes-page {
 /* Row that holds the drag handle + header button side-by-side */
 .ep-stop__head {
     display: flex;
-    align-items: stretch;
+    align-items: center;
 }
 
 .ep-stop__drag-handle {
-    padding-top: 15px;
     display: inline-flex;
     flex-shrink: 0;
     width: 36px;
@@ -765,6 +764,7 @@ body.app-body--routes-page {
 }
 
 .ep-stop__header {
+    padding-top: 6px;
     display: flex;
     flex: 1;
     min-width: 0;
@@ -934,6 +934,12 @@ body.app-body--routes-page {
 .ep-stop__chip--audio-active {
     border-color: rgba(31, 138, 112, 0.28);
     color: var(--color-brand);
+    animation: ep-audio-chip-pulse 2.6s ease-in-out infinite;
+}
+
+@keyframes ep-audio-chip-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(31, 138, 112, 0); }
+    50%       { box-shadow: 0 0 0 3px rgba(31, 138, 112, 0.18); }
 }
 
 .ep-stop__remove {

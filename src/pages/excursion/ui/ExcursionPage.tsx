@@ -916,16 +916,18 @@ function NavigationPhase({
           {/* Stop details — visible in full */}
           <div className="ep-nav__stop">
             <div className="ep-nav__stop-img">
-              {currentStop.imageUrl ? (
-                <img alt={currentStop.title} loading="lazy" referrerPolicy="no-referrer" src={currentStop.imageUrl} />
-              ) : (
-                <div
-                  aria-hidden="true"
-                  className="ep-nav__stop-img-fallback"
-                  style={getStopFallbackStyle(currentStop.category)}
-                />
-              )}
-              <span className="ep-nav__stop-cat">{getPointCategoryLabel(currentStop)}</span>
+              <div className={`ep-nav__stop-img-inner${!currentStop.imageUrl ? ' ep-nav__stop-img-inner--fallback' : ''}`}>
+                {currentStop.imageUrl ? (
+                  <img alt={currentStop.title} loading="lazy" referrerPolicy="no-referrer" src={currentStop.imageUrl} />
+                ) : (
+                  <div
+                    aria-hidden="true"
+                    className="ep-nav__stop-img-fallback"
+                    style={getStopFallbackStyle(currentStop.category)}
+                  />
+                )}
+                <span className="ep-nav__stop-cat">{getPointCategoryLabel(currentStop)}</span>
+              </div>
             </div>
 
             <div className="ep-nav__stop-header">

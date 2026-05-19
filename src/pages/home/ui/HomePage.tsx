@@ -197,7 +197,7 @@ export function HomePage() {
     }, [backendCategories]);
     const [radiusMeters, setRadiusMeters] = useState<number>(
         clampDiscoveryRadius(
-            storedContext.radiusMeters ?? appMapConfig.discoveryRadiusMeters,
+            storedContext.radiusMeters ?? appMapConfig.defaultDiscoveryRadiusMeters,
         ),
     );
     const [debouncedRadiusMeters, setDebouncedRadiusMeters] =
@@ -393,6 +393,11 @@ export function HomePage() {
         currentCenter.lat,
         currentCenter.lng,
     );
+    // displayedPoint: holds the card data to render, including during leave animation.
+    const [displayedPoint, setDisplayedPoint] = useState<typeof selectedPoint>(null);
+    const [isPlaceLeaving, setIsPlaceLeaving] = useState(false);
+    const placeLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     const effectiveRouteTargetId =
         routeTargetId && nearbyPoints.some((p) => p.id === routeTargetId)
             ? routeTargetId
@@ -611,6 +616,11 @@ export function HomePage() {
     const selectedPointIdRef = useRef("");
     // Prevents the sheetState useEffect from overriding a manually set transform
     const skipSnapRef = useRef(false);
+    // ref to nearby section — used for height measurement when a card is open
+    const nearbySectionRef = useRef<HTMLDivElement | null>(null);
+    // Tracks last displayedPoint.id that triggered a height re-snap;
+    // reset to "" when displayedPoint becomes null so re-selection works.
+    const prevDisplayedPointIdRef = useRef<string>("");
 
     const snapToPeek = useCallback(() => {
         const sheet = sheetRef.current;
@@ -699,25 +709,32 @@ export function HomePage() {
         selectedPointIdRef.current = selectedPointId;
     }, [selectedPointId]);
 
-    // Measure preview height: ends right at the bottom of "Готовые маршруты" h3.
-    // Skipped when a place card is open — the card pushes h3 far down, which
-    // would make previewT ≈ fullT and collapse all snap points together.
-    // scrollTop compensation: getBoundingClientRect is viewport-relative, so
-    // if the body is scrolled by S, all inner elements appear S px higher in
-    // the viewport — we add S back to get the true layout offset.
+    // Measure preview height dynamically:
+    // – no point selected  → bottom of "Готовые маршруты" h3 (normal preview)
+    // – point selected     → bottom of "Рядом с вами" section (expanded preview)
+    // Using getBCR requires scrollTop compensation because BCR is viewport-relative.
     const measurePreviewHeight = useCallback(() => {
-        if (selectedPointIdRef.current) return;
-        const title = routesTitleRef.current;
         const sheet = sheetRef.current;
-        if (!title || !sheet) return;
+        if (!sheet) return;
         const scrollCompensation = bodyRef.current?.scrollTop ?? 0;
-        const measured =
-            title.getBoundingClientRect().bottom -
-            sheet.getBoundingClientRect().top +
-            scrollCompensation +
-            8;
-        if (measured > CLOSED_HEIGHT + 50) {
-            previewHeightRef.current = measured;
+        if (selectedPointIdRef.current) {
+            const section = nearbySectionRef.current;
+            if (!section) return;
+            const measured =
+                section.getBoundingClientRect().bottom -
+                sheet.getBoundingClientRect().top +
+                scrollCompensation +
+                16;
+            if (measured > CLOSED_HEIGHT + 50) previewHeightRef.current = measured;
+        } else {
+            const title = routesTitleRef.current;
+            if (!title) return;
+            const measured =
+                title.getBoundingClientRect().bottom -
+                sheet.getBoundingClientRect().top +
+                scrollCompensation +
+                8;
+            if (measured > CLOSED_HEIGHT + 50) previewHeightRef.current = measured;
         }
     }, []);
 
@@ -794,13 +811,75 @@ export function HomePage() {
         return () => cancelAnimationFrame(frameId);
     }, [nearbyPoints, isLoading, canLoadNearbyPlaces, measurePreviewHeight]);
 
-    // When a place card is deselected, refresh previewHeight (base layout restored).
-    // On select we skip — measurePreviewHeight guards against it internally.
+    // When the point is deselected: re-measure (no card now) and re-snap preview
+    // after the card leave animation finishes (280ms + buffer).
     useEffect(() => {
         if (selectedPointId !== "") return;
-        const frameId = requestAnimationFrame(measurePreviewHeight);
-        return () => cancelAnimationFrame(frameId);
+        const timerId = setTimeout(() => requestAnimationFrame(() => {
+            measurePreviewHeight(); // selectedPointIdRef is already "" → measures to routes title
+            const sheet = sheetRef.current;
+            if (!sheet || sheetStateRef.current !== "preview") return;
+            const target = getSnapTranslate("preview", sheet.offsetHeight, peekHeightRef.current, previewHeightRef.current);
+            snapSheet(sheet, target, 500, "cubic-bezier(0.4, 0, 0.2, 1)");
+        }), 310);
+        return () => clearTimeout(timerId);
     }, [selectedPointId, measurePreviewHeight]);
+
+    // When displayedPoint changes (card appears or switches to a different point),
+    // re-measure the expanded preview height and re-snap.
+    // The card uses opacity+transform animation so its layout height is correct
+    // immediately — no grid-template-rows timing issue.
+    useEffect(() => {
+        if (!displayedPoint) {
+            prevDisplayedPointIdRef.current = "";
+            return;
+        }
+        if (displayedPoint.id === prevDisplayedPointIdRef.current) return;
+        prevDisplayedPointIdRef.current = displayedPoint.id;
+        if (sheetStateRef.current === "full") return;
+        const frameId = requestAnimationFrame(() => {
+            measurePreviewHeight(); // selectedPointIdRef.current is set → measures to nearby section
+            const sheet = sheetRef.current;
+            if (!sheet) return;
+            if (bodyRef.current) bodyRef.current.scrollTop = 0;
+            const target = getSnapTranslate("preview", sheet.offsetHeight, peekHeightRef.current, previewHeightRef.current);
+            // Only call setSheetState when actually changing state to avoid skipSnapRef leaking.
+            if (sheetStateRef.current !== "preview") {
+                skipSnapRef.current = true;
+                setSheetState("preview");
+                sheetStateRef.current = "preview";
+            }
+            snapSheet(sheet, target, 480, "cubic-bezier(0.16, 1, 0.3, 1)");
+        });
+        return () => cancelAnimationFrame(frameId);
+    }, [displayedPoint, measurePreviewHeight]);
+
+    // Manage place-card enter/leave animations.
+    // On select: show immediately. On deselect: animate out then unmount.
+    useEffect(() => {
+        if (selectedPoint) {
+            if (placeLeaveTimerRef.current) {
+                clearTimeout(placeLeaveTimerRef.current);
+                placeLeaveTimerRef.current = null;
+            }
+            setIsPlaceLeaving(false);
+            setDisplayedPoint(selectedPoint);
+        } else if (displayedPoint) {
+            setIsPlaceLeaving(true);
+            placeLeaveTimerRef.current = setTimeout(() => {
+                setDisplayedPoint(null);
+                setIsPlaceLeaving(false);
+                placeLeaveTimerRef.current = null;
+            }, 280);
+        }
+        return () => {
+            if (placeLeaveTimerRef.current) {
+                clearTimeout(placeLeaveTimerRef.current);
+                placeLeaveTimerRef.current = null;
+            }
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedPoint]);
 
     // Auto-open to preview on mount. Near-zero delay so the animation begins
     // immediately after first paint; the fast-start easing (0.16,1,0.3,1) passes
@@ -854,14 +933,8 @@ export function HomePage() {
                 const sheet = sheetRef.current;
                 if (!sheet) return;
                 bodyEl.scrollTop = 0;
-                // Step down one level: full → preview, preview → closed
                 if (state === "full") {
-                    const previewT = getSnapTranslate(
-                        "preview",
-                        sheet.offsetHeight,
-                        peekHeightRef.current,
-                        previewHeightRef.current,
-                    );
+                    const previewT = getSnapTranslate("preview", sheet.offsetHeight, peekHeightRef.current, previewHeightRef.current);
                     skipSnapRef.current = true;
                     setSheetState("preview");
                     sheetStateRef.current = "preview";
@@ -941,20 +1014,11 @@ export function HomePage() {
         const sheetHeight = sheet.offsetHeight;
         const velocity = dragRef.current.velocity;
         const fullT = DRAG_MIN;
-        const previewT = getSnapTranslate(
-            "preview",
-            sheetHeight,
-            peekHeightRef.current,
-            previewHeightRef.current,
-        );
-        const peekT = getSnapTranslate(
-            "peek",
-            sheetHeight,
-            peekHeightRef.current,
-            previewHeightRef.current,
-        );
+        const previewT = getSnapTranslate("preview", sheetHeight, peekHeightRef.current, previewHeightRef.current);
+        const peekT = getSnapTranslate("peek", sheetHeight, peekHeightRef.current, previewHeightRef.current);
         const closedT = sheetHeight - CLOSED_HEIGHT;
 
+        // preview height is dynamic: includes the place card when one is open.
         const snaps: [SheetState, number][] = [
             ["full", fullT],
             ["preview", previewT],
@@ -1145,10 +1209,7 @@ export function HomePage() {
                     className="home-sheet__body"
                     ref={bodyRef}
                     style={{
-                        overflowY:
-                            sheetState === "full" || sheetState === "preview"
-                                ? undefined
-                                : "hidden",
+                        overflowY: sheetState === "full" || sheetState === "preview" ? undefined : "hidden",
                     }}>
                     {/* ── Categories ── */}
                     <div
@@ -1176,93 +1237,78 @@ export function HomePage() {
                     </div>
 
                     {/* ── Selected place card ── */}
-                    {selectedPoint && (
+                    {displayedPoint && (
                         <div
-                            className="home-sheet__place-wrap"
-                            key={selectedPoint.id}>
-                            <div className="home-sheet__place">
-                                <div className="home-sheet__place-top">
-                                    <div className="home-sheet__place-meta">
-                                        <span className="home-sheet__place-cat">
-                                            {getPointCategoryLabel(
-                                                selectedPoint,
-                                            )}
-                                        </span>
-                                        <span className="home-sheet__place-dist">
-                                            {formatMeters(
-                                                selectedPoint.distanceMeters,
-                                            )}
-                                        </span>
+                            className={`home-sheet__place-wrap${isPlaceLeaving ? " home-sheet__place-wrap--leaving" : ""}`}
+                            key="place-card">
+                                <div className="home-sheet__place">
+                                    <div className="home-sheet__place-top">
+                                        <div className="home-sheet__place-meta">
+                                            <span className="home-sheet__place-cat">
+                                                {getPointCategoryLabel(displayedPoint)}
+                                            </span>
+                                            <span className="home-sheet__place-dist">
+                                                {formatMeters(displayedPoint.distanceMeters)}
+                                            </span>
+                                        </div>
+                                        <button
+                                            aria-label="Построить маршрут к месту"
+                                            className="home-sheet__place-go"
+                                            onClick={() => handleGoToPlace(displayedPoint)}
+                                            type="button">
+                                            <svg
+                                                fill="currentColor"
+                                                height="18"
+                                                viewBox="0 0 24 24"
+                                                width="18"
+                                                aria-hidden="true">
+                                                <circle cx="12" cy="4.5" r="1.75" />
+                                                <path d="M14.5 8.5c-.6-.8-1.4-1-2-.9l-3 1.2-1.5 3.5 1.8.7.9-2.2 1-.4-1.5 4.1-2.8 2.4 1.2 1.4 3-2.6 1.4 3.3H16l-1.6-4 .6-1.6 1 2h1.9L15.5 12l-.3-1.4 1.4.6.6-1.7-2.7-1z" />
+                                            </svg>
+                                        </button>
                                     </div>
-                                    <button
-                                        aria-label="Построить маршрут к месту"
-                                        className="home-sheet__place-go"
-                                        onClick={() =>
-                                            handleGoToPlace(selectedPoint)
-                                        }
-                                        type="button">
-                                        {/* Walking person icon */}
-                                        <svg
-                                            fill="currentColor"
-                                            height="18"
-                                            viewBox="0 0 24 24"
-                                            width="18"
-                                            aria-hidden="true">
-                                            <circle cx="12" cy="4.5" r="1.75" />
-                                            <path d="M14.5 8.5c-.6-.8-1.4-1-2-.9l-3 1.2-1.5 3.5 1.8.7.9-2.2 1-.4-1.5 4.1-2.8 2.4 1.2 1.4 3-2.6 1.4 3.3H16l-1.6-4 .6-1.6 1 2h1.9L15.5 12l-.3-1.4 1.4.6.6-1.7-2.7-1z" />
-                                        </svg>
-                                    </button>
+                                    <h3 className="home-sheet__place-title">
+                                        {displayedPoint.title}
+                                    </h3>
+                                    {displayedPoint.addressLabel && (
+                                        <p className="home-sheet__place-address">
+                                            {displayedPoint.addressLabel}
+                                        </p>
+                                    )}
+                                    {displayedPoint.scheduleLabel && (
+                                        <p className="home-sheet__place-schedule">
+                                            {displayedPoint.scheduleLabel}
+                                        </p>
+                                    )}
+                                    {(displayedPoint.shortDescription || displayedPoint.description) && (
+                                        <p className="home-sheet__place-desc">
+                                            {displayedPoint.shortDescription || displayedPoint.description}
+                                        </p>
+                                    )}
+                                    {(displayedPoint.expectedVisitMinutes > 0 || displayedPoint.distanceMeters > 0) && (
+                                        <div className="home-sheet__place-stats">
+                                            {displayedPoint.expectedVisitMinutes > 0 && (
+                                                <span className="home-sheet__place-stat">
+                                                    <span className="home-sheet__place-stat-label">На посещение:</span>
+                                                    {" "}~{displayedPoint.expectedVisitMinutes} мин
+                                                </span>
+                                            )}
+                                            {displayedPoint.distanceMeters > 0 && (
+                                                <span className="home-sheet__place-stat">
+                                                    <span className="home-sheet__place-stat-label">Идти:</span>
+                                                    {" "}~{Math.ceil(displayedPoint.distanceMeters / 80)} мин
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
-                                <h3 className="home-sheet__place-title">
-                                    {selectedPoint.title}
-                                </h3>
-                                {selectedPoint.addressLabel && (
-                                    <p className="home-sheet__place-address">
-                                        {selectedPoint.addressLabel}
-                                    </p>
-                                )}
-                                {selectedPoint.scheduleLabel && (
-                                    <p className="home-sheet__place-schedule">
-                                        {selectedPoint.scheduleLabel}
-                                    </p>
-                                )}
-                                {(selectedPoint.shortDescription ||
-                                    selectedPoint.description) && (
-                                    <p className="home-sheet__place-desc">
-                                        {selectedPoint.shortDescription ||
-                                            selectedPoint.description}
-                                    </p>
-                                )}
-                                {(selectedPoint.rating > 0 ||
-                                    selectedPoint.expectedVisitMinutes > 0) && (
-                                    <div className="home-sheet__place-stats">
-                                        {selectedPoint.rating > 0 && (
-                                            <span className="home-sheet__place-stat home-sheet__place-stat--rating">
-                                                ★{" "}
-                                                {selectedPoint.rating.toFixed(
-                                                    1,
-                                                )}
-                                            </span>
-                                        )}
-                                        {selectedPoint.expectedVisitMinutes >
-                                            0 && (
-                                            <span className="home-sheet__place-stat">
-                                                ~
-                                                {
-                                                    selectedPoint.expectedVisitMinutes
-                                                }{" "}
-                                                мин
-                                            </span>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
                         </div>
                     )}
 
                     {/* ── Nearby cards ── */}
                     <div
                         className="home-sheet__section"
+                        ref={nearbySectionRef}
                     >
                         <h3 className="home-sheet__section-title">Рядом с вами</h3>
                         {nearbyPoints.length > 0 ? (
