@@ -45,14 +45,40 @@
   justify-content: center;
   width: 34px;
   height: 34px;
-  font-size: 22px;
-  line-height: 1;
   border-radius: 50%;
   background: #ffffff;
+  color: #1f8a70;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.22);
   transition:
     transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
     box-shadow 0.2s ease;
+}
+
+.poi-marker__glyph svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+/* Custom file icons — green tint from brand color */
+.poi-cat-icon {
+  display: block;
+  flex-shrink: 0;
+  /* Convert any color to brand green #1f8a70 */
+  filter: brightness(0) saturate(100%) invert(46%) sepia(60%) saturate(480%) hue-rotate(120deg) brightness(95%);
+}
+
+.poi-marker__glyph .poi-cat-icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* White variant — for icons inside the green cluster bubble */
+.cluster-marker .poi-cat-icon {
+  width: 22px;
+  height: 22px;
+  filter: brightness(0) invert(1);
 }
 
 .poi-marker--pulse::before {
@@ -170,4 +196,11 @@
   box-shadow:
     0 4px 16px rgba(31, 138, 112, 0.55),
     0 0 0 2px rgba(31, 138, 112, 0.28);
+}
+
+.cluster-marker svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
 }

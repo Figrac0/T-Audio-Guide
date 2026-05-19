@@ -111,7 +111,7 @@ const httpApi: FrontendApi = {
 
   async getDiscoveryFeed(payload): Promise<DiscoveryFeedDto> {
     // swagger: radiusKilometers is integer [1, 15]
-    const radiusKm = Math.max(1, Math.min(15, Math.round(payload.radiusMeters / 1000)))
+    const radiusKm = Math.max(1, Math.min(15, Math.ceil(payload.radiusMeters / 1000)))
 
     // category can be:
     //  - 'all' → no filter
@@ -146,6 +146,8 @@ const httpApi: FrontendApi = {
     let nearbyPoints = rawPoints.map((p) =>
       mapNearbyPointFromShort(p, payload.center.lat, payload.center.lng),
     )
+
+    nearbyPoints = nearbyPoints.filter((p) => p.distanceMeters <= payload.radiusMeters)
 
     const search = payload.search?.trim().toLocaleLowerCase() ?? ''
     if (search) {
@@ -201,7 +203,7 @@ const httpApi: FrontendApi = {
   },
 
   async getRoutesCatalog(payload: RouteCatalogRequest) {
-    const radiusKm = Math.max(1, Math.min(15, Math.round(payload.radiusMeters / 1000)))
+    const radiusKm = Math.max(1, Math.min(15, Math.ceil(payload.radiusMeters / 1000)))
     const rawExcursions = await excursionsService.searchExcursions({
       location: { latitude: payload.center.lat, longitude: payload.center.lng },
       radiusKilometers: radiusKm,

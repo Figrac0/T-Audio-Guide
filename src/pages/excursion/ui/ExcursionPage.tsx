@@ -189,13 +189,75 @@ export function ExcursionPage() {
 
   if (phase === 'complete') {
     return (
-      <CompleteScreen
-        excursion={displayExcursion}
-        excursionId={displayExcursion.id}
-        isSaved={isSaved}
-        onSave={() => toggleSavedRoute(displayExcursion)}
-        onShare={() => void shareRoute(displayExcursion)}
-      />
+      <>
+        {/* Fixed full-screen art behind nav + card */}
+        <div aria-hidden="true" className="ep-complete__global-bg">
+          <svg fill="none" preserveAspectRatio="xMidYMid slice" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+            <circle cx="80"  cy="100" r="90"  fill="rgba(31,138,112,0.07)" stroke="rgba(31,138,112,0.13)" strokeWidth="1.5" />
+            <circle cx="220" cy="560" r="70"  fill="rgba(246,191,22,0.06)" stroke="rgba(246,191,22,0.14)" strokeWidth="1.5" />
+            <circle cx="1120" cy="80"  r="80"  fill="rgba(246,191,22,0.07)" stroke="rgba(246,191,22,0.15)" strokeWidth="1.5" />
+            <circle cx="980"  cy="660" r="95"  fill="rgba(31,138,112,0.06)" stroke="rgba(31,138,112,0.12)" strokeWidth="1" />
+            <circle cx="600"  cy="60"  r="55"  fill="rgba(31,138,112,0.05)" stroke="rgba(31,138,112,0.10)" strokeWidth="1" />
+            <circle cx="600"  cy="740" r="60"  fill="rgba(246,191,22,0.05)" stroke="rgba(246,191,22,0.10)" strokeWidth="1" />
+            <circle cx="360"  cy="150" r="40"  fill="rgba(246,191,22,0.05)" stroke="rgba(246,191,22,0.12)" strokeWidth="1" />
+            <circle cx="840"  cy="100" r="50"  fill="rgba(31,138,112,0.05)" stroke="rgba(31,138,112,0.11)" strokeWidth="1" />
+            <circle cx="150"  cy="700" r="45"  fill="rgba(31,138,112,0.05)" stroke="rgba(31,138,112,0.10)" strokeWidth="1" />
+            <circle cx="1060" cy="420" r="65"  fill="rgba(246,191,22,0.05)" stroke="rgba(246,191,22,0.11)" strokeWidth="1" />
+            <circle cx="480"  cy="680" r="28"  fill="rgba(31,138,112,0.06)" stroke="rgba(31,138,112,0.13)" strokeWidth="1" />
+            <circle cx="740"  cy="720" r="22"  fill="rgba(246,191,22,0.07)" stroke="rgba(246,191,22,0.15)" strokeWidth="1" />
+            <circle cx="310"  cy="400" r="24"  fill="rgba(246,191,22,0.05)" stroke="rgba(246,191,22,0.12)" strokeWidth="1" />
+            <circle cx="890"  cy="380" r="20"  fill="rgba(31,138,112,0.05)" stroke="rgba(31,138,112,0.11)" strokeWidth="1" />
+            <path d="M42 200 L46 188 L50 200 L62 204 L50 208 L46 220 L42 208 L30 204 Z" fill="rgba(246,191,22,0.36)" />
+            <path d="M140 430 L143 422 L146 430 L154 433 L146 436 L143 444 L140 436 L132 433 Z" fill="rgba(31,138,112,0.28)" />
+            <path d="M60 620 L63 612 L66 620 L74 623 L66 626 L63 634 L60 626 L52 623 Z" fill="rgba(246,191,22,0.32)" />
+            <path d="M190 280 L193 273 L196 280 L203 283 L196 286 L193 293 L190 286 L183 283 Z" fill="rgba(31,138,112,0.26)" />
+            <path d="M1158 200 L1162 188 L1166 200 L1178 204 L1166 208 L1162 220 L1158 208 L1146 204 Z" fill="rgba(31,138,112,0.34)" />
+            <path d="M1050 430 L1053 422 L1056 430 L1064 433 L1056 436 L1053 444 L1050 436 L1042 433 Z" fill="rgba(246,191,22,0.3)" />
+            <path d="M1140 620 L1143 612 L1146 620 L1154 623 L1146 626 L1143 634 L1140 626 L1132 623 Z" fill="rgba(31,138,112,0.26)" />
+            <path d="M1010 280 L1013 273 L1016 280 L1023 283 L1016 286 L1013 293 L1010 286 L1003 283 Z" fill="rgba(246,191,22,0.32)" />
+            <path d="M560 30 L563 22 L566 30 L574 33 L566 36 L563 44 L560 36 L552 33 Z" fill="rgba(246,191,22,0.3)" />
+            <path d="M660 760 L663 752 L666 760 L674 763 L666 766 L663 774 L660 766 L652 763 Z" fill="rgba(31,138,112,0.26)" />
+            <path d="M400 740 L403 733 L406 740 L413 743 L406 746 L403 753 L400 746 L393 743 Z" fill="rgba(246,191,22,0.28)" />
+            <path d="M800 30 L803 22 L806 30 L814 33 L806 36 L803 44 L800 36 L792 33 Z" fill="rgba(31,138,112,0.3)" />
+            <circle cx="30"   cy="340" r="4"   fill="rgba(31,138,112,0.28)" />
+            <circle cx="108"  cy="180" r="3"   fill="rgba(246,191,22,0.4)" />
+            <circle cx="185"  cy="500" r="3.5" fill="rgba(31,138,112,0.24)" />
+            <circle cx="250"  cy="640" r="2.5" fill="rgba(246,191,22,0.32)" />
+            <circle cx="320"  cy="740" r="3"   fill="rgba(31,138,112,0.22)" />
+            <circle cx="440"  cy="120" r="3.5" fill="rgba(246,191,22,0.38)" />
+            <circle cx="520"  cy="760" r="3"   fill="rgba(31,138,112,0.24)" />
+            <circle cx="600"  cy="180" r="2.5" fill="rgba(246,191,22,0.34)" />
+            <circle cx="680"  cy="640" r="4"   fill="rgba(31,138,112,0.26)" />
+            <circle cx="760"  cy="100" r="3"   fill="rgba(246,191,22,0.36)" />
+            <circle cx="840"  cy="740" r="3.5" fill="rgba(31,138,112,0.22)" />
+            <circle cx="920"  cy="160" r="2.5" fill="rgba(246,191,22,0.32)" />
+            <circle cx="1000" cy="560" r="3"   fill="rgba(31,138,112,0.26)" />
+            <circle cx="1080" cy="200" r="4"   fill="rgba(246,191,22,0.38)" />
+            <circle cx="1160" cy="500" r="3"   fill="rgba(31,138,112,0.24)" />
+            <circle cx="1180" cy="340" r="2.5" fill="rgba(246,191,22,0.3)" />
+            <circle cx="270"  cy="200" r="2"   fill="rgba(31,138,112,0.3)" />
+            <circle cx="460"  cy="480" r="2"   fill="rgba(246,191,22,0.28)" />
+            <circle cx="740"  cy="440" r="2"   fill="rgba(31,138,112,0.22)" />
+            <circle cx="960"  cy="740" r="2.5" fill="rgba(246,191,22,0.3)" />
+            <path d="M0 220 Q 150 200 300 225 Q 450 250 600 220 Q 750 190 900 218 Q 1050 246 1200 218" fill="none" stroke="rgba(31,138,112,0.12)" strokeLinecap="round" strokeWidth="2" />
+            <path d="M0 580 Q 160 555 320 582 Q 480 609 640 578 Q 800 547 960 576 Q 1120 605 1200 576" fill="none" stroke="rgba(246,191,22,0.14)" strokeLinecap="round" strokeWidth="1.5" />
+            <path d="M0 400 Q 200 380 400 405 Q 600 430 800 398 Q 1000 366 1200 398" fill="none" stroke="rgba(31,138,112,0.08)" strokeLinecap="round" strokeWidth="1.5" />
+            <path d="M130 760 L138 748 L146 760 L138 772 Z" fill="none" stroke="rgba(31,138,112,0.2)" strokeWidth="1.5" />
+            <path d="M490 40 L498 28 L506 40 L498 52 Z" fill="none" stroke="rgba(246,191,22,0.22)" strokeWidth="1.5" />
+            <path d="M700 760 L708 748 L716 760 L708 772 Z" fill="none" stroke="rgba(31,138,112,0.2)" strokeWidth="1.5" />
+            <path d="M1070 760 L1078 748 L1086 760 L1078 772 Z" fill="none" stroke="rgba(246,191,22,0.2)" strokeWidth="1.5" />
+            <path d="M1070 40 L1078 28 L1086 40 L1078 52 Z" fill="none" stroke="rgba(31,138,112,0.22)" strokeWidth="1.5" />
+            <path d="M200 40 L208 28 L216 40 L208 52 Z" fill="none" stroke="rgba(246,191,22,0.2)" strokeWidth="1.5" />
+          </svg>
+        </div>
+        <CompleteScreen
+          excursion={displayExcursion}
+          excursionId={displayExcursion.id}
+          isSaved={isSaved}
+          onSave={() => toggleSavedRoute(displayExcursion)}
+          onShare={() => void shareRoute(displayExcursion)}
+        />
+      </>
     )
   }
 

@@ -41,6 +41,7 @@ import {
     getPointCategoryLabel,
 } from "@/shared/lib/format";
 import { matchesExcursionThemeFilter } from "@/shared/lib/excursion-theme";
+import { CATEGORY_SVG, getCategorySvg } from "@/shared/lib/category-icon-svg";
 import { SmartPlaceImage } from "@/shared/ui/SmartPlaceImage";
 import { FooterFeatureIcon } from "@/shared/ui/FooterFeatureIcon";
 import { ExcursionCatalog } from "@/widgets/excursion-catalog/ui/ExcursionCatalog";
@@ -91,29 +92,17 @@ function snapSheet(
     setTimeout(clear, durationMs + 100);
 }
 
-// Category tabs are built dynamically inside the HomePage component from
-// the backend's /points/categories list — admins can add/remove categories
-// freely and the UI mirrors them without code changes.
-const categoryIcons: Record<string, string> = {
-    all: "◎",
-    museum: "🏛",
-    entertainment: "✨",
-    landmark: "📍",
-    food: "🍽",
-    park: "🌿",
-};
+const categoryIcons: Record<string, string> = CATEGORY_SVG
 
-// Map a backend category (slug/name) to an icon. Backend categories can have
-// arbitrary names; we look up known patterns and fallback to a generic pin.
 function pickCategoryIcon(slug: string | undefined, name: string | undefined): string {
     if (slug && categoryIcons[slug]) return categoryIcons[slug]
     const text = `${slug ?? ''} ${name ?? ''}`.toLowerCase()
-    if (/музе|museum|gallery|галер/.test(text)) return "🏛"
-    if (/ресторан|кафе|еда|food|restaurant|cafe/.test(text)) return "🍽"
-    if (/парк|сад|приро|park|garden|nature/.test(text)) return "🌿"
-    if (/развле|театр|кино|entert|theat|cinema|fun/.test(text)) return "✨"
-    if (/истор|достоприм|памят|history|landmark|monument/.test(text)) return "📍"
-    return "📍"
+    if (/музе|museum|gallery|галер/.test(text)) return CATEGORY_SVG.museum
+    if (/ресторан|кафе|еда|food|restaurant|cafe/.test(text)) return CATEGORY_SVG.food
+    if (/парк|сад|приро|park|garden|nature/.test(text)) return CATEGORY_SVG.park
+    if (/развле|театр|кино|entert|theat|cinema|fun/.test(text)) return CATEGORY_SVG.entertainment
+    if (/истор|достоприм|памят|history|landmark|monument/.test(text)) return CATEGORY_SVG.landmark
+    return getCategorySvg('landmark')
 }
 
 const routeThemeOptions: Array<ExcursionTheme | "all"> = [
@@ -183,7 +172,7 @@ export function HomePage() {
                 );
                 return pickCategoryIcon(cat?.slug, cat?.name);
             }
-            return categoryIcons[id] ?? "📍";
+            return categoryIcons[id] ?? getCategorySvg('landmark');
         },
         [backendCategories],
     );
@@ -245,6 +234,10 @@ export function HomePage() {
 
     const nearbyListRef = useRef<HTMLDivElement | null>(null);
     const shouldScrollNearbyListRef = useRef(false);
+    const nearbyScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const nearbyScrollRafRef = useRef<number | null>(null);
+    const nearbyScrollDirRef = useRef<0 | 1 | -1>(0);
+    const nearbyScrollIsHoldRef = useRef(false);
     const isAuthenticated = Boolean(
         session?.isAuthenticated && session.profile,
     );
@@ -252,6 +245,46 @@ export function HomePage() {
     useEffect(() => {
         document.body.classList.add("app-body--home-page");
         return () => document.body.classList.remove("app-body--home-page");
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (nearbyScrollTimerRef.current !== null) clearTimeout(nearbyScrollTimerRef.current);
+            if (nearbyScrollRafRef.current !== null) cancelAnimationFrame(nearbyScrollRafRef.current);
+        };
+    }, []);
+
+    const nearbyScrollDown = useCallback((dir: 1 | -1) => {
+        nearbyScrollDirRef.current = dir;
+        nearbyScrollIsHoldRef.current = false;
+        nearbyScrollTimerRef.current = setTimeout(() => {
+            nearbyScrollIsHoldRef.current = true;
+            const el = nearbyListRef.current;
+            if (!el) return;
+            const tick = () => {
+                if (nearbyScrollDirRef.current === 0) return;
+                el.scrollLeft += nearbyScrollDirRef.current * 5;
+                nearbyScrollRafRef.current = requestAnimationFrame(tick);
+            };
+            nearbyScrollRafRef.current = requestAnimationFrame(tick);
+        }, 300);
+    }, []);
+
+    const nearbyScrollUp = useCallback(() => {
+        const dir = nearbyScrollDirRef.current;
+        nearbyScrollDirRef.current = 0;
+        if (nearbyScrollTimerRef.current !== null) {
+            clearTimeout(nearbyScrollTimerRef.current);
+            nearbyScrollTimerRef.current = null;
+        }
+        if (nearbyScrollRafRef.current !== null) {
+            cancelAnimationFrame(nearbyScrollRafRef.current);
+            nearbyScrollRafRef.current = null;
+        }
+        if (!nearbyScrollIsHoldRef.current && dir !== 0) {
+            const el = nearbyListRef.current;
+            if (el) el.scrollBy({ left: dir * 480, behavior: "smooth" });
+        }
     }, []);
 
     const {
@@ -1133,9 +1166,9 @@ export function HomePage() {
                                     type="button">
                                     <span
                                         className="home-sheet__cat-icon"
-                                        aria-hidden="true">
-                                        {getTabIcon(opt.id)}
-                                    </span>
+                                        aria-hidden="true"
+                                        dangerouslySetInnerHTML={{ __html: getTabIcon(opt.id) }}
+                                    />
                                     {opt.label}
                                 </button>
                             ))}
@@ -1233,6 +1266,20 @@ export function HomePage() {
                     >
                         <h3 className="home-sheet__section-title">Рядом с вами</h3>
                         {nearbyPoints.length > 0 ? (
+                            <div className="home-nearby-carousel">
+                                <button
+                                    aria-label="Листать влево"
+                                    className="home-nearby-carousel__arrow home-nearby-carousel__arrow--prev"
+                                    onPointerCancel={nearbyScrollUp}
+                                    onPointerDown={() => nearbyScrollDown(-1)}
+                                    onPointerLeave={nearbyScrollUp}
+                                    onPointerUp={nearbyScrollUp}
+                                    type="button"
+                                >
+                                    <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16">
+                                        <path d="M15 19l-7-7 7-7" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
+                                    </svg>
+                                </button>
                             <div
                                 className="home-sheet__cards"
                                 ref={nearbyListRef}>
@@ -1285,6 +1332,20 @@ export function HomePage() {
                                         </div>
                                     </button>
                                 ))}
+                            </div>
+                                <button
+                                    aria-label="Листать вправо"
+                                    className="home-nearby-carousel__arrow home-nearby-carousel__arrow--next"
+                                    onPointerCancel={nearbyScrollUp}
+                                    onPointerDown={() => nearbyScrollDown(1)}
+                                    onPointerLeave={nearbyScrollUp}
+                                    onPointerUp={nearbyScrollUp}
+                                    type="button"
+                                >
+                                    <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16">
+                                        <path d="M9 5l7 7-7 7" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
+                                    </svg>
+                                </button>
                             </div>
                         ) : canShowEmpty && !isLoading ? (
                             <section className={`status-card${discoveryError ? ' status-card--error' : ''}`}>

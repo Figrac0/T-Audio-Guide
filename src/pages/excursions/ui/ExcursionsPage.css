@@ -1208,51 +1208,56 @@ body.app-body--routes-page {
 
 /* ── Nearby strip arrow navigation (desktop only) ────────────────────────── */
 
-.ep-nearby-nav {
+/* Carousel wrapper — arrows flanking the strip, visible on desktop */
+.ep-nearby-carousel {
+    display: flex;
+    align-items: center;
+    gap: 0;
+}
+
+.ep-nearby-carousel__arrow {
     display: none;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1.5px solid rgba(31, 37, 51, 0.14);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 1px 6px rgba(31, 37, 51, 0.08);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition:
+        color 0.16s ease,
+        border-color 0.16s ease,
+        background 0.16s ease,
+        box-shadow 0.16s ease,
+        transform 0.14s ease;
+}
+
+.ep-nearby-carousel__arrow svg {
+    display: block;
+    flex-shrink: 0;
+}
+
+.ep-nearby-carousel__arrow:hover {
+    color: var(--color-brand);
+    border-color: rgba(31, 138, 112, 0.3);
+    background: var(--color-brand-soft);
+    box-shadow: 0 4px 14px rgba(31, 138, 112, 0.18);
+    transform: scale(1.06);
+}
+
+.ep-nearby-carousel__arrow:active {
+    transform: scale(0.94);
 }
 
 @media (min-width: 768px) {
-    .ep-nearby-nav {
+    .ep-nearby-carousel__arrow {
         display: flex;
-        justify-content: center;
-        gap: 10px;
-        padding: 6px 16px 8px;
-    }
-
-    .ep-nearby-nav__btn {
-        display: inline-flex;
-        width: 40px;
-        height: 40px;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        line-height: 1;
-        border: 1.5px solid rgba(31, 37, 51, 0.14);
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.96);
-        box-shadow: 0 1px 4px rgba(31, 37, 51, 0.07);
-        color: var(--color-text-secondary);
-        cursor: pointer;
-        transition:
-            color 0.16s ease,
-            border-color 0.16s ease,
-            box-shadow 0.16s ease;
-    }
-
-    .ep-nearby-nav__btn svg {
-        display: block;
-        flex-shrink: 0;
-    }
-
-    .ep-nearby-nav__btn:hover {
-        color: var(--color-brand);
-        border-color: rgba(31, 138, 112, 0.3);
-        box-shadow: 0 2px 6px rgba(31, 37, 51, 0.09);
-    }
-
-    .ep-nearby-nav__btn:active {
-        transform: scale(0.94);
     }
 }
 

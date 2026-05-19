@@ -146,6 +146,10 @@ export function ExcursionsPage() {
   const stopsContainerRef = useRef<HTMLDivElement>(null)
   const nearbyListRef = useRef<HTMLDivElement>(null)
   const badgeRef = useRef<HTMLSpanElement>(null)
+  const nearbyScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const nearbyScrollRafRef = useRef<number | null>(null)
+  const nearbyScrollDirRef = useRef<0 | 1 | -1>(0)
+  const nearbyScrollIsHoldRef = useRef(false)
 
   useEffect(() => { draftStopsRef.current = state.draftStops }, [state.draftStops])
   useEffect(() => { handleReorderStopRef.current = state.handleReorderStop }, [state.handleReorderStop])
@@ -159,6 +163,46 @@ export function ExcursionsPage() {
     void badge.offsetHeight
     badge.classList.add('ep-draft__badge--bump')
   }, [state.draftFullBumpKey])
+
+  useEffect(() => {
+    return () => {
+      if (nearbyScrollTimerRef.current !== null) clearTimeout(nearbyScrollTimerRef.current)
+      if (nearbyScrollRafRef.current !== null) cancelAnimationFrame(nearbyScrollRafRef.current)
+    }
+  }, [])
+
+  const nearbyScrollDown = useCallback((dir: 1 | -1) => {
+    nearbyScrollDirRef.current = dir
+    nearbyScrollIsHoldRef.current = false
+    nearbyScrollTimerRef.current = setTimeout(() => {
+      nearbyScrollIsHoldRef.current = true
+      const el = nearbyListRef.current
+      if (!el) return
+      const tick = () => {
+        if (nearbyScrollDirRef.current === 0) return
+        el.scrollLeft += nearbyScrollDirRef.current * 5
+        nearbyScrollRafRef.current = requestAnimationFrame(tick)
+      }
+      nearbyScrollRafRef.current = requestAnimationFrame(tick)
+    }, 300)
+  }, [])
+
+  const nearbyScrollUp = useCallback(() => {
+    const dir = nearbyScrollDirRef.current
+    nearbyScrollDirRef.current = 0
+    if (nearbyScrollTimerRef.current !== null) {
+      clearTimeout(nearbyScrollTimerRef.current)
+      nearbyScrollTimerRef.current = null
+    }
+    if (nearbyScrollRafRef.current !== null) {
+      cancelAnimationFrame(nearbyScrollRafRef.current)
+      nearbyScrollRafRef.current = null
+    }
+    if (!nearbyScrollIsHoldRef.current && dir !== 0) {
+      const el = nearbyListRef.current
+      if (el) el.scrollBy({ left: dir * 480, behavior: 'smooth' })
+    }
+  }, [])
 
   const displayedStops = useMemo(() => {
     if (!reorderState) return state.draftStops
@@ -883,46 +927,74 @@ export function ExcursionsPage() {
               <div className="ep-nearby-wrap">
                 <h3 className="ep-nearby-wrap__title">Рядом с вами</h3>
                 {state.nearbyPoints.length > 0 ? (
-                  <div className="ep-nearby-strip" ref={nearbyListRef}>
-                    {state.nearbyPoints.map((point) => {
-                      const inDraft = state.isPointInDraft(point.id)
-                      return (
-                        <button
-                          className={`ep-nearby-card${inDraft ? ' ep-nearby-card--active' : ''}`}
-                          data-point-id={point.id}
-                          key={point.id}
-                          onClick={() => {
-                            if (inDraft) {
-                              state.handleRemovePointFromDraft(point.id)
-                            } else {
-                              state.handleAddPoint(point)
-                            }
-                          }}
-                          type="button"
-                        >
-                          <div className="ep-nearby-card__img">
-                            <SmartPlaceImage
-                              alt={point.title}
-                              category={point.category}
-                              loading="lazy"
-                              referrerPolicy="no-referrer"
-                              src={pointDetailsMap.get(point.id)?.imageUrl || point.imageUrl}
-                              title={point.title}
-                            />
-                            <span className="ep-nearby-card__dist">{formatMeters(point.distanceMeters)}</span>
-                            {inDraft && (
-                              <span className="ep-nearby-card__badge" aria-hidden="true">
-                                {draftPointOrders.get(point.id)}
-                              </span>
-                            )}
-                          </div>
-                          <div className="ep-nearby-card__body">
-                            <span className="ep-nearby-card__cat">{getPointCategoryLabel(point)}</span>
-                            <p className="ep-nearby-card__name">{point.title}</p>
-                          </div>
-                        </button>
-                      )
-                    })}
+                  <div className="ep-nearby-carousel">
+                    <button
+                      aria-label="Прокрутить влево"
+                      className="ep-nearby-carousel__arrow ep-nearby-carousel__arrow--prev"
+                      onPointerCancel={nearbyScrollUp}
+                      onPointerDown={() => nearbyScrollDown(-1)}
+                      onPointerLeave={nearbyScrollUp}
+                      onPointerUp={nearbyScrollUp}
+                      type="button"
+                    >
+                      <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16">
+                        <path d="M15 19l-7-7 7-7" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
+                      </svg>
+                    </button>
+                    <div className="ep-nearby-strip" ref={nearbyListRef}>
+                      {state.nearbyPoints.map((point) => {
+                        const inDraft = state.isPointInDraft(point.id)
+                        return (
+                          <button
+                            className={`ep-nearby-card${inDraft ? ' ep-nearby-card--active' : ''}`}
+                            data-point-id={point.id}
+                            key={point.id}
+                            onClick={() => {
+                              if (inDraft) {
+                                state.handleRemovePointFromDraft(point.id)
+                              } else {
+                                state.handleAddPoint(point)
+                              }
+                            }}
+                            type="button"
+                          >
+                            <div className="ep-nearby-card__img">
+                              <SmartPlaceImage
+                                alt={point.title}
+                                category={point.category}
+                                loading="lazy"
+                                referrerPolicy="no-referrer"
+                                src={pointDetailsMap.get(point.id)?.imageUrl || point.imageUrl}
+                                title={point.title}
+                              />
+                              <span className="ep-nearby-card__dist">{formatMeters(point.distanceMeters)}</span>
+                              {inDraft && (
+                                <span className="ep-nearby-card__badge" aria-hidden="true">
+                                  {draftPointOrders.get(point.id)}
+                                </span>
+                              )}
+                            </div>
+                            <div className="ep-nearby-card__body">
+                              <span className="ep-nearby-card__cat">{getPointCategoryLabel(point)}</span>
+                              <p className="ep-nearby-card__name">{point.title}</p>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <button
+                      aria-label="Прокрутить вправо"
+                      className="ep-nearby-carousel__arrow ep-nearby-carousel__arrow--next"
+                      onPointerCancel={nearbyScrollUp}
+                      onPointerDown={() => nearbyScrollDown(1)}
+                      onPointerLeave={nearbyScrollUp}
+                      onPointerUp={nearbyScrollUp}
+                      type="button"
+                    >
+                      <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16">
+                        <path d="M9 5l7 7-7 7" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
+                      </svg>
+                    </button>
                   </div>
                 ) : !state.isLoading ? (
                   <section className={`status-card${state.discoveryError ? ' status-card--error' : ''}`}>
@@ -936,32 +1008,6 @@ export function ExcursionsPage() {
                     </p>
                   </section>
                 ) : null}
-
-                {/* Arrow buttons — visible only on desktop (≥768px via CSS) */}
-                {state.nearbyPoints.length > 0 && (
-                  <div className="ep-nearby-nav" aria-hidden="true">
-                    <button
-                      aria-label="Прокрутить влево"
-                      className="ep-nearby-nav__btn"
-                      onClick={() => nearbyListRef.current?.scrollBy({ left: -300, behavior: 'smooth' })}
-                      type="button"
-                    >
-                      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                        <path d="M11 4L6 9L11 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </button>
-                    <button
-                      aria-label="Прокрутить вправо"
-                      className="ep-nearby-nav__btn"
-                      onClick={() => nearbyListRef.current?.scrollBy({ left: 300, behavior: 'smooth' })}
-                      type="button"
-                    >
-                      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                        <path d="M7 4L12 9L7 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </button>
-                  </div>
-                )}
               </div>
 
               {/* Decorative art — fills the gap between nearby section and footer */}

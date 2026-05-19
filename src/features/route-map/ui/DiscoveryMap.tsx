@@ -995,7 +995,7 @@ export function DiscoveryMap({
     const el = marker.getElement()
     const inner = el?.querySelector('.cluster-marker')
     if (inner) {
-      inner.textContent = getPointCategoryIcon(selectedPoint.category)
+      inner.innerHTML = getPointCategoryIcon(selectedPoint.category)
       prevSelectedClusterKeyRef.current = selectedCluster.key
     }
   }, [selectedPointId, clusterVersion, nearbyPoints])

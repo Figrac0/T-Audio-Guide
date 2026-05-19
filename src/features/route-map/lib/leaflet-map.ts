@@ -1,6 +1,7 @@
 ﻿import * as L from 'leaflet'
 
 import type { GeoPoint, NearbyPoint, RouteStop } from '@/entities/excursion/model/types'
+import { getCategorySvg } from '@/shared/lib/category-icon-svg'
 import {
   type LngLatBounds,
   type MapLocationRequest,
@@ -335,25 +336,9 @@ export function buildMarkerTitle(point: { title: string; shortDescription?: stri
   return point.shortDescription ? `${point.title}\n${point.shortDescription}` : point.title
 }
 
-export function getPointCategoryIcon(category: NearbyPoint['category'] | 'all' | number) {
-  // Backend category id — generic landmark pin; HomePage handles its own
-  // dynamic icon mapping for backend categories via pickCategoryIcon().
-  if (typeof category === 'number') return '📍'
-  switch (category) {
-    case 'museum':
-      return '🏛'
-    case 'food':
-      return '🍽'
-    case 'park':
-      return '🌿'
-    case 'entertainment':
-      return '✨'
-    case 'landmark':
-      return '📍'
-    case 'all':
-    default:
-      return '◎'
-  }
+export function getPointCategoryIcon(category: NearbyPoint['category'] | 'all' | number): string {
+  if (typeof category === 'number') return getCategorySvg('landmark')
+  return getCategorySvg(category === 'all' ? 'all' : category)
 }
 
 function toLeafletDuration(duration?: number) {

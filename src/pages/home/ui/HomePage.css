@@ -337,9 +337,26 @@ body.app-body--home-page {
 }
 
 .home-sheet__cat-icon {
-    font-size: 0.88rem;
-    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: currentColor;
 }
+
+.home-sheet__cat-icon svg {
+    display: block;
+    width: 15px;
+    height: 15px;
+}
+
+.home-sheet__cat-icon .poi-cat-icon {
+    display: block;
+    width: 15px;
+    height: 15px;
+    filter: brightness(0) saturate(100%) invert(46%) sepia(60%) saturate(480%) hue-rotate(120deg) brightness(95%);
+}
+
 
 /* Route filter pills: left-aligned horizontal scroll (no wrap) */
 .home-sheet__filter-group--inline .home-sheet__cats {
@@ -640,6 +657,63 @@ body.app-body--home-page {
 .home-sheet__section--fading {
   opacity: 0.4;
   pointer-events: none;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   NEARBY CAROUSEL (arrows visible only on laptop+)
+───────────────────────────────────────────────────────────────────────────── */
+
+.home-nearby-carousel {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    min-width: 0;
+}
+
+.home-nearby-carousel__arrow {
+    display: none;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid rgba(216, 220, 229, 0.85);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.96);
+    color: var(--color-brand);
+    box-shadow: 0 2px 8px rgba(31, 37, 51, 0.1);
+    cursor: pointer;
+    transition:
+        box-shadow 0.14s ease,
+        transform 0.14s ease,
+        background 0.14s ease;
+}
+
+.home-nearby-carousel__arrow:hover {
+    background: var(--color-brand-soft);
+    box-shadow: 0 4px 14px rgba(31, 138, 112, 0.18);
+    transform: scale(1.06);
+}
+
+.home-nearby-carousel__arrow:active {
+    transform: scale(0.91);
+}
+
+.home-nearby-carousel > .home-sheet__cards {
+    flex: 1;
+    min-width: 0;
+}
+
+@media (min-width: 1024px) {
+    .home-nearby-carousel__arrow {
+        display: flex;
+    }
+    .home-nearby-carousel__arrow--prev {
+        margin-right: 6px;
+    }
+    .home-nearby-carousel__arrow--next {
+        margin-left: 6px;
+    }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
