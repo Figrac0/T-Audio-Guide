@@ -23,6 +23,9 @@ body.app-body--home-page {
     inset: 0;
     z-index: 1;
     background: #e8edf4;
+    /* Dedicated GPU compositing layer — prevents map repaints from bleeding
+       into the sheet layer, same pattern as .ep__map on the excursions page. */
+    transform: translateZ(0);
 }
 
 /* Geolocation banner — sits above the sheet but below modal layers. Auto-hides
@@ -773,6 +776,7 @@ body.app-body--home-page {
     background: #ffffff;
     overflow: hidden;
     text-align: left;
+    contain: content;
     transition:
         border-color 0.2s ease,
         transform 0.2s ease;

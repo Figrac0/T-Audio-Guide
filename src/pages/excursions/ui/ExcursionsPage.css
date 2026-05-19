@@ -714,6 +714,7 @@ body.app-body--routes-page {
         rgba(247, 248, 252, 0.96)
     );
     box-shadow: 0 4px 12px rgba(31, 37, 51, 0.04);
+    contain: content;
     animation: ep-stop-enter 0.24s cubic-bezier(0.34, 1.02, 0.64, 1) both;
     transition:
         border-color 0.18s ease,

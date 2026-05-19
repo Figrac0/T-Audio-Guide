@@ -496,24 +496,37 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
     if (!map || !clusterLayer) return
 
     const CLUSTER_RADIUS_PX = 40
+    const R2 = CLUSTER_RADIUS_PX * CLUSTER_RADIUS_PX
+    const n = nearbyPoints.length
+    const pxX = new Float64Array(n)
+    const pxY = new Float64Array(n)
+    for (let k = 0; k < n; k++) {
+      const p = nearbyPoints[k]
+      const px = map.latLngToContainerPoint([p.coordinates.lat, p.coordinates.lng])
+      pxX[k] = px.x
+      pxY[k] = px.y
+    }
+
     const visited = new Set<string>()
     const rawClusters: Array<{ ids: string[]; lat: number; lng: number }> = []
 
-    for (const point of nearbyPoints) {
+    for (let i = 0; i < n; i++) {
+      const point = nearbyPoints[i]
       if (visited.has(point.id)) continue
       visited.add(point.id)
 
-      const centerPx = map.latLngToContainerPoint([point.coordinates.lat, point.coordinates.lng])
+      const cx = pxX[i]
+      const cy = pxY[i]
       const ids = [point.id]
       let sumLat = point.coordinates.lat
       let sumLng = point.coordinates.lng
 
-      for (const other of nearbyPoints) {
+      for (let j = i + 1; j < n; j++) {
+        const other = nearbyPoints[j]
         if (visited.has(other.id)) continue
-        const otherPx = map.latLngToContainerPoint([other.coordinates.lat, other.coordinates.lng])
-        const dx = centerPx.x - otherPx.x
-        const dy = centerPx.y - otherPx.y
-        if (dx * dx + dy * dy <= CLUSTER_RADIUS_PX * CLUSTER_RADIUS_PX) {
+        const dx = cx - pxX[j]
+        const dy = cy - pxY[j]
+        if (dx * dx + dy * dy <= R2) {
           visited.add(other.id)
           ids.push(other.id)
           sumLat += other.coordinates.lat

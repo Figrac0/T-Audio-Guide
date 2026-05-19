@@ -162,20 +162,16 @@ export function HomePage() {
         ];
     }, [backendCategories]);
 
-    // Resolve icon for a given tab option (backend categories use their slug)
-    const getTabIcon = useCallback(
-        (id: PointCategory | "all" | number): string => {
-            if (id === "all") return categoryIcons.all;
-            if (typeof id === "number") {
-                const cat = backendCategories.find(
-                    (c: ApiCategory) => c.id === id,
-                );
-                return pickCategoryIcon(cat?.slug, cat?.name);
-            }
-            return categoryIcons[id] ?? getCategorySvg('landmark');
-        },
-        [backendCategories],
-    );
+    // Precompute tab icon Map so rendering each button is a O(1) Map.get()
+    // instead of a O(n) backendCategories.find() per button per render.
+    const tabIconMap = useMemo<Map<PointCategory | "all" | number, string>>(() => {
+        const m = new Map<PointCategory | "all" | number, string>();
+        m.set("all", categoryIcons.all);
+        for (const c of backendCategories) {
+            m.set(c.id, pickCategoryIcon(c.slug, c.name));
+        }
+        return m;
+    }, [backendCategories]);
 
     // If the stored category slug is stale (no longer a valid frontend enum
     // value AND not a backend id), drop it to 'all' or pick a matching id.
@@ -552,6 +548,7 @@ export function HomePage() {
     }, [effectiveUserPosition, requestLocation]);
 
     const handleNearbyCardClick = useCallback((pointId: string) => {
+        selectionFromMapRef.current = false;
         const isDeselecting = selectedPointIdRef.current === pointId;
         setSelectedPointId((prev) => {
             if (prev === pointId) return "";
@@ -564,6 +561,7 @@ export function HomePage() {
     }, []);
 
     const handleMapPointSelect = useCallback((pointId: string) => {
+        selectionFromMapRef.current = true;
         shouldScrollNearbyListRef.current = true;
         setSelectedPointId(pointId);
     }, []);
@@ -621,6 +619,9 @@ export function HomePage() {
     // Tracks last displayedPoint.id that triggered a height re-snap;
     // reset to "" when displayedPoint becomes null so re-selection works.
     const prevDisplayedPointIdRef = useRef<string>("");
+    // True when the latest selection came from a map marker click — the sheet
+    // should NOT auto-open in that case (popup already shows on the map).
+    const selectionFromMapRef = useRef(false);
 
     const snapToPeek = useCallback(() => {
         const sheet = sheetRef.current;
@@ -836,6 +837,8 @@ export function HomePage() {
         }
         if (displayedPoint.id === prevDisplayedPointIdRef.current) return;
         prevDisplayedPointIdRef.current = displayedPoint.id;
+        // Map marker click → popup opens on the map; don't force the sheet open.
+        if (selectionFromMapRef.current) return;
         if (sheetStateRef.current === "full") return;
         const frameId = requestAnimationFrame(() => {
             measurePreviewHeight(); // selectedPointIdRef.current is set → measures to nearby section
@@ -1228,7 +1231,7 @@ export function HomePage() {
                                     <span
                                         className="home-sheet__cat-icon"
                                         aria-hidden="true"
-                                        dangerouslySetInnerHTML={{ __html: getTabIcon(opt.id) }}
+                                        dangerouslySetInnerHTML={{ __html: tabIconMap.get(opt.id) ?? categoryIcons.all }}
                                     />
                                     {opt.label}
                                 </button>

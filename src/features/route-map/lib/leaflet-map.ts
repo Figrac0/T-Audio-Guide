@@ -19,7 +19,7 @@ export function createOpenStreetMapLayer() {
     attribution: openStreetMapAttribution,
     maxZoom: 19,
     minZoom: 2,
-    keepBuffer: 2,
+    keepBuffer: 3,
     updateWhenZooming: false,
     updateWhenIdle: true,
     tileSize: 256,
@@ -109,25 +109,35 @@ export function toLeafletPolylineSegments(
   return geometry.coordinates.map((segment) => segment.map(toLeafletLatLngFromLngLat))
 }
 
+// Cache icon HTML strings by (category:isActive:draftOrder:shouldPulse) — avoids
+// repeated string interpolation and getCategoryIcon() calls across 100+ markers.
+const poiIconHtmlCache = new Map<string, string>()
+
 export function createPoiIcon(
   point: NearbyPoint,
   isActive: boolean,
   draftOrder: number | null = null,
   shouldPulse = false,
 ) {
-  const isInDraft = draftOrder !== null
-  const markerClasses = [
-    'poi-marker',
-    isActive ? 'poi-marker--active' : '',
-    isActive && shouldPulse ? 'poi-marker--pulse' : '',
-    isInDraft ? 'poi-marker--draft' : '',
-  ]
-    .filter(Boolean)
-    .join(' ')
+  const key = `${point.category}:${isActive ? '1' : '0'}:${draftOrder ?? ''}:${shouldPulse ? '1' : '0'}`
+  let html = poiIconHtmlCache.get(key)
+  if (!html) {
+    const isInDraft = draftOrder !== null
+    const markerClasses = [
+      'poi-marker',
+      isActive ? 'poi-marker--active' : '',
+      isActive && shouldPulse ? 'poi-marker--pulse' : '',
+      isInDraft ? 'poi-marker--draft' : '',
+    ]
+      .filter(Boolean)
+      .join(' ')
+    html = `<div class="${markerClasses}"><span class="poi-marker__glyph poi-marker__glyph--${point.category}" aria-hidden="true">${getCategoryIcon(point.category)}</span>${draftOrder !== null ? `<span class="poi-marker__order" aria-hidden="true">${draftOrder}</span>` : ''}</div>`
+    poiIconHtmlCache.set(key, html)
+  }
 
   return L.divIcon({
     className: emptyDivIconClassName,
-    html: `<div class="${markerClasses}"><span class="poi-marker__glyph poi-marker__glyph--${point.category}" aria-hidden="true">${getCategoryIcon(point.category)}</span>${draftOrder !== null ? `<span class="poi-marker__order" aria-hidden="true">${draftOrder}</span>` : ''}</div>`,
+    html,
     iconSize: [34, 34],
     iconAnchor: [17, 30],
     popupAnchor: [0, -28],
