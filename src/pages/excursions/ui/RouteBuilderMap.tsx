@@ -166,11 +166,9 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
   const clustersRef = useRef<Array<{ ids: string[]; key: string; lat: number; lng: number }>>([])
   const prevSelectedClusterKeyRef = useRef<string | null>(null)
   const prevUserPositionRef = useRef<GeoPoint | null>(null)
-  const setClusterVersionRef = useRef<((fn: (n: number) => number) => void) | null>(null)
   const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const initialCenterRef = useRef(initialCenter ?? userPosition ?? appMapConfig.defaultCenter)
   const [clusterVersion, setClusterVersion] = useState(0)
-  setClusterVersionRef.current = setClusterVersion
 
   useImperativeHandle(ref, () => ({
     closePopup: () => { mapRef.current?.closePopup() },
@@ -234,7 +232,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
         zoomDebounceRef.current = setTimeout(() => {
           onChangeRadiusRef.current(getDiscoveryRadiusForZoom(map.getZoom()))
         }, 200)
-        setClusterVersionRef.current?.((v) => v + 1)
+        setClusterVersion((v) => v + 1)
       })
 
       map.on('popupclose', () => {
@@ -493,7 +491,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
     const map = mapRef.current
     const clusterLayer = clusterLayerRef.current
     const container = containerRef.current
-    if (!map || !clusterLayer) return
+    if (!map || !clusterLayer || !container) return
 
     const CLUSTER_RADIUS_PX = 40
     const R2 = CLUSTER_RADIUS_PX * CLUSTER_RADIUS_PX

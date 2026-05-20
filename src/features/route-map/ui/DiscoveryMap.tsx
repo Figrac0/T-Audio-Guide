@@ -176,7 +176,6 @@ export function DiscoveryMap({
   const clustersRef = useRef<Array<{ ids: string[]; key: string; lat: number; lng: number }>>([])
   const prevSelectedClusterKeyRef = useRef<string | null>(null)
   const clusterZoomRef = useRef<number | null>(null)
-  const setClusterVersionRef = useRef<((fn: (n: number) => number) => void) | null>(null)
   const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const onChangeRadiusRef = useRef(onChangeRadius)
   const onMapClickRef = useRef(onMapClick)
@@ -265,7 +264,6 @@ export function DiscoveryMap({
   selectedPointIdRef.current = selectedPointId
   panOnlyIdRef.current = panOnlyId
   nearbyPointsRef.current = nearbyPoints
-  setClusterVersionRef.current = setClusterVersion
   const guideGeometry =
     guideRoute.signature === guideSignature && guideRoute.geometry
       ? guideRoute.geometry
@@ -363,7 +361,7 @@ export function DiscoveryMap({
           updateTargetRadius(newRadius)
         }, 250)
         clusterZoomRef.current = map.getZoom()
-        setClusterVersionRef.current?.((v) => v + 1)
+        setClusterVersion((v) => v + 1)
       })
 
       map.on('click', (event: L.LeafletMouseEvent) => {
