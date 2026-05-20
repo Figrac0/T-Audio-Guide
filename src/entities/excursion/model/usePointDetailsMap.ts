@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 
+import { adminService } from '@/shared/api/adminService'
 import type { ApiPointDetail, ApiPointMedia } from '@/shared/api/mappers'
 import { pointsService } from '@/shared/api/pointsService'
 
@@ -56,18 +57,27 @@ export function fetchPointDetailData(id: string): Promise<PointDetailData | null
   const numericId = Number(id)
   if (!Number.isFinite(numericId)) return Promise.resolve(null)
 
-  const promise = pointsService
-    .getPointDetail(numericId)
-    .then((response) => {
+  // Admin endpoint returns the full detail including workingHours; public
+  // endpoint may omit it. Try admin first, fall back to public for non-admins.
+  const promise = (async (): Promise<PointDetailData | null> => {
+    try {
+      const response = await adminService.getPoint(numericId)
       const data = extractPointDetailData(response)
       cache.set(id, data)
-      inflight.delete(id)
       return data
-    })
-    .catch(() => {
+    } catch {
+      try {
+        const response = await pointsService.getPointDetail(numericId)
+        const data = extractPointDetailData(response)
+        cache.set(id, data)
+        return data
+      } catch {
+        return null
+      }
+    } finally {
       inflight.delete(id)
-      return null
-    })
+    }
+  })()
 
   inflight.set(id, promise)
   return promise
@@ -80,7 +90,7 @@ export function fetchPointDetailData(id: string): Promise<PointDetailData | null
  * this hook to show real uploaded photos and the full description.
  */
 export function usePointDetailsMap(ids: string[]): Map<string, PointDetailData> {
-  const [, forceUpdate] = useState(0)
+  const [version, forceUpdate] = useState(0)
   const backendIds = useMemo(
     () => Array.from(new Set(ids.map(toBackendPointId).filter(Boolean))),
     [ids],
@@ -112,5 +122,5 @@ export function usePointDetailsMap(ids: string[]): Map<string, PointDetailData> 
     }
     return map
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idsKey])
+  }, [idsKey, version])
 }

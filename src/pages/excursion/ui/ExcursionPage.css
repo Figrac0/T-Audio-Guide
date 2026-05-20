@@ -983,27 +983,32 @@ body.app-body--excursion-nav {
 .ep-nav__stop-stats {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    justify-content: center;
+    gap: 8px;
 }
 
-.ep-nav__stop-rating,
-.ep-nav__stop-time,
-.ep-nav__stop-schedule {
+.ep-nav__stop-chip {
     display: inline-flex;
-    min-height: 28px;
+    min-height: 34px;
     align-items: center;
-    padding: 0 10px;
-    border: 1px solid rgba(31, 37, 51, 0.1);
-    border-radius: var(--radius-pill);
-    background: var(--color-bg-soft);
+    justify-content: center;
+    padding: 0 12px;
+    border: 1px solid rgba(31, 37, 51, 0.08);
+    border-radius: 999px;
+    background: rgba(244, 246, 249, 0.92);
     color: var(--color-text-secondary);
-    font-size: 0.76rem;
+    font-size: 0.82rem;
     font-weight: 800;
+    line-height: 1.2;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
     white-space: nowrap;
 }
 
-.ep-nav__stop-rating {
-    color: #d4a017;
+.ep-nav__stop-chip--schedule {
+    border-color: rgba(31, 138, 112, 0.18);
+    background: rgba(31, 138, 112, 0.07);
+    color: var(--color-brand-strong);
+    white-space: normal;
 }
 
 /* Reading panel — mirrors the point-detail "О месте" panel on the

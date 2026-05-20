@@ -563,10 +563,15 @@ function NavigationPhase({
   const [sheetState, setSheetState] = useState<SheetState>('closed')
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(false)
   const [transcriptHeight, setTranscriptHeight] = useState(0)
+  const [prevStopIndex, setPrevStopIndex] = useState(currentStopIndex)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const { isAudioPlaying, isAudioAvailable, toggleAudio, loadedDurationSeconds } = useAudioGuide(currentStop, currentStopIndex)
 
-  useEffect(() => { setIsTranscriptOpen(false); setTranscriptHeight(0) }, [currentStopIndex])
+  if (prevStopIndex !== currentStopIndex) {
+    setPrevStopIndex(currentStopIndex)
+    setIsTranscriptOpen(false)
+    setTranscriptHeight(0)
+  }
   const sheetStateRef = useRef<SheetState>('closed')
   const sheetRef = useRef<HTMLDivElement>(null)
   const navRowRef = useRef<HTMLDivElement>(null)
@@ -800,6 +805,9 @@ function NavigationPhase({
     () => effectiveUserPosition ? getDistanceMetersBetween(effectiveUserPosition, currentStop.coordinates) : null,
     [effectiveUserPosition, currentStop.coordinates],
   )
+  const walkMinutesToStop = distanceToStop !== null
+    ? Math.max(1, Math.round((distanceToStop / 1000) * 12))
+    : null
   const guideRouteUserPosition = effectiveUserPosition
 
   const handleManualPositionToggle = useCallback(() => { toggleOverride() }, [toggleOverride])
@@ -933,14 +941,25 @@ function NavigationPhase({
             <div className="ep-nav__stop-header">
               <h2 className="ep-nav__stop-title">{currentStop.title}</h2>
               <div className="ep-nav__stop-stats">
-                {currentStop.rating > 0 ? (
-                  <span className="ep-nav__stop-rating">★ {currentStop.rating.toFixed(1)}</span>
+                {distanceToStop !== null ? (
+                  <span className="ep-nav__stop-chip">
+                    ~{walkMinutesToStop} мин · {formatMeters(distanceToStop)}
+                  </span>
                 ) : null}
                 {currentStop.expectedVisitMinutes > 0 ? (
-                  <span className="ep-nav__stop-time">~{currentStop.expectedVisitMinutes} мин</span>
+                  <span className="ep-nav__stop-chip">
+                    ~{currentStop.expectedVisitMinutes} мин на осмотр
+                  </span>
                 ) : null}
                 {currentStop.scheduleLabel ? (
-                  <span className="ep-nav__stop-schedule">{currentStop.scheduleLabel}</span>
+                  <span className="ep-nav__stop-chip ep-nav__stop-chip--schedule">
+                    {currentStop.scheduleLabel}
+                  </span>
+                ) : null}
+                {currentStop.rating > 0 ? (
+                  <span className="ep-nav__stop-chip">
+                    ★ {currentStop.rating.toFixed(1)}
+                  </span>
                 ) : null}
               </div>
             </div>

@@ -3,7 +3,6 @@ import * as L from 'leaflet'
 
 import {
   createLeafletMap,
-  createOpenStreetMapLayer,
 } from '@/features/route-map/lib/leaflet-map'
 import type { CreatePointParams, PatchPointParams } from '@/shared/api/adminService'
 import type { ApiCategory, ApiPointDetail } from '@/shared/api/mappers'
@@ -45,6 +44,9 @@ export function PointForm({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const [geocodeQuery, setGeocodeQuery] = useState('')
+  const [geocodeStatus, setGeocodeStatus] = useState<'idle' | 'loading' | 'notfound'>('idle')
+
   // Fall back to first category id if categories arrive after mount.
   useEffect(() => {
     if (categoryId === '' && categories.length > 0 && !initial) {
@@ -65,7 +67,7 @@ export function PointForm({
     const startLat = Number.parseFloat(latitude) || defaultCenter.lat
     const startLng = Number.parseFloat(longitude) || defaultCenter.lng
     const map = createLeafletMap(container, { lat: startLat, lng: startLng }, 12)
-    createOpenStreetMapLayer().addTo(map)
+    map.attributionControl.remove()
     mapRef.current = map
 
     const marker = L.marker([startLat, startLng], { draggable: true }).addTo(map)
@@ -96,6 +98,34 @@ export function PointForm({
     if (Number.isFinite(lat) && Number.isFinite(lng) && markerRef.current && mapRef.current) {
       markerRef.current.setLatLng([lat, lng])
       mapRef.current.setView([lat, lng], mapRef.current.getZoom())
+    }
+  }
+
+  async function handleGeocode() {
+    const q = geocodeQuery.trim()
+    if (!q) return
+    setGeocodeStatus('loading')
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`,
+        { headers: { 'Accept-Language': 'ru,en' } },
+      )
+      const data = await res.json() as Array<{ lat: string; lon: string }>
+      if (!data.length) {
+        setGeocodeStatus('notfound')
+        return
+      }
+      const lat = Number.parseFloat(data[0]!.lat)
+      const lng = Number.parseFloat(data[0]!.lon)
+      setLatitude(lat.toFixed(6))
+      setLongitude(lng.toFixed(6))
+      if (markerRef.current && mapRef.current) {
+        markerRef.current.setLatLng([lat, lng])
+        mapRef.current.setView([lat, lng], 14)
+      }
+      setGeocodeStatus('idle')
+    } catch {
+      setGeocodeStatus('notfound')
     }
   }
 
@@ -245,8 +275,31 @@ export function PointForm({
 
       <div className="admin-form__row">
         <label className="admin-form__label">Координаты</label>
+        <div className="admin-map-search">
+          <input
+            className="admin-map-search__input"
+            onChange={(e) => { setGeocodeQuery(e.target.value); setGeocodeStatus('idle') }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleGeocode() } }}
+            placeholder="Поиск города или адреса…"
+            type="search"
+            value={geocodeQuery}
+          />
+          <button
+            className="admin-btn admin-btn--primary admin-btn--small admin-map-search__btn"
+            disabled={geocodeStatus === 'loading' || !geocodeQuery.trim()}
+            onClick={() => void handleGeocode()}
+            type="button"
+          >
+            {geocodeStatus === 'loading' ? '…' : 'Найти'}
+          </button>
+        </div>
+        {geocodeStatus === 'notfound' ? (
+          <p className="admin-map-search__hint admin-map-search__hint--error">
+            Место не найдено. Попробуйте другой запрос.
+          </p>
+        ) : null}
         <p className="admin-form__map-hint">
-          Перетащите маркер или кликните по карте.
+          Перетащите маркер или кликните по карте, чтобы уточнить координаты.
         </p>
         <div className="admin-form__map" ref={mapContainerRef} />
       </div>

@@ -1352,9 +1352,16 @@ function PointDetailPanel({
   const [playingAudioUrl, setPlayingAudioUrl] = useState<string | null>(null)
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(false)
   const [transcriptHeight, setTranscriptHeight] = useState(0)
+  const [prevPointId, setPrevPointId] = useState(point.id)
   const hasAudioGuide = Boolean(point.audioGuideUrl)
   const isAudioPlaying = playingAudioUrl === point.audioGuideUrl
   const hasTranscript = Boolean(point.audioTranscript)
+
+  if (prevPointId !== point.id) {
+    setPrevPointId(point.id)
+    setPlayingAudioUrl(null)
+    setIsTranscriptOpen(false)
+  }
 
   function handleTranscriptToggle() {
     if (!isTranscriptOpen && transcriptRef.current) {
@@ -1368,13 +1375,6 @@ function PointDetailPanel({
       audioRef.current?.pause()
       audioRef.current = null
     }
-  }, [])
-
-  useEffect(() => {
-    audioRef.current?.pause()
-    audioRef.current = null
-    setPlayingAudioUrl(null)
-    setIsTranscriptOpen(false)
   }, [point.id])
 
   function handleToggleAudioGuide() {
@@ -1414,20 +1414,28 @@ function PointDetailPanel({
 
       <div className="ep-detail__body">
         <div className="ep-detail__metrics" role="list" aria-label="Краткие метрики точки">
-          <span className="ep-detail__metric-chip" role="listitem">{formatMeters(point.distanceMeters)}</span>
-          <span className="ep-detail__metric-chip" role="listitem">~{walkMinutes} мин</span>
+          <span className="ep-detail__metric-chip" role="listitem">
+            ~{walkMinutes} мин · {formatMeters(point.distanceMeters)}
+          </span>
+          {point.expectedVisitMinutes > 0 ? (
+            <span className="ep-detail__metric-chip" role="listitem">
+              ~{point.expectedVisitMinutes} мин на осмотр
+            </span>
+          ) : null}
           {point.rating > 0 ? (
             <span className="ep-detail__metric-chip ep-detail__metric-chip--accent" role="listitem">
               ★ {point.rating.toFixed(1)}
+            </span>
+          ) : null}
+          {point.scheduleLabel ? (
+            <span className="ep-detail__metric-chip ep-detail__metric-chip--schedule" role="listitem">
+              {point.scheduleLabel}
             </span>
           ) : null}
         </div>
 
         <div className="ep-detail__heading">
           <h2 className="ep-detail__title">{point.title}</h2>
-          {point.scheduleLabel && (
-            <span className="ep-detail__schedule">{point.scheduleLabel}</span>
-          )}
         </div>
 
         {descriptionParagraphs.length > 0 && (

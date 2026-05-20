@@ -175,9 +175,10 @@ export function PointsSection() {
             categories={categories}
             onCancel={() => setCreating(false)}
             onSubmit={async (values) => {
-              await adminService.createPoint(values as CreatePointParams)
+              const created = await adminService.createPoint(values as CreatePointParams)
               setCreating(false)
               pageState.refresh()
+              setEditingId(created.id)
             }}
             submitLabel="Создать"
           />
