@@ -1,7 +1,7 @@
 # T-Guide
 
 <div align="center">
-  <a href="https://t-audio-guide-f-b.vercel.app/" target="_blank">
+  <a href="https://tguide.enzolu.ru/" target="_blank">
     <img
       src="https://github.com/Figrac0/Figrac0/blob/main/href.svg"
       alt="Quick Access - Visit Site"
