@@ -88,6 +88,8 @@ interface DiscoveryMapProps {
   showDirectRouteInPopup?: boolean
   showPopupRouteActions?: boolean
   userPosition: GeoPoint | null
+  isManualUserPosition?: boolean
+  isRadiusLocked?: boolean
 }
 
 const mapPadding: [number, number, number, number] = [56, 48, 48, 48]
@@ -150,6 +152,8 @@ export function DiscoveryMap({
   showDirectRouteInPopup = false,
   showPopupRouteActions = true,
   userPosition,
+  isManualUserPosition = false,
+  isRadiusLocked = false,
 }: DiscoveryMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
@@ -177,6 +181,9 @@ export function DiscoveryMap({
   const prevSelectedClusterKeyRef = useRef<string | null>(null)
   const clusterZoomRef = useRef<number | null>(null)
   const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isRadiusLockedRef = useRef(isRadiusLocked)
+  isRadiusLockedRef.current = isRadiusLocked
+  const pointCacheRef = useRef<Map<string, NearbyPoint>>(new Map())
   const onChangeRadiusRef = useRef(onChangeRadius)
   const onMapClickRef = useRef(onMapClick)
   const selectedPointIdRef = useRef(selectedPointId)
@@ -208,16 +215,6 @@ export function DiscoveryMap({
     signature: '',
   })
 
-  const guidedPoint =
-    nearbyPoints.find((point) => point.id === routeTargetId) ?? null
-  const pointsBounds = useMemo(() => {
-    const points = [
-      ...nearbyPoints.map((point) => point.coordinates),
-      ...(userPosition ? [userPosition] : []),
-    ]
-
-    return getBoundsFromPoints(points)
-  }, [nearbyPoints, userPosition])
   const activeCategoryOption =
     categoryOptions.find((option) => option.id === activeCategory) ?? categoryOptions[0]
   const activeRadiusLabel =
@@ -249,6 +246,47 @@ export function DiscoveryMap({
       .map((point) => `${point.lat.toFixed(5)}:${point.lng.toFixed(5)}`)
       .join('|')
   }, [userPosition, visibleDraftStops])
+
+  // Keep radius callback ref current so zoomend listener always calls latest version
+  onChangeRadiusRef.current = onChangeRadius
+  onMapClickRef.current = onMapClick
+  selectedPointIdRef.current = selectedPointId
+  panOnlyIdRef.current = panOnlyId
+  nearbyPointsRef.current = nearbyPoints
+
+  // Update point cache — used to keep pinned markers visible when outside radius
+  for (const p of nearbyPoints) {
+    pointCacheRef.current.set(p.id, p)
+  }
+
+  // effectivePoints = nearby + any pinned points (route target, draft stops) not in nearby
+  const effectivePoints = useMemo(() => {
+    const nearbyIds = new Set(nearbyPoints.map((p) => p.id))
+    const extras: NearbyPoint[] = []
+    if (routeTargetId && !nearbyIds.has(routeTargetId)) {
+      const cached = pointCacheRef.current.get(routeTargetId)
+      if (cached) extras.push(cached)
+    }
+    visibleDraftPointIds.forEach((id) => {
+      if (!nearbyIds.has(id)) {
+        const cached = pointCacheRef.current.get(id)
+        if (cached) extras.push(cached)
+      }
+    })
+    return extras.length > 0 ? [...nearbyPoints, ...extras] : nearbyPoints
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nearbyPoints, routeTargetId, visibleDraftPointIds])
+
+  const guidedPoint =
+    effectivePoints.find((point) => point.id === routeTargetId) ?? null
+  const pointsBounds = useMemo(() => {
+    const points = [
+      ...effectivePoints.map((point) => point.coordinates),
+      ...(userPosition ? [userPosition] : []),
+    ]
+
+    return getBoundsFromPoints(points)
+  }, [effectivePoints, userPosition])
   // Signature must include guidedPoint coordinates, not just id: when the user
   // toggles manual position the center changes and points get re-derived with
   // shifted coordinates (mock API generates them relative to center). If only
@@ -258,12 +296,6 @@ export function DiscoveryMap({
       ? `${guidedPoint.id}:${guidedPoint.coordinates.lat.toFixed(5)}:${guidedPoint.coordinates.lng.toFixed(5)}:${userPosition.lat.toFixed(5)}:${userPosition.lng.toFixed(5)}`
       : ''
 
-  // Keep radius callback ref current so zoomend listener always calls latest version
-  onChangeRadiusRef.current = onChangeRadius
-  onMapClickRef.current = onMapClick
-  selectedPointIdRef.current = selectedPointId
-  panOnlyIdRef.current = panOnlyId
-  nearbyPointsRef.current = nearbyPoints
   const guideGeometry =
     guideRoute.signature === guideSignature && guideRoute.geometry
       ? guideRoute.geometry
@@ -357,8 +389,10 @@ export function DiscoveryMap({
           clearTimeout(zoomDebounceRef.current)
         }
         zoomDebounceRef.current = window.setTimeout(() => {
-          const newRadius = getDiscoveryRadiusForZoom(map.getZoom())
-          updateTargetRadius(newRadius)
+          if (!isRadiusLockedRef.current) {
+            const newRadius = getDiscoveryRadiusForZoom(map.getZoom())
+            updateTargetRadius(newRadius)
+          }
         }, 250)
         clusterZoomRef.current = map.getZoom()
         setClusterVersion((v) => v + 1)
@@ -654,11 +688,11 @@ export function DiscoveryMap({
 
     if (userPosition) {
       L.marker([userPosition.lat, userPosition.lng], {
-        icon: createUserIcon(),
+        icon: createUserIcon(isManualUserPosition),
         title: 'Ваше местоположение',
       }).addTo(routeLayer)
     }
-  }, [draftGeometry, guideGeometry, userPosition])
+  }, [draftGeometry, guideGeometry, isManualUserPosition, userPosition])
 
   // Markers layer: POI markers — DIFFED on each update instead of clear+rebuild.
   // For 100-200 markers, recreating all DOM nodes on every nearbyPoints change
@@ -671,7 +705,7 @@ export function DiscoveryMap({
 
     suppressPopupCloseRef.current = true
 
-    const newIds = new Set(nearbyPoints.map((point) => point.id))
+    const newIds = new Set(effectivePoints.map((point) => point.id))
 
     // Remove markers that are no longer in the points list
     markerRefs.current.forEach((marker, id) => {
@@ -683,7 +717,7 @@ export function DiscoveryMap({
     })
 
     // Add new / update existing
-    nearbyPoints.forEach((point) => {
+    effectivePoints.forEach((point) => {
       const googleMapsUrl = buildGoogleMapsUrl(point.coordinates, userPosition)
       const isInDraft = visibleDraftPointIds.has(point.id)
       const draftOrder = visibleDraftOrderMap.get(point.id) ?? null
@@ -816,7 +850,7 @@ export function DiscoveryMap({
     return () => {
       window.clearTimeout(reopenTimeout)
     }
-  }, [draftStops.length, nearbyPoints, onAddPointToDraft, onBuildRoute, onClearDraftRoute, onSelectPoint, routeTargetId, showDirectRouteInPopup, showPopupRouteActions, userPosition, visibleDraftOrderMap, visibleDraftPointIds])
+  }, [draftStops.length, effectivePoints, onAddPointToDraft, onBuildRoute, onClearDraftRoute, onSelectPoint, routeTargetId, showDirectRouteInPopup, showPopupRouteActions, userPosition, visibleDraftOrderMap, visibleDraftPointIds])
 
 
   // Initialize and sync when radiusMeters changes from parent (e.g., from radius menu)
@@ -847,11 +881,11 @@ export function DiscoveryMap({
     // Greedy pixel-distance clustering. Pixel coords are precomputed once so the
     // inner loop does no projection calls. Inner loop starts at j = i+1 (each
     // pair checked once) — halves iterations vs the original O(n²) approach.
-    const n = nearbyPoints.length
+    const n = effectivePoints.length
     const pxX = new Float64Array(n)
     const pxY = new Float64Array(n)
     for (let k = 0; k < n; k++) {
-      const p = nearbyPoints[k]
+      const p = effectivePoints[k]
       const px = map.latLngToContainerPoint([p.coordinates.lat, p.coordinates.lng])
       pxX[k] = px.x
       pxY[k] = px.y
@@ -862,7 +896,7 @@ export function DiscoveryMap({
     const rawClusters: Array<{ ids: string[]; lat: number; lng: number }> = []
 
     for (let i = 0; i < n; i++) {
-      const point = nearbyPoints[i]
+      const point = effectivePoints[i]
       if (visited.has(point.id)) continue
       visited.add(point.id)
 
@@ -873,7 +907,7 @@ export function DiscoveryMap({
       let sumLng = point.coordinates.lng
 
       for (let j = i + 1; j < n; j++) {
-        const other = nearbyPoints[j]
+        const other = effectivePoints[j]
         if (visited.has(other.id)) continue
         const dx = cx - pxX[j]
         const dy = cy - pxY[j]
@@ -941,7 +975,7 @@ export function DiscoveryMap({
             .on('click', () => {
               const bounds = L.latLngBounds(
                 cluster.ids.map((id) => {
-                  const p = nearbyPoints.find((pt) => pt.id === id)!
+                  const p = effectivePoints.find((pt) => pt.id === id)!
                   return [p.coordinates.lat, p.coordinates.lng] as [number, number]
                 }),
               )
@@ -966,7 +1000,7 @@ export function DiscoveryMap({
 
     clusterMarkersRef.current = nextClusterMap
     clustersRef.current = nextClusters
-  }, [clusterVersion, nearbyPoints])
+  }, [clusterVersion, effectivePoints])
 
   // Selection-in-cluster: when the selected point is inside a multi-point cluster,
   // replace the cluster count with its category icon (no individual marker shown).
@@ -1001,7 +1035,7 @@ export function DiscoveryMap({
     const marker = clusterMarkers.get(selectedCluster.key)
     if (!marker) return
 
-    const selectedPoint = nearbyPoints.find((p) => p.id === selectedPointId)
+    const selectedPoint = effectivePoints.find((p) => p.id === selectedPointId)
     if (!selectedPoint) return
 
     // Swap count for category icon directly in the DOM — no setIcon(), no animation
@@ -1011,7 +1045,7 @@ export function DiscoveryMap({
       inner.innerHTML = getPointCategoryIcon(selectedPoint.category)
       prevSelectedClusterKeyRef.current = selectedCluster.key
     }
-  }, [selectedPointId, clusterVersion, nearbyPoints])
+  }, [selectedPointId, clusterVersion, effectivePoints])
 
   // Selection-only icon update. The main marker diff effect uses
   // selectedPointIdRef and won't re-run when ONLY selection changes, so we
@@ -1019,7 +1053,7 @@ export function DiscoveryMap({
   // setIcon calls — typically only 0-2 markers actually change visual state
   // (the previous selected loses --active, the new one gains it).
   useEffect(() => {
-    nearbyPoints.forEach((point) => {
+    effectivePoints.forEach((point) => {
       const marker = markerRefs.current.get(point.id)
       if (!marker) return
       const isActive = point.id === selectedPointId
@@ -1041,7 +1075,7 @@ export function DiscoveryMap({
         }
       }
     })
-  }, [nearbyPoints, selectedPointId, visibleDraftOrderMap])
+  }, [effectivePoints, selectedPointId, visibleDraftOrderMap])
 
   // Pan-only: triggered by a nearby card click. Closes any open popup, pans to
   // the point at the current zoom level, and does NOT open the popup.

@@ -160,7 +160,16 @@ export function createRouteStopIcon(
   })
 }
 
-export function createUserIcon() {
+export function createUserIcon(isManual = false) {
+  if (isManual) {
+    return L.divIcon({
+      className: 'leaflet-div-icon leaflet-div-icon--user leaflet-div-icon--user-manual',
+      html: '<div class="user-marker user-marker--manual"><svg class="user-marker__pin-svg" viewBox="0 0 24 34" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 1C6.48 1 2 5.48 2 11C2 18.5 12 33 12 33S22 18.5 22 11C22 5.48 17.52 1 12 1Z" fill="#f5c842" stroke="white" stroke-width="1.5"/><circle cx="12" cy="11" r="4" fill="white"/></svg></div>',
+      iconSize: [28, 36],
+      iconAnchor: [14, 36],
+      popupAnchor: [0, -36],
+    })
+  }
   return L.divIcon({
     // Intentionally NOT emptyDivIconClassName — the clustering CSS hides
     // .leaflet-div-icon--clean, but the user position marker must always show.

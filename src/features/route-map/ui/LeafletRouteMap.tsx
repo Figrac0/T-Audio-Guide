@@ -33,6 +33,7 @@ const userZoom = 15.4
 
 export function LeafletRouteMap({
   isMapLocked,
+  isManualUserPosition = false,
   onLocateUser,
   onMapClick,
   onSelect,
@@ -269,11 +270,11 @@ export function LeafletRouteMap({
 
     if (userPosition) {
       L.marker([userPosition.lat, userPosition.lng], {
-        icon: createUserIcon(),
+        icon: createUserIcon(isManualUserPosition),
         title: 'Ваше местоположение',
       }).addTo(overlay)
     }
-  }, [firstStop, guideGeometry, lastStop, onSelect, routeColor, routeGeometry, selectedStopId, stops, userPosition])
+  }, [firstStop, guideGeometry, isManualUserPosition, lastStop, onSelect, routeColor, routeGeometry, selectedStopId, stops, userPosition])
 
   useEffect(() => {
     const map = mapRef.current

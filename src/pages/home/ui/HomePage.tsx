@@ -35,6 +35,7 @@ import {
     saveDiscoveryContext,
 } from "@/shared/lib/discovery-context";
 import { useManualPosition } from "@/shared/lib/ManualPositionContext";
+import { useRadiusLock } from "@/shared/lib/useRadiusLock";
 import {
     formatDuration,
     formatTheme,
@@ -297,6 +298,7 @@ export function HomePage() {
         setManualPosition,
         toggleOverride,
     } = useManualPosition();
+    const { isLocked: isRadiusLocked, toggle: toggleRadiusLock } = useRadiusLock();
 
     const effectiveUserPosition = isOverrideActive ? manualPosition : userPosition;
     const currentCenter = effectiveUserPosition ?? storedContext.center;
@@ -376,8 +378,15 @@ export function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Keep the selected state when the point is pinned outside the API radius
+    // (either as the current route target or via draftStops).
     const effectiveSelectedPointId =
-        nearbyPoints.find((p) => p.id === selectedPointId)?.id ?? "";
+        selectedPointId &&
+        (nearbyPoints.some((p) => p.id === selectedPointId) ||
+            selectedPointId === routeTargetId ||
+            draftStops.some((s) => s.id.replace(/-draft-stop(?:-\d+)?$/, '') === selectedPointId))
+            ? selectedPointId
+            : "";
     const selectedPointFallback = effectiveSelectedPointId
         ? (nearbyPoints.find((p) => p.id === effectiveSelectedPointId) ?? null)
         : null;
@@ -394,10 +403,7 @@ export function HomePage() {
     const [isPlaceLeaving, setIsPlaceLeaving] = useState(false);
     const placeLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const effectiveRouteTargetId =
-        routeTargetId && nearbyPoints.some((p) => p.id === routeTargetId)
-            ? routeTargetId
-            : null;
+    const effectiveRouteTargetId = routeTargetId;
     const visibleRoutes = useMemo(
         () =>
             excursions.filter((e) => {
@@ -1101,6 +1107,8 @@ export function HomePage() {
                     showDirectRouteInPopup={true}
                     showPopupRouteActions={false}
                     userPosition={effectiveUserPosition}
+                    isManualUserPosition={isOverrideActive}
+                    isRadiusLocked={isRadiusLocked}
                 />
                 {/* Geolocation banner: shown only when the sheet is collapsed
                     (closed/peek). Hides on user dismiss; re-appears if the
@@ -1151,7 +1159,7 @@ export function HomePage() {
                     <div className="home-sheet__handle" />
                     <button
                         aria-label={overrideMode !== 'off' ? "Вернуться к реальной геопозиции" : "Установить собственное местоположение"}
-                        className={`home-sheet__profile${overrideMode !== 'off' ? ' home-sheet__profile--active' : ''}`}
+                        className={`home-sheet__profile${overrideMode !== 'off' ? ' home-sheet__profile--active' : geolocationError && geolocationError !== dismissedGeoError && (sheetState === 'closed' || sheetState === 'peek') ? ' home-sheet__profile--geo-error' : ''}`}
                         onClick={handleToggleOverride}
                         onPointerDown={(e) => e.stopPropagation()}
                         title={isOverrideActive ? "Нажмите ещё раз чтобы вернуться к реальной геопозиции" : "Нажмите, а затем кликните на карту чтобы установить своё местоположение"}
@@ -1176,6 +1184,26 @@ export function HomePage() {
                                 fill="currentColor"
                             />
                         </svg>
+                    </button>
+
+                    <button
+                        aria-label={isRadiusLocked ? "Разблокировать радиус" : "Зафиксировать радиус карты"}
+                        className={`home-sheet__lock${isRadiusLocked ? ' home-sheet__lock--active' : ''}`}
+                        onClick={toggleRadiusLock}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        title={isRadiusLocked ? "Радиус зафиксирован — нажмите чтобы разблокировать" : "Нажмите чтобы зафиксировать радиус при зуме"}
+                        type="button">
+                        {isRadiusLocked ? (
+                            <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                                <rect height="11" rx="2" stroke="currentColor" strokeWidth="2.2" width="18" x="3" y="11" />
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" />
+                            </svg>
+                        ) : (
+                            <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                                <rect height="11" rx="2" stroke="currentColor" strokeWidth="2.2" width="18" x="3" y="11" />
+                                <path d="M7 11V7a5 5 0 0 1 9.9-1" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" />
+                            </svg>
+                        )}
                     </button>
 
                     {/* Locate button lives inside drag area — always visible */}

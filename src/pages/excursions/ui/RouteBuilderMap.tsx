@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import * as L from 'leaflet'
 
 import type { GeoPoint, NearbyPoint } from '@/entities/excursion/model/types'
@@ -127,6 +127,8 @@ interface RouteBuilderMapProps {
   routeState: PlannerRouteState
   selectedPointId: string
   userPosition: GeoPoint | null
+  isManualUserPosition?: boolean
+  isRadiusLocked?: boolean
 }
 
 export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMapProps>(function RouteBuilderMap({
@@ -148,6 +150,8 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
   routeState,
   selectedPointId,
   userPosition,
+  isManualUserPosition = false,
+  isRadiusLocked = false,
 }: RouteBuilderMapProps, ref) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
@@ -167,8 +171,32 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
   const prevSelectedClusterKeyRef = useRef<string | null>(null)
   const prevUserPositionRef = useRef<GeoPoint | null>(null)
   const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isRadiusLockedRef = useRef(isRadiusLocked)
+  isRadiusLockedRef.current = isRadiusLocked
+  const pointCacheRef = useRef<Map<string, NearbyPoint>>(new Map())
   const initialCenterRef = useRef(initialCenter ?? userPosition ?? appMapConfig.defaultCenter)
   const [clusterVersion, setClusterVersion] = useState(0)
+
+  // Update cache during render so the useMemo below reads current data
+  for (const p of nearbyPoints) {
+    pointCacheRef.current.set(p.id, p)
+  }
+
+  // Effective points: API nearbyPoints + draft stops that have left the radius.
+  // Used by ALL effects (markers, clustering, selection) so pinned markers stay
+  // visible and their dm--visible-in-cluster class is managed correctly.
+  const effectiveNearbyPoints = useMemo(() => {
+    const nearbyIds = new Set(nearbyPoints.map((p) => p.id))
+    const extras: NearbyPoint[] = []
+    draftPointOrders.forEach((_, pointId) => {
+      if (!nearbyIds.has(pointId)) {
+        const cached = pointCacheRef.current.get(pointId)
+        if (cached) extras.push(cached)
+      }
+    })
+    return extras.length > 0 ? [...nearbyPoints, ...extras] : nearbyPoints
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nearbyPoints, draftPointOrders])
 
   useImperativeHandle(ref, () => ({
     closePopup: () => { mapRef.current?.closePopup() },
@@ -230,7 +258,9 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
         }
 
         zoomDebounceRef.current = setTimeout(() => {
-          onChangeRadiusRef.current(getDiscoveryRadiusForZoom(map.getZoom()))
+          if (!isRadiusLockedRef.current) {
+            onChangeRadiusRef.current(getDiscoveryRadiusForZoom(map.getZoom()))
+          }
         }, 200)
         setClusterVersion((v) => v + 1)
       })
@@ -357,12 +387,12 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
     layer.clearLayers()
     if (userPosition) {
       L.marker([userPosition.lat, userPosition.lng], {
-        icon: createUserIcon(),
+        icon: createUserIcon(isManualUserPosition),
         title: 'Ваше местоположение',
         zIndexOffset: 1000,
       }).addTo(layer)
     }
-  }, [userPosition])
+  }, [isManualUserPosition, userPosition])
 
   useEffect(() => {
     const circle = radiusCircleRef.current
@@ -399,7 +429,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
     const layer = markersLayerRef.current
     if (!layer) return
 
-    const newIds = new Set(nearbyPoints.map((p) => p.id))
+    const newIds = new Set(effectiveNearbyPoints.map((p) => p.id))
 
     // Remove markers no longer present
     markerRefsMap.current.forEach((marker, id) => {
@@ -410,7 +440,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
       }
     })
 
-    nearbyPoints.forEach((point) => {
+    effectiveNearbyPoints.forEach((point) => {
       const draftOrder = draftPointOrders.get(point.id) ?? null
       const isSelected = point.id === selectedPointIdRef.current
 
@@ -480,7 +510,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
       markerRefsMap.current.set(point.id, marker)
       markerIconStateRef.current.set(point.id, { selected: isSelected, draftOrder })
     })
-  }, [draftPointOrders, nearbyPoints])
+  }, [draftPointOrders, effectiveNearbyPoints])
 
   // Marker clustering — diff-based: reuse existing L.Marker instances for
   // unchanged clusters so the cluster-pop animation only fires when clusters
@@ -495,11 +525,11 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
 
     const CLUSTER_RADIUS_PX = 40
     const R2 = CLUSTER_RADIUS_PX * CLUSTER_RADIUS_PX
-    const n = nearbyPoints.length
+    const n = effectiveNearbyPoints.length
     const pxX = new Float64Array(n)
     const pxY = new Float64Array(n)
     for (let k = 0; k < n; k++) {
-      const p = nearbyPoints[k]
+      const p = effectiveNearbyPoints[k]
       const px = map.latLngToContainerPoint([p.coordinates.lat, p.coordinates.lng])
       pxX[k] = px.x
       pxY[k] = px.y
@@ -509,7 +539,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
     const rawClusters: Array<{ ids: string[]; lat: number; lng: number }> = []
 
     for (let i = 0; i < n; i++) {
-      const point = nearbyPoints[i]
+      const point = effectiveNearbyPoints[i]
       if (visited.has(point.id)) continue
       visited.add(point.id)
 
@@ -520,7 +550,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
       let sumLng = point.coordinates.lng
 
       for (let j = i + 1; j < n; j++) {
-        const other = nearbyPoints[j]
+        const other = effectiveNearbyPoints[j]
         if (visited.has(other.id)) continue
         const dx = cx - pxX[j]
         const dy = cy - pxY[j]
@@ -584,7 +614,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
             .on('click', () => {
               const bounds = L.latLngBounds(
                 cluster.ids.map((id) => {
-                  const p = nearbyPoints.find((pt) => pt.id === id)!
+                  const p = effectiveNearbyPoints.find((pt) => pt.id === id)!
                   return [p.coordinates.lat, p.coordinates.lng] as [number, number]
                 }),
               )
@@ -607,7 +637,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
 
     clusterMarkersRef.current = nextClusterMap
     clustersRef.current = nextClusters
-  }, [clusterVersion, nearbyPoints])
+  }, [clusterVersion, effectiveNearbyPoints])
 
   // Selection-in-cluster: when the selected point is inside a multi-point cluster,
   // replace the cluster count with its category icon via direct DOM update.
@@ -640,7 +670,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
     const marker = clusterMarkers.get(selectedCluster.key)
     if (!marker) return
 
-    const selectedPoint = nearbyPoints.find((p) => p.id === selectedPointId)
+    const selectedPoint = effectiveNearbyPoints.find((p) => p.id === selectedPointId)
     if (!selectedPoint) return
 
     const el = marker.getElement()
@@ -649,22 +679,24 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
       inner.innerHTML = getPointCategoryIcon(selectedPoint.category)
       prevSelectedClusterKeyRef.current = selectedCluster.key
     }
-  }, [selectedPointId, clusterVersion, nearbyPoints])
+  }, [selectedPointId, clusterVersion, effectiveNearbyPoints])
 
   // Update marker icons when selection changes (without touching nearbyPoints).
+  // Iterates markerRefsMap so pinned markers (draft stops outside radius) are
+  // also updated — they exist in the map but may not be in nearbyPoints.
   useEffect(() => {
-    nearbyPoints.forEach((point) => {
-      const marker = markerRefsMap.current.get(point.id)
-      if (!marker) return
-      const draftOrder = draftPointOrders.get(point.id) ?? null
-      const isSelected = point.id === selectedPointId
-      const prev = markerIconStateRef.current.get(point.id)
+    markerRefsMap.current.forEach((marker, id) => {
+      const point = pointCacheRef.current.get(id)
+      if (!point) return
+      const draftOrder = draftPointOrders.get(id) ?? null
+      const isSelected = id === selectedPointId
+      const prev = markerIconStateRef.current.get(id)
       if (prev && prev.selected === isSelected && prev.draftOrder === draftOrder) return
       marker.setIcon(createPoiIcon(point, isSelected, draftOrder))
-      markerIconStateRef.current.set(point.id, { selected: isSelected, draftOrder })
+      markerIconStateRef.current.set(id, { selected: isSelected, draftOrder })
       if (containerRef.current?.classList.contains('dm--clustering')) {
         const isInMultiCluster = clustersRef.current.some(
-          (c) => c.ids.length > 1 && c.ids.includes(point.id),
+          (c) => c.ids.length > 1 && c.ids.includes(id),
         )
         if (!isInMultiCluster) {
           const el = marker.getElement()
@@ -672,7 +704,7 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
         }
       }
     })
-  }, [draftPointOrders, nearbyPoints, selectedPointId])
+  }, [draftPointOrders, effectiveNearbyPoints, selectedPointId])
 
   useEffect(() => {
     if (!recenterKey || !userPosition || !mapRef.current) return

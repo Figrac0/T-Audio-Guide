@@ -31,6 +31,7 @@ import {
 import { buildPlacePlaceholderImage, buildRoutePlaceholderImage } from '@/shared/lib/placeholder-images'
 import { useAnimatedItems } from '@/shared/lib/useAnimatedItems'
 import { useManualPosition } from '@/shared/lib/ManualPositionContext'
+import { useRadiusLock } from '@/shared/lib/useRadiusLock'
 import { FooterFeatureIcon } from '@/shared/ui/FooterFeatureIcon'
 import { ResilientImage } from '@/shared/ui/ResilientImage'
 import { SmartPlaceImage } from '@/shared/ui/SmartPlaceImage'
@@ -83,6 +84,7 @@ function getSheetTranslateY(el: HTMLElement): number {
 
 export function ExcursionsPage() {
   const { isOverrideActive, manualPosition, mode: overrideMode, setManualPosition, toggleOverride } = useManualPosition()
+  const { isLocked: isRadiusLocked, toggle: toggleRadiusLock } = useRadiusLock()
   const effectiveUserPosition = isOverrideActive ? manualPosition : null
   const state = useExcursionsPageState(effectiveUserPosition, effectiveUserPosition)
   const [showAll, setShowAll] = useState(false)
@@ -744,6 +746,7 @@ export function ExcursionsPage() {
           isDraftFull={isDraftAtLimit}
           isLoading={state.isLoading || !state.canLoadNearbyPlaces}
           isMapLocked={overrideMode === 'waiting'}
+          isRadiusLocked={isRadiusLocked}
           nearbyPoints={state.nearbyPoints}
           onAddPoint={state.handleAddPoint}
           onChangeRadius={state.setRadiusMeters}
@@ -757,6 +760,7 @@ export function ExcursionsPage() {
           routeState={state.routeState}
           selectedPointId={state.selectedPointId}
           userPosition={finalEffectiveUserPosition}
+          isManualUserPosition={isOverrideActive}
         />
       </div>
 
@@ -817,6 +821,26 @@ export function ExcursionsPage() {
                 <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
                 <circle cx="12" cy="12" r="3" fill="currentColor" />
               </svg>
+            </button>
+            <button
+              aria-label={isRadiusLocked ? "Разблокировать радиус" : "Зафиксировать радиус карты"}
+              className={`ep-sheet__lock${isRadiusLocked ? ' ep-sheet__lock--active' : ''}`}
+              onClick={toggleRadiusLock}
+              onPointerDown={(e) => e.stopPropagation()}
+              title={isRadiusLocked ? "Радиус зафиксирован — нажмите чтобы разблокировать" : "Нажмите чтобы зафиксировать радиус при зуме"}
+              type="button"
+            >
+              {isRadiusLocked ? (
+                <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                  <rect height="11" rx="2" stroke="currentColor" strokeWidth="2.2" width="18" x="3" y="11" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" />
+                </svg>
+              ) : (
+                <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                  <rect height="11" rx="2" stroke="currentColor" strokeWidth="2.2" width="18" x="3" y="11" />
+                  <path d="M7 11V7a5 5 0 0 1 9.9-1" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" />
+                </svg>
+              )}
             </button>
             <button
               aria-label="Найти моё местоположение"

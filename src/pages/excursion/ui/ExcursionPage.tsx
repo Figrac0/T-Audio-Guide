@@ -831,6 +831,7 @@ function NavigationPhase({
       <div className="ep-nav__map">
         <RouteMap
           isMapLocked={overrideMode === 'waiting'}
+          isManualUserPosition={isOverrideActive}
           onLocateUser={requestLocation}
           onMapClick={handleNavMapClick}
           onSelect={handleNavMarkerSelect}

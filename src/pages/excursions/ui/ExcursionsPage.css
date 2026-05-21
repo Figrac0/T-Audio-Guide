@@ -250,6 +250,46 @@ body.app-body--routes-page {
     border-color: var(--color-brand);
 }
 
+/* Radius-lock button — sits immediately right of the geo-override button */
+.ep-sheet__lock {
+    position: absolute;
+    top: 50%;
+    left: 60px; /* 12px profile-left + 34px profile-width + 14px gap */
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid rgba(216, 220, 229, 0.8);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.96);
+    color: var(--color-text-secondary);
+    box-shadow: 0 4px 12px rgba(31, 37, 51, 0.1);
+    transition:
+        background 0.16s ease,
+        border-color 0.16s ease,
+        color 0.16s ease,
+        box-shadow 0.16s ease,
+        transform 0.16s ease;
+}
+
+.ep-sheet__lock:hover {
+    box-shadow: 0 6px 16px rgba(31, 37, 51, 0.14);
+    transform: translateY(calc(-50% - 1px));
+}
+
+.ep-sheet__lock:active {
+    transform: translateY(-50%) scale(0.92);
+}
+
+.ep-sheet__lock--active {
+    background: rgba(31, 138, 112, 0.1);
+    border-color: rgba(31, 138, 112, 0.5);
+    color: #1f8a70;
+    box-shadow: 0 4px 12px rgba(31, 138, 112, 0.14);
+}
+
 .ep-sheet__profile:disabled,
 .ep-sheet__locate:disabled {
     opacity: 0.42;
@@ -1827,6 +1867,10 @@ body.app-body--routes-page {
 
     .ep-sheet__profile {
         left: calc(50% - 92px);
+    }
+
+    .ep-sheet__lock {
+        left: calc(50% - 44px); /* profile-left + 34px + 14px */
     }
 
     .ep-sheet__locate {

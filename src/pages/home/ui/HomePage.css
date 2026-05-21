@@ -34,17 +34,19 @@ body.app-body--home-page {
     position: absolute;
     z-index: 6;
     bottom: 72px;
-    left: 12px;
-    right: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: calc(100% - 48px);
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 12px;
-    border: 1px solid rgba(212, 70, 70, 0.35);
+    padding: 10px 14px;
+    border: 1px solid rgba(212, 70, 70, 0.32);
     border-radius: 14px;
     background: #fff1f1;
     color: #b03434;
-    font-size: 0.85rem;
+    font-size: 0.84rem;
     font-weight: 600;
     line-height: 1.35;
     box-shadow: 0 8px 20px rgba(31, 37, 51, 0.12);
@@ -54,6 +56,13 @@ body.app-body--home-page {
 .home-geo-banner__text {
     flex: 1;
     min-width: 0;
+    white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+    .home-geo-banner__text {
+        white-space: normal;
+    }
 }
 
 .home-geo-banner__close {
@@ -82,11 +91,33 @@ body.app-body--home-page {
 @keyframes home-geo-banner-enter {
     from {
         opacity: 0;
-        transform: translateY(8px);
+        transform: translateX(-50%) translateY(8px);
     }
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.home-sheet__profile--geo-error {
+    background: rgba(176, 52, 52, 0.1);
+    border-color: rgba(176, 52, 52, 0.28);
+    color: #b03434;
+    animation: home-profile-geo-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes home-profile-geo-pulse {
+    0%, 100% {
+        box-shadow: 0 2px 8px rgba(31, 37, 51, 0.08), 0 0 0 0 rgba(176, 52, 52, 0.32);
+    }
+    50% {
+        box-shadow: 0 2px 8px rgba(31, 37, 51, 0.08), 0 0 0 8px rgba(176, 52, 52, 0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .home-sheet__profile--geo-error {
+        animation: none;
     }
 }
 
@@ -210,6 +241,46 @@ body.app-body--home-page {
     background: var(--color-brand);
     color: white;
     border-color: var(--color-brand);
+}
+
+/* Radius-lock button — sits immediately right of the geo-override button */
+.home-sheet__lock {
+    position: absolute;
+    top: 50%;
+    left: 60px; /* 12px profile-left + 34px profile-width + 14px gap */
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid rgba(216, 220, 229, 0.8);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.96);
+    color: var(--color-text-secondary);
+    box-shadow: 0 4px 12px rgba(31, 37, 51, 0.1);
+    transition:
+        background 0.16s ease,
+        border-color 0.16s ease,
+        color 0.16s ease,
+        box-shadow 0.16s ease,
+        transform 0.16s ease;
+}
+
+.home-sheet__lock:hover {
+    box-shadow: 0 6px 16px rgba(31, 37, 51, 0.14);
+    transform: translateY(calc(-50% - 1px));
+}
+
+.home-sheet__lock:active {
+    transform: translateY(-50%) scale(0.91);
+}
+
+.home-sheet__lock--active {
+    background: rgba(31, 138, 112, 0.1);
+    border-color: rgba(31, 138, 112, 0.5);
+    color: #1f8a70;
+    box-shadow: 0 4px 12px rgba(31, 138, 112, 0.14);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -1122,6 +1193,10 @@ body.app-body--home-page {
 
     .home-sheet__profile {
         left: calc(50% - 92px);
+    }
+
+    .home-sheet__lock {
+        left: calc(50% - 44px); /* profile-left + 34px + 14px */
     }
 
     .home-sheet__locate {
