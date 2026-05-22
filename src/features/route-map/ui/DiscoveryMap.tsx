@@ -83,6 +83,7 @@ interface DiscoveryMapProps {
   radiusOptions?: DiscoveryRadiusOption[]
   recenterTrigger?: number
   routeTargetId: string | null
+  searchFlyTo?: { lat: number; lng: number; zoom: number; seq: number }
   searchQuery?: string
   selectedPointId: string
   showDirectRouteInPopup?: boolean
@@ -147,6 +148,7 @@ export function DiscoveryMap({
   radiusOptions = [],
   recenterTrigger = 0,
   routeTargetId,
+  searchFlyTo,
   searchQuery = '',
   selectedPointId,
   showDirectRouteInPopup = false,
@@ -1178,6 +1180,16 @@ export function DiscoveryMap({
       easing: 'ease-in-out',
     })
   }, [recenterTrigger, userPosition])
+
+  // Fly to address search result
+  useEffect(() => {
+    if (!searchFlyTo?.seq) return
+    mapRef.current?.flyTo([searchFlyTo.lat, searchFlyTo.lng], searchFlyTo.zoom, {
+      animate: true,
+      duration: 1.2,
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchFlyTo?.seq])
 
   function focusOnUser() {
     const map = mapRef.current

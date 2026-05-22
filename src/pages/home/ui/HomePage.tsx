@@ -46,6 +46,7 @@ import { CATEGORY_SVG, getCategorySvg } from "@/shared/lib/category-icon-svg";
 import { SmartPlaceImage } from "@/shared/ui/SmartPlaceImage";
 import { FooterFeatureIcon } from "@/shared/ui/FooterFeatureIcon";
 import { ExcursionCatalog } from "@/widgets/excursion-catalog/ui/ExcursionCatalog";
+import { MapSearchBar } from "@/shared/ui/MapSearchBar";
 import "./HomePage.css";
 
 const CLOSED_HEIGHT = 52; // drag handle bar only
@@ -219,6 +220,8 @@ export function HomePage() {
         "success" | "warning"
     >("success");
     const [recenterTrigger, setRecenterTrigger] = useState(0);
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [searchFlyTo, setSearchFlyTo] = useState<{ lat: number; lng: number; zoom: number; seq: number } | undefined>();
 
     // Tracks the last dismissed geolocation error string. The banner re-appears
     // if a different error arrives, but stays dismissed for the current one.
@@ -553,6 +556,15 @@ export function HomePage() {
         setRecenterTrigger((n) => n + 1);
     }, [effectiveUserPosition, requestLocation]);
 
+    const handleSearchOpen = useCallback(() => {
+        setIsSearchOpen(true);
+        setSheetState('closed');
+    }, []);
+
+    const handleSearchResult = useCallback((lat: number, lng: number, zoom: number) => {
+        setSearchFlyTo({ lat, lng, zoom, seq: Date.now() });
+    }, []);
+
     const handleNearbyCardClick = useCallback((pointId: string) => {
         selectionFromMapRef.current = false;
         const isDeselecting = selectedPointIdRef.current === pointId;
@@ -676,6 +688,7 @@ export function HomePage() {
     useEffect(() => {
         if (sheetState !== "closed") {
             window.dispatchEvent(new CustomEvent("app-sheet-open"));
+            setIsSearchOpen(false);
         }
     }, [sheetState]);
     const dragRef = useRef({
@@ -1103,6 +1116,7 @@ export function HomePage() {
                     radiusMeters={radiusMeters}
                     recenterTrigger={recenterTrigger}
                     routeTargetId={effectiveRouteTargetId}
+                    searchFlyTo={searchFlyTo}
                     selectedPointId={effectiveSelectedPointId}
                     showDirectRouteInPopup={true}
                     showPopupRouteActions={false}
@@ -1132,6 +1146,12 @@ export function HomePage() {
                 ) : null}
             </div>
 
+            <MapSearchBar
+                isOpen={isSearchOpen}
+                onClose={() => setIsSearchOpen(false)}
+                onResult={handleSearchResult}
+            />
+
             <div className="home-sheet" ref={sheetRef}>
                 {/* Drag handle — the only thing visible in peek state */}
                 <div
@@ -1156,83 +1176,68 @@ export function HomePage() {
                     onPointerUp={handleDragEnd}
                     role="button"
                     tabIndex={0}>
+                    {/* Left group: geo-override + radius-lock */}
+                    <div className="home-sheet__btn-group">
+                        <button
+                            aria-label={overrideMode !== 'off' ? "Вернуться к реальной геопозиции" : "Установить собственное местоположение"}
+                            className={`home-sheet__profile${overrideMode !== 'off' ? ' home-sheet__profile--active' : geolocationError && geolocationError !== dismissedGeoError && (sheetState === 'closed' || sheetState === 'peek') ? ' home-sheet__profile--geo-error' : ''}`}
+                            onClick={handleToggleOverride}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            title={isOverrideActive ? "Нажмите ещё раз чтобы вернуться к реальной геопозиции" : "Нажмите, а затем кликните на карту чтобы установить своё местоположение"}
+                            type="button">
+                            <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16">
+                                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+                                <circle cx="12" cy="12" r="3" fill="currentColor" />
+                            </svg>
+                        </button>
+                        <button
+                            aria-label={isRadiusLocked ? "Разблокировать радиус" : "Зафиксировать радиус карты"}
+                            className={`home-sheet__lock${isRadiusLocked ? ' home-sheet__lock--active' : ''}`}
+                            onClick={toggleRadiusLock}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            title={isRadiusLocked ? "Радиус зафиксирован — нажмите чтобы разблокировать" : "Нажмите чтобы зафиксировать радиус при зуме"}
+                            type="button">
+                            {isRadiusLocked ? (
+                                <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                                    <rect height="11" rx="2" stroke="currentColor" strokeWidth="2.2" width="18" x="3" y="11" />
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" />
+                                </svg>
+                            ) : (
+                                <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                                    <rect height="11" rx="2" stroke="currentColor" strokeWidth="2.2" width="18" x="3" y="11" />
+                                    <path d="M7 11V7a5 5 0 0 1 9.9-1" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" />
+                                </svg>
+                            )}
+                        </button>
+                    </div>
+
                     <div className="home-sheet__handle" />
-                    <button
-                        aria-label={overrideMode !== 'off' ? "Вернуться к реальной геопозиции" : "Установить собственное местоположение"}
-                        className={`home-sheet__profile${overrideMode !== 'off' ? ' home-sheet__profile--active' : geolocationError && geolocationError !== dismissedGeoError && (sheetState === 'closed' || sheetState === 'peek') ? ' home-sheet__profile--geo-error' : ''}`}
-                        onClick={handleToggleOverride}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        title={isOverrideActive ? "Нажмите ещё раз чтобы вернуться к реальной геопозиции" : "Нажмите, а затем кликните на карту чтобы установить своё местоположение"}
-                        type="button">
-                        <svg
-                            aria-hidden="true"
-                            fill="none"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            width="16">
-                            <circle
-                                cx="12"
-                                cy="12"
-                                r="9"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                            />
-                            <circle
-                                cx="12"
-                                cy="12"
-                                r="3"
-                                fill="currentColor"
-                            />
-                        </svg>
-                    </button>
 
-                    <button
-                        aria-label={isRadiusLocked ? "Разблокировать радиус" : "Зафиксировать радиус карты"}
-                        className={`home-sheet__lock${isRadiusLocked ? ' home-sheet__lock--active' : ''}`}
-                        onClick={toggleRadiusLock}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        title={isRadiusLocked ? "Радиус зафиксирован — нажмите чтобы разблокировать" : "Нажмите чтобы зафиксировать радиус при зуме"}
-                        type="button">
-                        {isRadiusLocked ? (
-                            <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
-                                <rect height="11" rx="2" stroke="currentColor" strokeWidth="2.2" width="18" x="3" y="11" />
-                                <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" />
+                    {/* Right group: search + locate */}
+                    <div className="home-sheet__btn-group">
+                        <button
+                            aria-label={isSearchOpen ? "Закрыть поиск" : "Поиск адреса или города на карте"}
+                            className="home-sheet__search"
+                            onClick={() => isSearchOpen ? setIsSearchOpen(false) : handleSearchOpen()}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            type="button">
+                            <svg fill="none" height="15" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" width="15">
+                                <circle cx="11" cy="11" r="8" />
+                                <path d="m21 21-4.35-4.35" />
                             </svg>
-                        ) : (
-                            <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
-                                <rect height="11" rx="2" stroke="currentColor" strokeWidth="2.2" width="18" x="3" y="11" />
-                                <path d="M7 11V7a5 5 0 0 1 9.9-1" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" />
+                        </button>
+                        <button
+                            aria-label="Найти моё местоположение"
+                            className="home-sheet__locate"
+                            onClick={handleCenterUser}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            type="button">
+                            <svg fill="none" height="16" viewBox="0 0 24 24" width="16">
+                                <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="2" />
+                                <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
                             </svg>
-                        )}
-                    </button>
-
-                    {/* Locate button lives inside drag area — always visible */}
-                    <button
-                        aria-label="Найти моё местоположение"
-                        className="home-sheet__locate"
-                        onClick={handleCenterUser}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        type="button">
-                        <svg
-                            fill="none"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            width="16">
-                            <circle
-                                cx="12"
-                                cy="12"
-                                r="3.5"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                            />
-                            <path
-                                d="M12 2v3M12 19v3M2 12h3M19 12h3"
-                                stroke="currentColor"
-                                strokeLinecap="round"
-                                strokeWidth="2"
-                            />
-                        </svg>
-                    </button>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Scrollable content */}

@@ -192,9 +192,23 @@ body.app-body--routes-page {
     position: relative;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
+    padding: 0 16px;
     height: 52px;
     flex-shrink: 0;
+}
+
+/* On wider screens: collapse the gap so groups sit close to the handle */
+@media (min-width: 768px) {
+    .ep-sheet__bar-row {
+        justify-content: center;
+        gap: 32px;
+        padding: 0;
+    }
+
+    .ep-sheet__btn-group {
+        gap: 12px;
+    }
 }
 
 .ep-sheet__handle {
@@ -204,83 +218,61 @@ body.app-body--routes-page {
     background: rgba(31, 37, 51, 0.18);
 }
 
+/* Button groups — flex clusters on each side of the handle */
+.ep-sheet__btn-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* All fab buttons: shared base, now in-flow (not absolute) */
 .ep-sheet__profile,
+.ep-sheet__lock,
+.ep-sheet__search,
 .ep-sheet__locate {
-    position: absolute;
-    top: 50%;
     display: inline-flex;
-    width: 34px;
-    height: 34px;
     align-items: center;
     justify-content: center;
-    transform: translateY(-50%);
+    width: 34px;
+    height: 34px;
     border: 1px solid rgba(216, 220, 229, 0.8);
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.96);
     box-shadow: 0 4px 12px rgba(31, 37, 51, 0.1);
-    color: var(--color-brand);
     transition:
         box-shadow 0.16s ease,
-        transform 0.16s ease;
+        transform 0.16s ease,
+        background 0.16s ease,
+        border-color 0.16s ease,
+        color 0.16s ease;
 }
 
-.ep-sheet__profile {
-    left: 12px;
-    text-decoration: none;
-}
-
-.ep-sheet__locate {
-    right: 12px;
-}
+.ep-sheet__profile { color: var(--color-brand); text-decoration: none; }
+.ep-sheet__locate  { color: var(--color-brand); }
+.ep-sheet__lock    { color: var(--color-text-secondary); }
+.ep-sheet__search  { color: var(--color-text-secondary); }
 
 .ep-sheet__profile:hover,
+.ep-sheet__lock:hover,
+.ep-sheet__search:hover,
 .ep-sheet__locate:hover {
     box-shadow: 0 6px 16px rgba(31, 37, 51, 0.14);
-    transform: translateY(calc(-50% - 1px));
+    transform: translateY(-1px);
 }
 
+.ep-sheet__search:hover { color: var(--color-brand); }
+
 .ep-sheet__profile:active,
+.ep-sheet__lock:active,
+.ep-sheet__search:active,
 .ep-sheet__locate:active {
-    transform: translateY(-50%) scale(0.92);
+    transform: scale(0.92);
 }
 
 .ep-sheet__profile--active {
     background: var(--color-brand);
     color: white;
     border-color: var(--color-brand);
-}
-
-/* Radius-lock button — sits immediately right of the geo-override button */
-.ep-sheet__lock {
-    position: absolute;
-    top: 50%;
-    left: 60px; /* 12px profile-left + 34px profile-width + 14px gap */
-    transform: translateY(-50%);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 34px;
-    border: 1px solid rgba(216, 220, 229, 0.8);
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.96);
-    color: var(--color-text-secondary);
-    box-shadow: 0 4px 12px rgba(31, 37, 51, 0.1);
-    transition:
-        background 0.16s ease,
-        border-color 0.16s ease,
-        color 0.16s ease,
-        box-shadow 0.16s ease,
-        transform 0.16s ease;
-}
-
-.ep-sheet__lock:hover {
-    box-shadow: 0 6px 16px rgba(31, 37, 51, 0.14);
-    transform: translateY(calc(-50% - 1px));
-}
-
-.ep-sheet__lock:active {
-    transform: translateY(-50%) scale(0.92);
 }
 
 .ep-sheet__lock--active {
@@ -291,6 +283,8 @@ body.app-body--routes-page {
 }
 
 .ep-sheet__profile:disabled,
+.ep-sheet__lock:disabled,
+.ep-sheet__search:disabled,
 .ep-sheet__locate:disabled {
     opacity: 0.42;
     cursor: not-allowed;

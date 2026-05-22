@@ -36,6 +36,7 @@ import { FooterFeatureIcon } from '@/shared/ui/FooterFeatureIcon'
 import { ResilientImage } from '@/shared/ui/ResilientImage'
 import { SmartPlaceImage } from '@/shared/ui/SmartPlaceImage'
 import { RouteBuilderMap, type RouteBuilderMapHandle } from './RouteBuilderMap'
+import { MapSearchBar } from '@/shared/ui/MapSearchBar'
 import './ExcursionsPage.css'
 
 const DRAG_MIN = 10
@@ -270,6 +271,7 @@ export function ExcursionsPage() {
   // ── Sheet state ─────────────────────────────────────────────────────────────
   const [sheetTranslate, setSheetTranslate] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
   const sheetRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const mapHandleRef = useRef<RouteBuilderMapHandle>(null)
@@ -518,8 +520,15 @@ export function ExcursionsPage() {
   }, [snapToClosed])
 
   useEffect(() => {
-    if (isFullyOpen) window.dispatchEvent(new CustomEvent('app-sheet-open'))
+    if (isFullyOpen) {
+      window.dispatchEvent(new CustomEvent('app-sheet-open'))
+      setIsSearchOpen(false)
+    }
   }, [isFullyOpen])
+
+  useEffect(() => {
+    if (sheetTranslate < closedTranslateRef.current - 8) setIsSearchOpen(false)
+  }, [sheetTranslate])
 
   useEffect(() => {
     handleCloseDetailRef.current = state.handleCloseDetail
@@ -788,6 +797,12 @@ export function ExcursionsPage() {
         </div>
       ) : null}
 
+      <MapSearchBar
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        onResult={(lat, lng, zoom) => mapHandleRef.current?.flyTo(lat, lng, zoom)}
+      />
+
       <div className="ep-sheet" ref={sheetRef}>
         {/* ── Drag handle bar ── */}
         <div
@@ -807,53 +822,80 @@ export function ExcursionsPage() {
           tabIndex={0}
         >
           <div className="ep-sheet__bar-row">
+            {/* Left group: geo-override + radius-lock */}
+            <div className="ep-sheet__btn-group">
+              <button
+                aria-label={overrideMode !== 'off' ? "Вернуться к реальной геопозиции" : "Установить собственное местоположение"}
+                className={`ep-sheet__profile${overrideMode !== 'off' ? ' ep-sheet__profile--active' : ''}`}
+                disabled={hasDraftStops}
+                onClick={handleToggleOverride}
+                onPointerDown={(e) => e.stopPropagation()}
+                title={hasDraftStops ? "Недоступно при наличии точек в маршруте" : (isOverrideActive ? "Нажмите ещё раз чтобы вернуться к реальной геопозиции" : "Нажмите, а затем кликните на карту чтобы установить своё местоположение")}
+                type="button"
+              >
+                <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16">
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+                  <circle cx="12" cy="12" r="3" fill="currentColor" />
+                </svg>
+              </button>
+              <button
+                aria-label={isRadiusLocked ? "Разблокировать радиус" : "Зафиксировать радиус карты"}
+                className={`ep-sheet__lock${isRadiusLocked ? ' ep-sheet__lock--active' : ''}`}
+                onClick={toggleRadiusLock}
+                onPointerDown={(e) => e.stopPropagation()}
+                title={isRadiusLocked ? "Радиус зафиксирован — нажмите чтобы разблокировать" : "Нажмите чтобы зафиксировать радиус при зуме"}
+                type="button"
+              >
+                {isRadiusLocked ? (
+                  <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                    <rect height="11" rx="2" stroke="currentColor" strokeWidth="2.2" width="18" x="3" y="11" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" />
+                  </svg>
+                ) : (
+                  <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                    <rect height="11" rx="2" stroke="currentColor" strokeWidth="2.2" width="18" x="3" y="11" />
+                    <path d="M7 11V7a5 5 0 0 1 9.9-1" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" />
+                  </svg>
+                )}
+              </button>
+            </div>
+
             <div className="ep-sheet__handle" />
-            <button
-              aria-label={overrideMode !== 'off' ? "Вернуться к реальной геопозиции" : "Установить собственное местоположение"}
-              className={`ep-sheet__profile${overrideMode !== 'off' ? ' ep-sheet__profile--active' : ''}`}
-              disabled={hasDraftStops}
-              onClick={handleToggleOverride}
-              onPointerDown={(e) => e.stopPropagation()}
-              title={hasDraftStops ? "Недоступно при наличии точек в маршруте" : (isOverrideActive ? "Нажмите ещё раз чтобы вернуться к реальной геопозиции" : "Нажмите, а затем кликните на карту чтобы установить своё местоположение")}
-              type="button"
-            >
-              <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16">
-                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
-                <circle cx="12" cy="12" r="3" fill="currentColor" />
-              </svg>
-            </button>
-            <button
-              aria-label={isRadiusLocked ? "Разблокировать радиус" : "Зафиксировать радиус карты"}
-              className={`ep-sheet__lock${isRadiusLocked ? ' ep-sheet__lock--active' : ''}`}
-              onClick={toggleRadiusLock}
-              onPointerDown={(e) => e.stopPropagation()}
-              title={isRadiusLocked ? "Радиус зафиксирован — нажмите чтобы разблокировать" : "Нажмите чтобы зафиксировать радиус при зуме"}
-              type="button"
-            >
-              {isRadiusLocked ? (
-                <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
-                  <rect height="11" rx="2" stroke="currentColor" strokeWidth="2.2" width="18" x="3" y="11" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" />
+
+            {/* Right group: search + locate */}
+            <div className="ep-sheet__btn-group">
+              <button
+                aria-label={isSearchOpen ? "Закрыть поиск" : "Поиск адреса или города на карте"}
+                className="ep-sheet__search"
+                onClick={() => {
+                  if (isSearchOpen) {
+                    setIsSearchOpen(false)
+                  } else {
+                    setIsSearchOpen(true)
+                    snapToClosed()
+                  }
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                type="button"
+              >
+                <svg fill="none" height="15" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" width="15">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.35-4.35" />
                 </svg>
-              ) : (
-                <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
-                  <rect height="11" rx="2" stroke="currentColor" strokeWidth="2.2" width="18" x="3" y="11" />
-                  <path d="M7 11V7a5 5 0 0 1 9.9-1" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" />
+              </button>
+              <button
+                aria-label="Найти моё местоположение"
+                className="ep-sheet__locate"
+                onClick={state.handleLocateUser}
+                onPointerDown={(e) => e.stopPropagation()}
+                type="button"
+              >
+                <svg fill="none" height="16" viewBox="0 0 24 24" width="16">
+                  <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="2" />
+                  <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
                 </svg>
-              )}
-            </button>
-            <button
-              aria-label="Найти моё местоположение"
-              className="ep-sheet__locate"
-              onClick={state.handleLocateUser}
-              onPointerDown={(e) => e.stopPropagation()}
-              type="button"
-            >
-              <svg fill="none" height="16" viewBox="0 0 24 24" width="16">
-                <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="2" />
-                <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-              </svg>
-            </button>
+              </button>
+            </div>
           </div>
 
           {/* Draft preview: visible only when sheet is at peek (partial) */}

@@ -1,0 +1,170 @@
+/* ── Search bar overlay (appears above the sheet drag handle) ── */
+
+.map-search {
+  position: absolute;
+  bottom: calc(52px + env(safe-area-inset-bottom, 0px) + 10px);
+  left: 50%;
+  width: min(480px, calc(100vw - 32px));
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-50%) translateY(10px);
+  transition:
+    opacity 0.2s ease,
+    transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.map-search--open {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: all;
+}
+
+/* ── Glass card ── */
+
+.map-search__box {
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(216, 220, 229, 0.8);
+  box-shadow:
+    0 16px 48px rgba(31, 37, 51, 0.18),
+    0 2px 8px rgba(31, 37, 51, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* ── Input row ── */
+
+.map-search__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 50px;
+  padding: 0 14px;
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(20px) saturate(1.3);
+}
+
+.map-search__box--has-results .map-search__row {
+  border-bottom: 1px solid rgba(31, 37, 51, 0.07);
+}
+
+.map-search__lens {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--color-brand);
+}
+
+.map-search__input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--color-text);
+  line-height: 1;
+}
+
+.map-search__input::placeholder {
+  color: var(--color-text-tertiary);
+  font-weight: 400;
+}
+
+.map-search__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(31, 37, 51, 0.09);
+  color: var(--color-text-secondary);
+  transition: background 0.14s ease;
+}
+
+.map-search__clear:hover {
+  background: rgba(31, 37, 51, 0.15);
+}
+
+.map-search__spinner {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(31, 138, 112, 0.2);
+  border-top-color: var(--color-brand);
+  border-radius: 50%;
+  animation: map-search-spin 0.65s linear infinite;
+}
+
+/* ── Results dropdown ── */
+
+.map-search__results {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(20px) saturate(1.3);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.map-search__result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.map-search__result + .map-search__result {
+  border-top: 1px solid rgba(31, 37, 51, 0.05);
+}
+
+.map-search__result:hover,
+.map-search__result:focus-visible {
+  background: rgba(31, 138, 112, 0.07);
+}
+
+.map-search__result-pin {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--color-brand);
+  opacity: 0.7;
+}
+
+.map-search__result-name {
+  font-size: 0.87rem;
+  font-weight: 500;
+  color: var(--color-text);
+  line-height: 1.35;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Spinner keyframe ── */
+
+@keyframes map-search-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Reduced motion ── */
+
+@media (prefers-reduced-motion: reduce) {
+  .map-search,
+  .map-search--open {
+    transition: opacity 0.15s ease;
+    transform: translateX(-50%);
+  }
+  .map-search__spinner {
+    animation: none;
+    border-top-color: var(--color-brand);
+  }
+}

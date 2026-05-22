@@ -173,7 +173,8 @@ body.app-body--home-page {
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
+    padding: 0 16px;
     height: 52px;
     z-index: 1;
     background: #ffffff;
@@ -183,6 +184,19 @@ body.app-body--home-page {
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
+}
+
+/* On wider screens: collapse the gap so groups sit close to the handle */
+@media (min-width: 768px) {
+    .home-sheet__drag {
+        justify-content: center;
+        gap: 40px;
+        padding: 0;
+    }
+
+    .home-sheet__btn-group {
+        gap: 16px;
+    }
 }
 
 .home-sheet__drag:active {
@@ -196,12 +210,18 @@ body.app-body--home-page {
     background: rgba(31, 37, 51, 0.18);
 }
 
-/* Locate / GPS button — always visible, inside the drag strip */
+/* Button groups — flex clusters on each side of the handle */
+.home-sheet__btn-group {
+    display: flex;
+    align-items: center;
+    gap: 30px;
+}
+
+/* All fab buttons: shared base, now in-flow (not absolute) */
 .home-sheet__profile,
+.home-sheet__lock,
+.home-sheet__search,
 .home-sheet__locate {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -210,70 +230,41 @@ body.app-body--home-page {
     border: 1px solid rgba(216, 220, 229, 0.8);
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.96);
-    color: var(--color-brand);
     box-shadow: 0 4px 12px rgba(31, 37, 51, 0.1);
     transition:
         box-shadow 0.16s ease,
-        transform 0.16s ease;
+        transform 0.16s ease,
+        background 0.16s ease,
+        border-color 0.16s ease,
+        color 0.16s ease;
 }
 
-.home-sheet__profile {
-    left: 12px;
-    text-decoration: none;
-}
-
-.home-sheet__locate {
-    right: 12px;
-}
+.home-sheet__profile { color: var(--color-brand); text-decoration: none; }
+.home-sheet__locate  { color: var(--color-brand); }
+.home-sheet__lock    { color: var(--color-text-secondary); }
+.home-sheet__search  { color: var(--color-text-secondary); }
 
 .home-sheet__profile:hover,
+.home-sheet__lock:hover,
+.home-sheet__search:hover,
 .home-sheet__locate:hover {
     box-shadow: 0 6px 16px rgba(31, 37, 51, 0.14);
-    transform: translateY(calc(-50% - 1px));
+    transform: translateY(-1px);
 }
 
+.home-sheet__search:hover { color: var(--color-brand); }
+
 .home-sheet__profile:active,
+.home-sheet__lock:active,
+.home-sheet__search:active,
 .home-sheet__locate:active {
-    transform: translateY(-50%) scale(0.91);
+    transform: scale(0.91);
 }
 
 .home-sheet__profile--active {
     background: var(--color-brand);
     color: white;
     border-color: var(--color-brand);
-}
-
-/* Radius-lock button — sits immediately right of the geo-override button */
-.home-sheet__lock {
-    position: absolute;
-    top: 50%;
-    left: 60px; /* 12px profile-left + 34px profile-width + 14px gap */
-    transform: translateY(-50%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 34px;
-    border: 1px solid rgba(216, 220, 229, 0.8);
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.96);
-    color: var(--color-text-secondary);
-    box-shadow: 0 4px 12px rgba(31, 37, 51, 0.1);
-    transition:
-        background 0.16s ease,
-        border-color 0.16s ease,
-        color 0.16s ease,
-        box-shadow 0.16s ease,
-        transform 0.16s ease;
-}
-
-.home-sheet__lock:hover {
-    box-shadow: 0 6px 16px rgba(31, 37, 51, 0.14);
-    transform: translateY(calc(-50% - 1px));
-}
-
-.home-sheet__lock:active {
-    transform: translateY(-50%) scale(0.91);
 }
 
 .home-sheet__lock--active {

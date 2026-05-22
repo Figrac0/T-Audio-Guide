@@ -106,6 +106,7 @@ function togglePopupAudio(audioUrl: string, button: HTMLButtonElement): void {
 
 export interface RouteBuilderMapHandle {
   closePopup: () => void
+  flyTo: (lat: number, lng: number, zoom: number) => void
 }
 
 interface RouteBuilderMapProps {
@@ -200,6 +201,9 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
 
   useImperativeHandle(ref, () => ({
     closePopup: () => { mapRef.current?.closePopup() },
+    flyTo: (lat, lng, zoom) => {
+      mapRef.current?.flyTo([lat, lng], zoom, { animate: true, duration: 1.2 })
+    },
   }), [])
 
   useEffect(() => {
