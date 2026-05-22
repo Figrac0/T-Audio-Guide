@@ -7,6 +7,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# JVM crash dumps (generated when Gradle daemon crashes)
+hs_err_pid*.log
+replay_pid*.log
+
 node_modules
 .claude
 dist
@@ -23,3 +27,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Android build artifacts
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/.idea/
+android/captures/
+android/app/release/

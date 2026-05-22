@@ -147,11 +147,11 @@ body.app-body--routes-page {
 .ep-sheet {
     position: absolute;
     right: 0;
-    bottom: 0;
+    bottom: env(safe-area-inset-bottom, 0px);
     left: 0;
     z-index: 5;
     display: flex;
-    height: calc(100% - 60px);
+    height: calc(100% - 60px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
     flex-direction: column;
     overflow: hidden;
     border-radius: 24px 24px 0 0;
@@ -2133,32 +2133,52 @@ body.app-body--routes-page {
     padding: 18px 16px 0;
 }
 
-.ep-detail__cover {
-    position: relative;
-    width: min(100%, 370px);
-    aspect-ratio: 1.22 / 1;
-    overflow: hidden;
-    border: 1px solid rgba(164, 198, 109, 0.24);
-    border-radius: 28px;
-    background:
-        linear-gradient(
-            135deg,
-            rgba(255, 225, 128, 0.16),
-            rgba(141, 207, 193, 0.12)
-        ),
-        var(--color-bg-soft);
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.72),
-        0 18px 40px rgba(31, 37, 51, 0.08);
-    flex-shrink: 0;
+.ep-detail__cover-img {
+    display: flex;
+    justify-content: center;
+    width: 100%;
 }
 
-.ep-detail__cover img {
-    display: block;
+.ep-detail__cover-img-inner {
+    position: relative;
+    width: fit-content;
+    max-width: 100%;
+    border-radius: 18px;
+    padding: 3px;
+}
+
+.ep-detail__cover-img-inner--fallback {
     width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center;
+}
+
+.ep-detail__cover-img-inner::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #1f8a70 0%, #a8e063 35%, #f5d020 65%, #1f8a70 100%);
+    background-size: 300% 300%;
+    animation: ep-detail-photo-shimmer 3s ease infinite;
+    z-index: 0;
+}
+
+.ep-detail__cover-img-inner img {
+    position: relative;
+    display: block;
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    max-height: 294px;
+    object-fit: contain;
+    border-radius: 15px;
+    background: #fff;
+    z-index: 1;
+}
+
+@keyframes ep-detail-photo-shimmer {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
 }
 
 .ep-detail__body {

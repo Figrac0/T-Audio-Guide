@@ -1426,13 +1426,15 @@ function PointDetailPanel({
     <div className="ep-detail">
       <div className="ep-detail__main">
       <div className="ep-detail__cover-shell">
-        <div className="ep-detail__cover">
-          <img
-            alt={point.title}
-            onError={(e) => { (e.target as HTMLImageElement).src = placeholder }}
-            src={point.imageUrl || placeholder}
-          />
-          <span className="ep-detail__cat">{getPointCategoryLabel(point)}</span>
+        <div className="ep-detail__cover-img">
+          <div className={`ep-detail__cover-img-inner${!point.imageUrl ? ' ep-detail__cover-img-inner--fallback' : ''}`}>
+            <img
+              alt={point.title}
+              onError={(e) => { (e.target as HTMLImageElement).src = placeholder }}
+              src={point.imageUrl || placeholder}
+            />
+            <span className="ep-detail__cat">{getPointCategoryLabel(point)}</span>
+          </div>
         </div>
       </div>
 

@@ -12,8 +12,6 @@ const config: CapacitorConfig = {
   },
   plugins: {
     StatusBar: {
-      // Translucent bar — content renders behind it; we push it down with
-      // env(safe-area-inset-top) in CSS.
       overlaysWebView: true,
       style: 'DARK',
       backgroundColor: '#00000000',
