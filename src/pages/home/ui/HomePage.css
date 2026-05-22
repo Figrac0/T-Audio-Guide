@@ -293,6 +293,8 @@ body.app-body--home-page {
     overflow-y: auto;
     overscroll-behavior: contain;
     transform: translateZ(0);
+    /* Keep content above the Android gesture nav bar when running as APK */
+    padding-bottom: env(safe-area-inset-bottom);
     -webkit-overflow-scrolling: touch;
     padding-bottom: env(safe-area-inset-bottom, 0px);
     scrollbar-width: thin;
@@ -1191,16 +1193,16 @@ body.app-body--home-page {
         border-radius: 28px 28px 0 0;
     }
 
-    .home-sheet__profile {
-        left: calc(50% - 92px);
+    .home-sheet__lock {
+        left: calc(50% - 124px);
     }
 
-    .home-sheet__lock {
-        left: calc(50% - 44px); /* profile-left + 34px + 14px */
+    .home-sheet__profile {
+        left: calc(50% - 76px);
     }
 
     .home-sheet__locate {
-        right: calc(50% - 92px);
+        right: calc(50% - 76px);
     }
 
     /* Center the excursions block heading and filters */

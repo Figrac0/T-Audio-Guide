@@ -6,6 +6,7 @@ import { AuthProvider } from "@/app/providers/AuthProvider";
 import { useAuth } from "@/app/providers/useAuth";
 import { ManualPositionProvider } from "@/shared/lib/ManualPositionContext";
 import { UserRoutesProvider } from "@/features/user-routes/model/UserRoutesProvider";
+import { isNative } from "@/shared/lib/platform";
 import { appRoutes } from "@/shared/config/routes";
 import "./App.css";
 
@@ -17,6 +18,15 @@ const NAV_LABELS = {
     profile: "\u041f\u0440\u043e\u0444\u0438\u043b\u044c",
     routes: "\u041c\u0430\u0440\u0448\u0440\u0443\u0442\u044b",
 };
+
+// Initialize native-only capabilities once, before first render.
+// Dynamic imports keep the StatusBar plugin out of the web bundle entirely.
+if (isNative) {
+    void import('@capacitor/status-bar').then(({ StatusBar, Style }) => {
+        void StatusBar.setOverlaysWebView({ overlay: true })
+        void StatusBar.setStyle({ style: Style.Dark })
+    })
+}
 
 function App() {
     return (

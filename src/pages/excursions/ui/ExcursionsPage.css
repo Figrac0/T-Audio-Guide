@@ -573,6 +573,8 @@ body.app-body--routes-page {
     flex-direction: column;
     min-height: 0;
     overflow-y: auto;
+    /* Keep content above the Android gesture nav bar when running as APK */
+    padding-bottom: env(safe-area-inset-bottom);
     overscroll-behavior: contain;
     transform: translateZ(0);
     -webkit-overflow-scrolling: touch;
@@ -1865,16 +1867,16 @@ body.app-body--routes-page {
         border-radius: 28px 28px 0 0;
     }
 
-    .ep-sheet__profile {
-        left: calc(50% - 92px);
+    .ep-sheet__lock {
+        left: calc(50% - 124px);
     }
 
-    .ep-sheet__lock {
-        left: calc(50% - 44px); /* profile-left + 34px + 14px */
+    .ep-sheet__profile {
+        left: calc(50% - 76px);
     }
 
     .ep-sheet__locate {
-        right: calc(50% - 92px);
+        right: calc(50% - 76px);
     }
 
     .ep-catalog__grid,

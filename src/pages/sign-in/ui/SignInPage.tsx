@@ -299,7 +299,7 @@ export function SignInPage() {
                     ) : mode === "reset" ? (
                         <p className="auth-page__reset-help">
                             Здравствуйте, если вы забыли или потеряли свои данные то напишите нам на почту{" "}
-                            <a href="mailto:TGuide@gmail.com">TGuide@gmail.com</a>{" "}
+                            <a href="mailto:taudioguide@gmail.com">TAudioGuide@gmail.com</a>{" "}
                             и мы поможем вернуть вам ваши данные.
                         </p>
                     ) : (

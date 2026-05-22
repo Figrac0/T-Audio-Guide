@@ -2,8 +2,8 @@
 
 .app-shell {
   min-height: 100vh;
-  /* Reserve space for the fixed header */
-  padding-top: 52px;
+  /* Reserve space for fixed header + Android status bar (env = 0 on web) */
+  padding-top: calc(52px + env(safe-area-inset-top));
 }
 
 /* ─── Header ─────────────────────────────────────────────────────────────── */
@@ -14,7 +14,9 @@
   left: 0;
   right: 0;
   z-index: 3000;
-  padding: 0 20px;
+  /* Push header below Android status bar when running as native APK.
+     env() resolves to 0 in the browser so this has no effect there. */
+  padding: env(safe-area-inset-top) 20px 0;
 }
 
 .app-header__inner {
@@ -55,6 +57,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* 52px is the visual bar height; safe-area-inset already handled by
+     the outer .app-header padding so we don't double-add it here. */
   min-height: 52px;
   padding: 0 16px;
 }
