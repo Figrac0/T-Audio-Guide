@@ -176,6 +176,7 @@ export function DiscoveryMap({
   const lastFittedRouteRef = useRef<string>('')
   const routeLayerRef = useRef<L.LayerGroup | null>(null)
   const clusterLayerRef = useRef<L.LayerGroup | null>(null)
+  const userLayerRef = useRef<L.LayerGroup | null>(null)
   const clusterMarkersRef = useRef<Map<string, L.Marker>>(new Map())
   const clustersRef = useRef<Array<{ ids: string[]; key: string; lat: number; lng: number }>>([])
   const prevSelectedClusterKeyRef = useRef<string | null>(null)
@@ -327,15 +328,18 @@ export function DiscoveryMap({
         initialCenterRef.current,
         appMapConfig.defaultZoom,
       )
-      // routeLayer (circle + polylines) rendered below markers layer
+      // Layer order matters: routeLayer (circle + polylines) → overlay (POI
+      // markers) → clusterLayer → userLayer (user position, always on top)
       const routeLayer = L.layerGroup().addTo(map)
       const overlay = L.layerGroup().addTo(map)
       const clusterLayer = L.layerGroup().addTo(map)
+      const userLayer = L.layerGroup().addTo(map)
 
       mapRef.current = map
       routeLayerRef.current = routeLayer
       overlayRef.current = overlay
       clusterLayerRef.current = clusterLayer
+      userLayerRef.current = userLayer
       clusterZoomRef.current = map.getZoom()
 
       map.on('popupclose', () => {
@@ -430,6 +434,8 @@ export function DiscoveryMap({
       clusterLayerRef.current = null
       overlayRef.current?.clearLayers()
       overlayRef.current = null
+      userLayerRef.current?.clearLayers()
+      userLayerRef.current = null
       markers.clear()
       mapRef.current?.remove()
       mapRef.current = null
@@ -685,14 +691,22 @@ export function DiscoveryMap({
     if (draftGeometry) {
       createSegmentedRoutePolyline(draftGeometry).addTo(routeLayer)
     }
+  }, [draftGeometry, guideGeometry, userPosition])
 
+  // User position marker — kept in its own layer (added last) so it always
+  // renders on top of POI markers and cluster bubbles.
+  useEffect(() => {
+    const layer = userLayerRef.current
+    if (!layer) return
+    layer.clearLayers()
     if (userPosition) {
       L.marker([userPosition.lat, userPosition.lng], {
         icon: createUserIcon(isManualUserPosition),
         title: 'Ваше местоположение',
-      }).addTo(routeLayer)
+        zIndexOffset: 2000,
+      }).addTo(layer)
     }
-  }, [draftGeometry, guideGeometry, isManualUserPosition, userPosition])
+  }, [isManualUserPosition, userPosition])
 
   // Markers layer: POI markers — DIFFED on each update instead of clear+rebuild.
   // For 100-200 markers, recreating all DOM nodes on every nearbyPoints change
