@@ -107,6 +107,7 @@
   position: absolute;
   top: -7px;
   right: -7px;
+  z-index: 2;
   display: grid;
   width: 16px;
   height: 16px;
