@@ -277,7 +277,7 @@ export function DiscoveryMap({
       }
     })
     return extras.length > 0 ? [...nearbyPoints, ...extras] : nearbyPoints
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [nearbyPoints, routeTargetId, visibleDraftPointIds])
 
   const guidedPoint =

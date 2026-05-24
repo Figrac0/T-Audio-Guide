@@ -11,9 +11,16 @@ export function useAudioGuide(currentStop: RouteStop, currentStopIndex: number) 
   const isAudioAvailable = hasAudioGuideAvailable(currentStop.audio)
   const isAudioPlaying = playingStopIndex === currentStopIndex
 
+  // Reset duration synchronously when the audio source changes — done during
+  // render (not in an effect) so React skips committing the stale value.
+  const [trackedAudioUrl, setTrackedAudioUrl] = useState(audioUrl)
+  if (audioUrl !== trackedAudioUrl) {
+    setTrackedAudioUrl(audioUrl)
+    setLoadedDurationSeconds(null)
+  }
+
   // Preload audio metadata to get real duration without downloading the full file.
   useEffect(() => {
-    setLoadedDurationSeconds(null)
     if (!audioUrl) return
     const meta = new Audio()
     meta.preload = 'metadata'

@@ -377,6 +377,7 @@ export function ExcursionsPage() {
     sheet.style.transform = `translateY(${safe}px)`
     sheetTranslateRef.current = safe
     setSheetTranslate(safe)
+    if (safe < closedTranslateRef.current - 8) setIsSearchOpen(false)
   }, [])
 
   const animateSheetPosition = useCallback((nextTranslate: number, durationMs = SHEET_SNAP_DURATION_MS) => {
@@ -398,6 +399,7 @@ export function ExcursionsPage() {
     sheet.style.transform = `translateY(${safe}px)`
     sheetTranslateRef.current = safe
     setSheetTranslate(safe)
+    if (safe < closedTranslateRef.current - 8) setIsSearchOpen(false)
     const animationVersion = animationVersionRef.current + 1
     animationVersionRef.current = animationVersion
     const clear = () => {
@@ -519,16 +521,20 @@ export function ExcursionsPage() {
     return () => window.removeEventListener('app-menu-open', snapToClosed)
   }, [snapToClosed])
 
+  // Close search synchronously on transition to fully-open — done during render
+  // so React skips the cascading commit.
+  const [trackedIsFullyOpen, setTrackedIsFullyOpen] = useState(isFullyOpen)
+  if (isFullyOpen !== trackedIsFullyOpen) {
+    setTrackedIsFullyOpen(isFullyOpen)
+    if (isFullyOpen) setIsSearchOpen(false)
+  }
+
   useEffect(() => {
     if (isFullyOpen) {
       window.dispatchEvent(new CustomEvent('app-sheet-open'))
-      setIsSearchOpen(false)
     }
   }, [isFullyOpen])
 
-  useEffect(() => {
-    if (sheetTranslate < closedTranslateRef.current - 8) setIsSearchOpen(false)
-  }, [sheetTranslate])
 
   useEffect(() => {
     handleCloseDetailRef.current = state.handleCloseDetail
