@@ -558,6 +558,7 @@
     line-height: 1.55;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
+    line-clamp: 3;
 }
 
 .ep-stop-card__audio {
@@ -1130,6 +1131,7 @@ body.app-body--excursion-nav {
     overflow: hidden;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
+    line-clamp: 3;
 }
 
 .ep-nav__audio-actions {

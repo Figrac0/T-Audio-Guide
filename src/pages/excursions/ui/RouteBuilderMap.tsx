@@ -173,15 +173,36 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
   const prevUserPositionRef = useRef<GeoPoint | null>(null)
   const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isRadiusLockedRef = useRef(isRadiusLocked)
-  isRadiusLockedRef.current = isRadiusLocked
-  const pointCacheRef = useRef<Map<string, NearbyPoint>>(new Map())
+  // Keep the ref in sync with the prop via an effect — writing during render
+  // is disallowed by react-hooks/refs.
+  useEffect(() => {
+    isRadiusLockedRef.current = isRadiusLocked
+  }, [isRadiusLocked])
   const initialCenterRef = useRef(initialCenter ?? userPosition ?? appMapConfig.defaultCenter)
   const [clusterVersion, setClusterVersion] = useState(0)
 
-  // Update cache during render so the useMemo below reads current data
-  for (const p of nearbyPoints) {
-    pointCacheRef.current.set(p.id, p)
-  }
+  // Point cache — remembers previously seen NearbyPoints so draft stops that
+  // leave the radius (and disappear from nearbyPoints) can still be rendered.
+  // Stored as state so useMemo can read it without violating react-hooks/refs;
+  // mirrored on a ref so effects/handlers (e.g. the marker-icon effect below)
+  // get synchronous access to the latest value.
+  const [pointCache, setPointCache] = useState<Map<string, NearbyPoint>>(() => new Map())
+  const pointCacheRef = useRef(pointCache)
+
+  useEffect(() => {
+    let changed = false
+    const next = new Map(pointCacheRef.current)
+    for (const p of nearbyPoints) {
+      if (next.get(p.id) !== p) {
+        next.set(p.id, p)
+        changed = true
+      }
+    }
+    if (changed) {
+      pointCacheRef.current = next
+      setPointCache(next)
+    }
+  }, [nearbyPoints])
 
   // Effective points: API nearbyPoints + draft stops that have left the radius.
   // Used by ALL effects (markers, clustering, selection) so pinned markers stay
@@ -191,13 +212,12 @@ export const RouteBuilderMap = forwardRef<RouteBuilderMapHandle, RouteBuilderMap
     const extras: NearbyPoint[] = []
     draftPointOrders.forEach((_, pointId) => {
       if (!nearbyIds.has(pointId)) {
-        const cached = pointCacheRef.current.get(pointId)
+        const cached = pointCache.get(pointId)
         if (cached) extras.push(cached)
       }
     })
     return extras.length > 0 ? [...nearbyPoints, ...extras] : nearbyPoints
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nearbyPoints, draftPointOrders])
+  }, [nearbyPoints, draftPointOrders, pointCache])
 
   useImperativeHandle(ref, () => ({
     closePopup: () => { mapRef.current?.closePopup() },
